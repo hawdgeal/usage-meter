@@ -36,6 +36,12 @@
       return;
     }
     const r = el.getBoundingClientRect();
+    if ((r.width === 0 || r.height === 0) && el.children.length) {
+      // A zero-size box can still show overflowing children: record it and keep going.
+      lines.push(`${'  '.repeat(depth)}${label(el)} zero-size kids=${visibleKids(el).length} clickables=${el.querySelectorAll(CLICKABLE).length}`);
+      [...el.children].forEach((k) => walk(k, depth + 1));
+      return;
+    }
     if (r.width < 40 || r.height < 16) return;
     lines.push(`${'  '.repeat(depth)}${label(el)} @${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}x${Math.round(r.height)} kids=${visibleKids(el).length} clickables=${el.querySelectorAll(CLICKABLE).length}`);
     if (el.matches(CLICKABLE)) return;
