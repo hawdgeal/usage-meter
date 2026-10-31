@@ -1391,6 +1391,19 @@
     if(observedFooter!==before){footerResizeObserver.disconnect();if(before)footerResizeObserver.observe(before);observedFooter=before;}
     const available=Math.max(80,Math.min(innerHeight,r.height||innerHeight)-(reserve||(footer?.height||0))-100-spacingValues(state.compact?'compact':'normal','outer')[0]-spacingValues(state.compact?'compact':'normal','outer')[2]);
     card.style.maxHeight=Math.min(available,innerHeight*.6)+'px';
+    alignToSidebar(nav);
+  }
+  // Claude's sidebar column pads its contents, which doubled the panel's side margins. Stretch the
+  // docked panel to the column's edges so only the panel's own margin remains, as on ChatGPT.
+  function alignToSidebar(nav){
+    const docked=IS_CLAUDE&&nav&&!host.hasAttribute('data-floating')&&!host.hasAttribute('data-sidebar-hidden');
+    if(!docked){if(host.style.marginLeft||host.style.marginRight){host.style.marginLeft='';host.style.marginRight='';}return;}
+    const n=nav.getBoundingClientRect(),h=host.getBoundingClientRect();
+    const left=parseFloat(host.style.marginLeft)||0,right=parseFloat(host.style.marginRight)||0;
+    const nextLeft=Math.min(0,left-(h.left-n.left)),nextRight=Math.min(0,right-(n.right-h.right));
+    const l=Math.abs(nextLeft)<0.5?'':nextLeft+'px',r=Math.abs(nextRight)<0.5?'':nextRight+'px';
+    if(host.style.marginLeft!==l)host.style.marginLeft=l;
+    if(host.style.marginRight!==r)host.style.marginRight=r;
   }
 
   function syncHeading(nav){
@@ -1426,7 +1439,7 @@
       const kids=[...nav.children].filter(c=>c!==host), before=kids[1]||null;
       if(host.parentElement!==nav||host.nextElementSibling!==before)nav.insertBefore(host,before);
     }
-    positionSettings();
+    alignToSidebar(nav);positionSettings();
   }
   let bottomFrame=0;
   function queueBottom(){if(state.position!=='floating'&&!bottomFrame)bottomFrame=requestAnimationFrame(()=>{bottomFrame=0;place(false);});}
