@@ -372,58 +372,58 @@
   const endDrag=()=>{if(drag?.started){persist();if(settingsOpen)renderSettings();}drag=null;};
   window.addEventListener('pointerup',endDrag);window.addEventListener('pointercancel',endDrag);window.addEventListener('blur',endDrag);
   $('.grab').addEventListener('keydown',e=>{if(e.key==='Escape'){state.position='top';persist();place(true);if(settingsOpen)renderSettings();return;}if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key))return;e.preventDefault();if(state.position!=='floating'){const r=host.getBoundingClientRect();state.floating={x:r.left,y:r.top};state.position='floating';}const step=e.shiftKey?30:10;state.floating.x+=e.key==='ArrowRight'?step:e.key==='ArrowLeft'?-step:0;state.floating.y+=e.key==='ArrowDown'?step:e.key==='ArrowUp'?-step:0;place(false);persist();if(settingsOpen)renderSettings();});
-  function findSidebarNav(){for(const selector of ['#stage-slideover-sidebar nav','nav[aria-label="Chat history"]','[data-testid="sidebar"] nav','nav'])for(const el of document.querySelectorAll(selector)){const r=el.getBoundingClientRect();if(r.width>120&&r.height>(selector==='nav'?160:40)&&r.left>=0&&r.left<innerWidth/2&&r.right>100&&getComputedStyle(el).visibility!=='hidden')return el;}return null;}
-
+  function isVisibleElement(el) {
+    const r=el.getBoundingClientRect();
+    if(r.width<=0||r.height<=0||r.right<=0||r.bottom<=0||r.left>=innerWidth||r.top>=innerHeight)return false;
+    for(let node=el;node&&node!==document.body;node=node.parentElement){
+      const style=getComputedStyle(node);
+      if(style.display==='none'||style.visibility==='hidden'||Number(style.opacity)===0||node.hidden||node.getAttribute('aria-hidden')==='true'||node.hasAttribute('inert'))return false;
+    }
+    return true;
+  }
+  function findSidebarNav(){
+    for(const selector of ['nav[aria-label="Chat history"]','#stage-slideover-sidebar nav','[data-testid="sidebar"] nav','nav']){
+      for(const el of document.querySelectorAll(selector)){
+        const r=el.getBoundingClientRect();
+        if(el.getAttribute('aria-label')!=='Show sidebar'&&r.width>120&&r.height>(selector==='nav'?160:40)&&r.left>=0&&r.left<innerWidth/2&&isVisibleElement(el))return el;
+      }
+    }
+    return null;
+  }
   function bottomTarget(nav) {
-    // The account footer can live outside the history nav, below its scroll area.
     let container=nav;
     for(let i=0;i<6&&container.parentElement&&container.parentElement!==document.body;i++){
-      const parent=container.parentElement, r=parent.getBoundingClientRect();
+      const parent=container.parentElement,r=parent.getBoundingClientRect();
       if(r.width>520||r.left>innerWidth/2)break;
       container=parent;
-      if(container.matches('#stage-slideover-sidebar,[data-testid="sidebar"],aside'))break;
+      if(container.matches('#app-shell-sidebar,#stage-slideover-sidebar,[data-testid="sidebar"],aside'))break;
     }
-    // Prefer the exact profile control; the absolute button itself is an overlay
-    // inside the account row, so insert beside its containing footer branch.
-    // ChatGPT also renders a profile button in the hidden collapsed rail; only use visible ones,
-    // preferring one inside the history nav's own panel.
-    const shown=el=>{const r=el.getBoundingClientRect();return r.width>0&&r.height>0&&getComputedStyle(el).visibility!=='hidden';};
-    const pick=sel=>{const all=[...container.querySelectorAll(sel)].filter(shown);return all.find(el=>nav.contains(el))||all.find(el=>nav.parentElement?.contains(el))||all[0]||null;};
-    const account=pick('button[aria-label="Open profile menu"]')||pick('[data-testid="accounts-profile-button"], [data-testid="user-menu-button"], [data-testid="profile-button"]')||pick('footer');
+    const selectors=['button[aria-label="Open profile menu"]','[data-testid="accounts-profile-button"], [data-testid="user-menu-button"], [data-testid="profile-button"]','footer'];
+    // The collapsed rail and expanded sidebar coexist. Search the active history
+    // nav first, and reject hidden duplicate profile controls in every search.
+    let account=null;
+    for(const scope of [nav,container]){
+      for(const selector of selectors){
+        account=[...scope.querySelectorAll(selector)].find(el=>!host.contains(el)&&isVisibleElement(el));
+        if(account)break;
+      }
+      if(account)break;
+    }
     if(account){
       let parent=nav;
       while(parent&&!parent.contains(account))parent=parent.parentElement;
       if(parent&&parent!==document.body){
-        const branchOf=par=>{let b=account;while(b.parentElement!==par)b=b.parentElement;return b;};
-        let before=branchOf(parent);
-        // Step into tall wrappers (e.g. the scrolling history list) until the branch is the footer itself.
-        while(before!==account&&before.getBoundingClientRect().height>200&&before.contains(account)&&before!==account.parentElement){parent=before;before=branchOf(parent);}
+        let before=account;
+        while(before.parentElement!==parent)before=before.parentElement;
         return {container,parent,before,account};
       }
     }
     return {container,parent:nav,before:null,account:null};
   }
-  function opaqueBackground(el){
-    for(;el&&el!==document.documentElement;el=el.parentElement){const c=getComputedStyle(el).backgroundColor;if(c&&c!=='transparent'&&!/rgba\([^)]*,\s*0\)$/.test(c))return c;}
-    return getComputedStyle(document.body).backgroundColor||'';
-  }
-  function clearSticky(){host.style.position='';host.style.bottom='';host.style.zIndex='';host.style.background='';}
   function layoutBottom(nav=findSidebarNav()) {
     if(!nav||!host.hasAttribute('data-bottom'))return;
     const {parent,before}=bottomTarget(nav);
     if(host.parentElement!==parent||host.nextElementSibling!==before)parent.insertBefore(host,before);
-    // When the footer lives inside the scrolling history list, a plain insert puts the
-    // panel after every chat. Pin it above the footer so it stays docked while scrolling.
-    const scrolls=/(auto|scroll|overlay)/.test(getComputedStyle(parent).overflowY);
-    if(scrolls){
-      const fs=before?getComputedStyle(before):null;
-      const footerSticky=fs&&fs.position==='sticky';
-      const offset=footerSticky?before.getBoundingClientRect().height+(parseFloat(fs.bottom)||0):0;
-      host.style.position='sticky';
-      host.style.bottom=offset+'px';
-      host.style.zIndex=footerSticky&&fs.zIndex!=='auto'?fs.zIndex:'1';
-      host.style.background=opaqueBackground(before||parent);
-    }else clearSticky();
     const r=parent.getBoundingClientRect(), account=before?.getBoundingClientRect();
     // Limit the panel's own height, leaving the account and history room in the layout.
     const available=Math.max(100,Math.min(innerHeight,r.height||innerHeight)-(account?.height||0)-100);
@@ -431,11 +431,10 @@
   }
   function place(force){
     const nav=findSidebarNav(), floating=state.position==='floating'||!nav, bottom=!floating&&state.position==='bottom';
-    if(nav&&observedSidebar!==nav){sidebarResizeObserver.disconnect();sidebarResizeObserver.observe(nav);const {container}=bottomTarget(nav);if(container!==nav)sidebarResizeObserver.observe(container);sidebarAttributes.disconnect();sidebarAttributes.observe(container,{attributes:true,attributeFilter:['class','style','hidden']});observedSidebar=nav;}
+    if(nav&&observedSidebar!==nav){sidebarResizeObserver.disconnect();sidebarResizeObserver.observe(nav);const {container}=bottomTarget(nav);if(container!==nav)sidebarResizeObserver.observe(container);sidebarAttributes.disconnect();sidebarAttributes.observe(container,{attributes:true,subtree:true,attributeFilter:['class','style','hidden','aria-hidden','inert']});observedSidebar=nav;}
     host.toggleAttribute('data-floating',floating);host.toggleAttribute('data-bottom',bottom);
     applySize();
-    host.style.left='';host.style.top='';
-    if(!bottom)clearSticky();
+    host.style.bottom='';host.style.left='';host.style.top='';
     if(floating){if(host.parentElement!==document.body)document.body.appendChild(host);clampFloat();}
     else if(bottom){
       layoutBottom(nav);
@@ -451,7 +450,7 @@
   document.addEventListener('scroll',queueBottom,true);
   let observedSidebar=null;
   const sidebarResizeObserver=new ResizeObserver(queueBottom);
-  const sidebarAttributes=new MutationObserver(queueBottom);
+  const sidebarAttributes=new MutationObserver(records=>{if(records.some(r=>r.target!==host&&!host.contains(r.target)))queueBottom();});
   const panelResizeObserver=new ResizeObserver(queueBottom);panelResizeObserver.observe(card);
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyTheme);
 
