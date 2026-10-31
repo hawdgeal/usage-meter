@@ -2,25 +2,37 @@
   "manifest_version": 3,
   "name": "ChatGPT Usage Meter",
   "short_name": "GPT Usage",
-  "version": "0.1.0",
-  "description": "Shows your ChatGPT / Codex plan usage, credits and per-model limits in ChatGPT's sidebar.",
+  "version": "0.2.0",
+  "description": "Customizable, draggable ChatGPT sidebar usage meter with persistent collapsible sections and dark/light themes.",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "permissions": ["storage"],
-  "host_permissions": ["https://chatgpt.com/*"],
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://chatgpt.com/*"
+  ],
   "content_scripts": [
     {
-      "matches": ["https://chatgpt.com/*"],
-      "js": ["page-hook.js"],
+      "matches": [
+        "https://chatgpt.com/*"
+      ],
+      "js": [
+        "page-hook.js"
+      ],
       "run_at": "document_start",
       "world": "MAIN"
     },
     {
-      "matches": ["https://chatgpt.com/*"],
-      "js": ["content.js"],
+      "matches": [
+        "https://chatgpt.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_idle"
     }
   ],
@@ -29,5 +41,15 @@
       "id": "chatgpt-usage-meter@alencar.fr",
       "strict_min_version": "128.0"
     }
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "meter.css"
+      ],
+      "matches": [
+        "https://chatgpt.com/*"
+      ]
+    }
+  ]
 }
