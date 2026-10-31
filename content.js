@@ -10,11 +10,11 @@
   const THEME_FAMILIES=[...new Set(THEME_PRESETS.map(p=>p.family))].sort((a,b)=>a.localeCompare(b));
   const SETTINGS_TABS={panel:'General',modules:'Modules',appearance:'Appearance',spacing:'Spacing'};
   const SPACING_AREAS={
-    outer:{label:'Outside frame',selector:'.panel-layout',kind:'padding',normal:[6,0,6,0]},
+    outer:{label:'Frame margins (outside)',selector:'.panel-layout',kind:'padding',normal:[6,0,0,0]},
     frame:{label:'Inside frame',selector:'',kind:'padding',normal:[6,0,6,0]},
     header:{label:'Usage header',selector:'.head',kind:'padding',normal:[5,6,5,6]},
     status:{label:'Update time & Details',selector:'.foot',kind:'padding',normal:[7,24,9,12],compact:[4,22,5,9]},
-    headerStatus:{label:'Header update time & Details',selector:'.head-status.foot',kind:'padding',normal:[0,0,0,0]},
+    headerStatus:{label:'Header update time',selector:'.head-status.foot',kind:'padding',normal:[0,0,0,0]},
     statusButton:{label:'Details button',selector:'.foot .text-btn',kind:'padding',normal:[3,3,3,3]},
     summary:{label:'Collapsed summary',selector:'.summary',kind:'padding',normal:[0,12,8,12],compact:[0,9,5,9]},
     plan:{label:'Plan limits module',selector:'[data-section="plan"]',kind:'margin',normal:[0,10,0,10],compact:[0,8,0,8]},
@@ -245,13 +245,12 @@
     .head-title-row .usage-open { flex:0 1 auto; }
     .head-title-row>.collapse-panel { flex:none; }
     .head-status-slot { display:contents; }
-    .head.has-header-status { flex-wrap:wrap; justify-content:flex-end; row-gap:0; }
-    .head.has-header-status .head-title-row { display:flex; align-items:center; flex:1 1 0; min-width:min-content; max-width:100%; flex-wrap:nowrap; gap:2px; }
-    .head.has-header-status>.refresh,.head.has-header-status>.customize { order:2; }
-    .head.has-header-status .usage-open { flex:0 1 auto; }
-    .head-status.foot { flex:0 1 auto; margin-left:4px; gap:4px; font-size:9px; line-height:1.25; max-width:100%; flex-wrap:wrap; }
-    .head-status .updated-at { white-space:nowrap; }
-    .head-status .text-btn { font-size:9px; }
+    .head.has-header-status { flex-wrap:nowrap; }
+    .head.has-header-status .head-title-row { flex:1 1 0; min-width:0; flex-wrap:nowrap; overflow:hidden; }
+    .head.has-header-status .usage-open { flex:0 0 auto; gap:5px; }
+    .head.has-header-status .collapse-panel { width:20px; }
+    .head-status.foot { flex:1 1 0; min-width:0; margin-left:2px; gap:0; font-size:9px; line-height:1.25; flex-wrap:nowrap; overflow:hidden; }
+    .head-status .updated-at { display:block; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .head { flex-shrink:0; display:flex; align-items:center; gap:3px; padding:5px 6px; min-height:38px; }
     .icon { width:28px; height:28px; display:inline-flex; align-items:center; justify-content:center; border-radius:7px; flex-shrink:0; color:var(--muted); }
     .grab { cursor:grab; touch-action:none; }
@@ -625,7 +624,8 @@
     const scroll=$('.body').scrollTop;
     const focused=root.activeElement?.dataset;
     const rawFocused=root.activeElement?.classList.contains('raw');
-    const footer=state.showUpdateTime||state.showDetails?`<div class="foot ${state.footerPosition==='header'?'head-status':''}">${state.showUpdateTime?`<span class="updated-at">Updated ${fmtAgo(state.usageAt)}</span>`:''}${state.showDetails?`<button class="text-btn raw" aria-expanded="${state.showRaw}">${state.showRaw?'Hide data':'Details'}</button>`:''}</div>`:'';
+    const inHeader=state.footerPosition==='header';
+    const footer=state.showUpdateTime||(!inHeader&&state.showDetails)?`<div class="foot ${inHeader?'head-status':''}">${state.showUpdateTime?`<span class="updated-at" title="Updated ${esc(fmtAgo(state.usageAt))}">${inHeader?'':'Updated '}${fmtAgo(state.usageAt)}</span>`:''}${!inHeader&&state.showDetails?`<button class="text-btn raw" aria-expanded="${state.showRaw}">${state.showRaw?'Hide data':'Details'}</button>`:''}</div>`:'';
     $('.head-status-slot').innerHTML=state.footerPosition==='header'?footer:'';
     $('.head').classList.toggle('has-header-status',state.footerPosition==='header'&&!!footer);
     $('.body').innerHTML=(state.footerPosition==='top'?footer:'')+state.sections.filter(k=>!state.hidden[k]).map(k=>`<section class="section" data-section="${k}"><div class="section-head"><button class="section-toggle" data-collapse="${k}" aria-expanded="${!state.closed[k]}" aria-controls="gptu-${k}">${icon(k)}<span>${labels[k]}</span>${k==='credits'&&state.closed.credits?`<span class="credit-inline">${esc(creditText)}</span>`:''}${icon('chevron')}</button><button class="icon section-handle" draggable="true" data-handle="${k}" aria-label="Reorder ${labels[k]}" title="Drag to reorder · ↑ / ↓">${icon('grip')}</button></div><div class="section-content" id="gptu-${k}" ${state.closed[k]?'hidden':''}>${blocks[k]}</div></section>`).join('')+
@@ -1005,6 +1005,10 @@
       ${hoverHidden}
       .card[data-hover-frame]:not(:hover):not(:has(:focus-visible)){border-color:transparent;box-shadow:none;}
       .card[data-hover-float]:not(:hover):not(:has(:focus-visible)) .head .grab{width:0;min-width:0;margin-right:-3px;overflow:hidden;}
+      .card[data-hover-updated]:not(:hover):not(:has(:focus-visible)) .head-status.foot{flex:0 0 0;width:0;margin:0;padding:0;}
+      .card[data-hover-collapse]:not(:hover):not(:has(:focus-visible)) .head .collapse-panel{width:0;min-width:0;margin-right:-2px;overflow:hidden;}
+      .card[data-hover-refresh]:not(:hover):not(:has(:focus-visible)) .head>.refresh,
+      :host(:not([data-settings-open])) .card[data-hover-customize]:not(:hover):not(:has(:focus-visible)) .head>.customize{width:0;min-width:0;margin-right:-3px;overflow:hidden;}
       .card[data-hover-scrollbar]:not(:hover):not(:has(:focus-visible)) .body{scrollbar-color:transparent transparent;}
       .card[data-hover-scrollbar]:not(:hover):not(:has(:focus-visible)) .body::-webkit-scrollbar-thumb{background:transparent;}
     }

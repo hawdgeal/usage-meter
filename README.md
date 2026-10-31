@@ -6,7 +6,7 @@ A browser extension that adds a **Usage** card to ChatGPT's left sidebar, showin
 - **Credits** — your pay-as-you-go usage-credit balance, or "Unlimited".
 - **Model & feature limits** — remaining messages/uses per model or feature (Deep Research, image generation…), captured whenever ChatGPT reports them.
 
-## Panel controls (0.3.22)
+## Panel controls (0.3.23)
 
 - The settings window has a lower-right resize handle. Its size is saved separately from the Usage panel; resizing fixes its current position. Double-click the handle or press Home while it is focused to restore automatic sizing.
 
@@ -18,6 +18,8 @@ A browser extension that adds a **Usage** card to ChatGPT's left sidebar, showin
 - Drag the settings title bar or its move handle to reposition the window. The position is saved and clamped to the viewport. Double-click the title to reattach it beside Customize; arrow keys move the focused handle and Home resets its position.
 
 - **Theme preset, Mode, Accent color, and Contrast** default to following ChatGPT and update with native theme changes. The theme picker contains ChatGPT and 27 Codex theme families, with their available light/dark variants. Manual controls also include System/Light/Dark mode, Default/Blue/Green/Yellow/Pink/Orange/Purple/Black–White accents, and System/Medium/Increased contrast. Preset palettes are adapted from Codex Palette; native application-shell colors can differ. Choices are saved independently. Native matching uses the page’s rendered sidebar and available color tokens, with a blue fallback when no accent is exposed. See THIRD-PARTY-NOTICES.txt for palette licensing.
+- **Spacing → Panel & header → Frame margins (outside)** controls the gap around the visible frame, including the gap above your profile. Bottom defaults to zero; Inside frame controls content padding separately. Explicit saved margins are preserved.
+
 - **Spacing** has separate normal/compact profiles and independent top/right/bottom/left controls for the outside and inside frame, Usage header, status row, collapsed summary, each module, headings, content, items, balance, credits actions, bars, captions, and expanded Details. Changes are saved and applied live; each profile can reset independently. Existing frame margins migrate automatically.
 - **Show available balance** in Modules → Credits can hide the numeric balance and caption while the remaining bar is enabled. When the larger balance display is hidden, the available amount appears beside the meter percentage. The choice is saved; turning the bar off always restores the larger balance. In compact mode, Add credits sits beside the remaining meter.
 - **Show credit balance bar** in Modules → Credits adds a blue remaining-balance bar with a percentage. **Full balance** defines 100%; it initially captures your current balance when enabled and is editable. The reference is saved and does not reset as credits are spent or added. Balances above the reference show more than 100%, with a full bar.
@@ -28,9 +30,9 @@ A browser extension that adds a **Usage** card to ChatGPT's left sidebar, showin
 - **Models & features to show** in settings lets you toggle individual counters (Deep Research, File uploads, Paste text to file, Image generation, and reported models). These choices are saved separately from the whole module switch. Hiding a counter keeps its cached data and does not affect your account limits. Counters still require data reported by ChatGPT.
 - **Show update time** and **Show Details button** in General → Update time & Details independently control visibility. Turning both off removes the status row and its spacing.
 
-- **General → Update time & Details → Status position** offers **Next to Usage** (between the title and Refresh), **Above modules** (default), and **Below modules**. Header placement shares the title row and wraps action icons when space is tight. Header spacing has its own control in Spacing → Update time & summary.
+- **General → Update time & Details → Status position** offers **Next to Usage** (between the title and Refresh), **Above modules** (default), and **Below modules**. Header placement shows only the short timestamp (for example, “just now”); Details is omitted. The header stays on one line, truncating the timestamp before moving action buttons. Header spacing has its own control in Spacing → Update time & summary.
 - The Usage panel scrollbar appears on hover or keyboard focus, with its space reserved to avoid text shifting. Settings retain a normal scrollbar.
-- Drag, refresh, customize, reorder, collapse arrows, update time, and Details appear on panel hover or keyboard focus. Touch devices keep controls visible. Hidden controls retain their space so rows do not jump.
+- Drag, refresh, customize, reorder, collapse arrows, update time, and Details appear on panel hover or keyboard focus. Touch devices keep controls visible. Hover-hidden header controls and the header timestamp release their space; module rows retain theirs.
 - Compact plan limits use responsive columns with short reset captions. Hover or focus a limit for its full status and reset time. Narrow panels stack them automatically.
 - **Compact mode** in settings uses tighter spacing, smaller icons and a shorter credit display while retaining readable text. The Usage heading uses the same sidebar-sized text and usage icon in both modes, aligned with the sidebar margin. It fits the content automatically instead of retaining an oversized panel height, and remembers your preference. Turn it off to restore your previous size.
 - Bottom mode removes footer-sized padding or margins from the history scroll area to avoid leaving unused space above Usage. Those page styles are restored in other placements.
