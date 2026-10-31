@@ -397,10 +397,27 @@
     }
     return {container,parent:nav,before:null,account:null};
   }
+  function opaqueBackground(el){
+    for(;el&&el!==document.documentElement;el=el.parentElement){const c=getComputedStyle(el).backgroundColor;if(c&&c!=='transparent'&&!/rgba\([^)]*,\s*0\)$/.test(c))return c;}
+    return getComputedStyle(document.body).backgroundColor||'';
+  }
+  function clearSticky(){host.style.position='';host.style.bottom='';host.style.zIndex='';host.style.background='';}
   function layoutBottom(nav=findSidebarNav()) {
     if(!nav||!host.hasAttribute('data-bottom'))return;
     const {parent,before}=bottomTarget(nav);
     if(host.parentElement!==parent||host.nextElementSibling!==before)parent.insertBefore(host,before);
+    // When the footer lives inside the scrolling history list, a plain insert puts the
+    // panel after every chat. Pin it above the footer so it stays docked while scrolling.
+    const scrolls=/(auto|scroll|overlay)/.test(getComputedStyle(parent).overflowY);
+    if(scrolls){
+      const fs=before?getComputedStyle(before):null;
+      const footerSticky=fs&&fs.position==='sticky';
+      const offset=footerSticky?before.getBoundingClientRect().height+(parseFloat(fs.bottom)||0):0;
+      host.style.position='sticky';
+      host.style.bottom=offset+'px';
+      host.style.zIndex=footerSticky&&fs.zIndex!=='auto'?fs.zIndex:'1';
+      host.style.background=opaqueBackground(before||parent);
+    }else clearSticky();
     const r=parent.getBoundingClientRect(), account=before?.getBoundingClientRect();
     // Limit the panel's own height, leaving the account and history room in the layout.
     const available=Math.max(100,Math.min(innerHeight,r.height||innerHeight)-(account?.height||0)-100);
@@ -411,7 +428,8 @@
     if(nav&&observedSidebar!==nav){sidebarResizeObserver.disconnect();sidebarResizeObserver.observe(nav);const {container}=bottomTarget(nav);if(container!==nav)sidebarResizeObserver.observe(container);sidebarAttributes.disconnect();sidebarAttributes.observe(container,{attributes:true,attributeFilter:['class','style','hidden']});observedSidebar=nav;}
     host.toggleAttribute('data-floating',floating);host.toggleAttribute('data-bottom',bottom);
     applySize();
-    host.style.bottom='';host.style.left='';host.style.top='';
+    host.style.left='';host.style.top='';
+    if(!bottom)clearSticky();
     if(floating){if(host.parentElement!==document.body)document.body.appendChild(host);clampFloat();}
     else if(bottom){
       layoutBottom(nav);
