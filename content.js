@@ -817,21 +817,45 @@
   }
   // Claude opens settings as its own modal with a settings sidebar. Inside our dialog, keep only
   // the settings content pane: hide everything that is not on the path from it to <html>.
+  const GPTU_MARKS=['data-gptu-hidden','data-gptu-path','data-gptu-content'];
+  function clearEmbeddedMarks(doc){
+    for(const el of doc.querySelectorAll('[data-gptu-hidden],[data-gptu-path],[data-gptu-content]'))for(const a of GPTU_MARKS)el.removeAttribute(a);
+    doc.documentElement.removeAttribute('data-gptu-isolated');
+  }
+  // Settings use two columns: a narrow menu of sections on the left and the content pane beside it.
+  // Find that pair by layout, so it works whatever the menu items are made of and in any language.
+  function findSettingsContent(doc){
+    const box=el=>el.getBoundingClientRect();
+    const scope=[...doc.querySelectorAll('[role="dialog"],dialog')].find(d=>{const r=box(d);return r.width>300&&r.height>200;})||doc.body;
+    const sr=box(scope);
+    const clickables=el=>el.querySelectorAll('a[href],button,[role="link"],[role="tab"],[role="menuitem"],[role="option"]').length;
+    let best=null,bestArea=0;
+    for(const parent of [scope,...scope.querySelectorAll('*')]){
+      const kids=[...parent.children].filter(k=>{const r=box(k);return r.width>0&&r.height>0;});
+      if(kids.length<2)continue;
+      const pr=box(parent);
+      if(pr.height<sr.height*0.4||pr.width<sr.width*0.5)continue;
+      for(const menu of kids){
+        const m=box(menu);
+        if(m.height<pr.height*0.5||clickables(menu)<4)continue;
+        for(const pane of kids){
+          if(pane===menu)continue;
+          const c=box(pane),area=c.width*c.height;
+          if(m.right<=c.left+2&&m.width<c.width&&c.height>=pr.height*0.5&&area>bestArea){best=pane;bestArea=area;}
+        }
+      }
+    }
+    return best;
+  }
   function isolateEmbeddedContent(doc){
     try{
-      const links=[...doc.querySelectorAll('a[href*="/settings/"]')];
-      if(!links.length||!doc.body)return false;
-      const scope=links[0].closest('[role="dialog"],dialog')||doc.body;
-      const hasNav=el=>links.some(a=>el.contains(a));
-      const sr=scope.getBoundingClientRect(),minArea=sr.width*sr.height*0.2;
-      let best=null,bestArea=0;
-      for(const el of scope.querySelectorAll('div,main,section,article')){
-        if(hasNav(el))continue;
-        const r=el.getBoundingClientRect(),area=r.width*r.height;
-        if(area>bestArea&&area>=minArea&&(el.textContent||'').trim().length>20){best=el;bestArea=area;}
-      }
+      if(!doc.body)return false;
+      // Keep the pane found earlier while it is still in the page: once the menu is hidden it has no
+      // size, so detecting again would find nothing (or the wrong pane).
+      let best=doc.querySelector('[data-gptu-content]');
+      if(!best?.isConnected){clearEmbeddedMarks(doc);best=findSettingsContent(doc);}
       if(!best)return false;
-      for(const el of doc.querySelectorAll('[data-gptu-hidden],[data-gptu-path],[data-gptu-content]'))for(const a of ['data-gptu-hidden','data-gptu-path','data-gptu-content'])el.removeAttribute(a);
+      for(const el of doc.querySelectorAll('[data-gptu-hidden],[data-gptu-path]'))for(const a of ['data-gptu-hidden','data-gptu-path'])el.removeAttribute(a);
       for(let el=best;el&&el!==doc.documentElement;el=el.parentElement){
         for(const sib of el.parentElement?.children||[])if(sib!==el&&!['SCRIPT','STYLE','LINK','META','TEMPLATE'].includes(sib.tagName))sib.setAttribute('data-gptu-hidden','');
         if(el!==best&&el!==doc.body)el.setAttribute('data-gptu-path','');
