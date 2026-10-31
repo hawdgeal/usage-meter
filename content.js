@@ -8,9 +8,9 @@
 
   const THEME_PRESETS=[{"id":"ayu-dark","family":"Ayu","type":"dark","surface":"#0d1017","hover":"#47526640","border":"#1b1f29","fg":"#bfbdb6","muted":"#5a6673","accent":"#e6b450"},{"id":"catppuccin-mocha","family":"Catppuccin","type":"dark","surface":"#181825","hover":"#31324480","border":"#585b70","fg":"#cdd6f4","muted":"#9399b2","accent":"#cba6f7"},{"id":"catppuccin-latte","family":"Catppuccin","type":"light","surface":"#e6e9ef","hover":"#ccd0da80","border":"#acb0be","fg":"#4c4f69","muted":"#7c7f93","accent":"#8839ef"},{"id":"absolutely-dark","family":"Absolutely","type":"dark","surface":"#373735","hover":"#373735","border":"#ffffff22","fg":"#f9f9f7","muted":"#b2b2b0","accent":"#cc7d5e"},{"id":"absolutely-light","family":"Absolutely","type":"light","surface":"#f4f4f2","hover":"#f4f4f2","border":"#00000022","fg":"#2d2d2b","muted":"#8e8e8c","accent":"#c27759"},{"id":"dracula","family":"Dracula","type":"dark","surface":"#21222C","hover":"#44475A75","border":"#BD93F9","fg":"#F8F8F2","muted":"#6272A4","accent":"#737583"},{"id":"everforest-dark","family":"Everforest","type":"dark","surface":"#2d353b","hover":"#2d353b00","border":"#2d353b","fg":"#d3c6aa","muted":"#859289","accent":"#a7c080"},{"id":"everforest-light","family":"Everforest","type":"light","surface":"#fdf6e3","hover":"#fdf6e300","border":"#fdf6e3","fg":"#5c6a72","muted":"#859289","accent":"#7d974c"},{"id":"github-dark","family":"GitHub","type":"dark","surface":"#010409","hover":"#6e76811a","border":"#30363d","fg":"#e6edf3","muted":"#8b949e","accent":"#238636"},{"id":"github-light","family":"GitHub","type":"light","surface":"#f6f8fa","hover":"#eaeef280","border":"#d0d7de","fg":"#1f2328","muted":"#6e7781","accent":"#1f883d"},{"id":"gruvbox-dark","family":"Gruvbox","type":"dark","surface":"#282828","hover":"#3c383680","border":"#3c3836","fg":"#ebdbb2","muted":"#928374","accent":"#458588"},{"id":"gruvbox-light","family":"Gruvbox","type":"light","surface":"#fbf1c7","hover":"#ebdbb280","border":"#ebdbb2","fg":"#3c3836","muted":"#928374","accent":"#458588"},{"id":"linear-dark","family":"Linear","type":"dark","surface":"#080a0f","hover":"#080a0f","border":"#ffffff22","fg":"#e6e9ef","muted":"#636b7b","accent":"#606acc"},{"id":"linear-light","family":"Linear","type":"light","surface":"#f2f4f8","hover":"#f2f4f8","border":"#00000022","fg":"#2a3140","muted":"#858ea1","accent":"#5e6ad2"},{"id":"lobster-dark","family":"Lobster","type":"dark","surface":"#111827","hover":"#111827","border":"#ffffff22","fg":"#e4e4e7","muted":"#71717a","accent":"#ff5c5c"},{"id":"material-dark","family":"Material","type":"dark","surface":"#212121","hover":"#212121","border":"#21212160","fg":"#EEFFFF","muted":"#6b6e6e","accent":"#717171"},{"id":"matrix-dark","family":"Matrix","type":"dark","surface":"#020402","hover":"#020402","border":"#ffffff22","fg":"#b8ffca","muted":"#3f8f52","accent":"#1eff5a"},{"id":"monokai","family":"Monokai","type":"dark","surface":"#1e1f1c","hover":"#3e3d32","border":"#414339","fg":"#f8f8f2","muted":"#88846f","accent":"#75715E"},{"id":"night-owl","family":"Night Owl","type":"dark","surface":"#011627","hover":"#011627","border":"#5f7e97","fg":"#d6deeb","muted":"#637777","accent":"#7e57c2"},{"id":"nord","family":"Nord","type":"dark","surface":"#2e3440","hover":"#3b4252","border":"#3b4252","fg":"#d8dee9","muted":"#737f97","accent":"#88c0d0"},{"id":"notion-dark","family":"Notion","type":"dark","surface":"#151515","hover":"#151515","border":"#ffffff22","fg":"#d9d9d8","muted":"#6a9955","accent":"#3183d8"},{"id":"notion-light","family":"Notion","type":"light","surface":"#f7f6f3","hover":"#f7f6f3","border":"#00000022","fg":"#37352f","muted":"#008000","accent":"#3183d8"},{"id":"oscurange","family":"Oscurange","type":"dark","surface":"#0B0B0F","hover":"#0B0B0F","border":"#ffffff22","fg":"#E6E6E6","muted":"#5e5f66","accent":"#F9B98C"},{"id":"one-dark","family":"One","type":"dark","surface":"#21252b","hover":"#2c313a","border":"#3e4452","fg":"#abb2bf","muted":"#abb2bf","accent":"#70757f"},{"id":"one-light","family":"One","type":"light","surface":"#EAEAEB","hover":"#DBDBDC66","border":"#E5E5E6","fg":"#383A42","muted":"#8b8c93","accent":"#5871EF"},{"id":"proof-light","family":"Proof","type":"light","surface":"#efede6","hover":"#efede6","border":"#00000022","fg":"#2f312d","muted":"#8b877c","accent":"#3d755d"},{"id":"raycast-dark","family":"Raycast","type":"dark","surface":"#101010","hover":"#FFFFFF14","border":"#FFFFFF14","fg":"#FFFFFF","muted":"#666666","accent":"#ff6363"},{"id":"raycast-light","family":"Raycast","type":"light","surface":"#fcfcfc","hover":"#0000000f","border":"#00000014","fg":"#000000","muted":"#919191","accent":"#f25e5e"},{"id":"rose-pine-dark","family":"Rose Pine","type":"dark","surface":"#232136","hover":"#817c9c14","border":"#00000000","fg":"#e0def4","muted":"#6e6a86","accent":"#ea9a97"},{"id":"rose-pine-light","family":"Rose Pine","type":"light","surface":"#faf4ed","hover":"#6e6a860d","border":"#00000000","fg":"#575279","muted":"#8e899e","accent":"#c27571"},{"id":"sentry-dark","family":"Sentry","type":"dark","surface":"#26222d","hover":"#26222d","border":"#ffffff22","fg":"#e6dff9","muted":"#8d849f","accent":"#775ef6"},{"id":"solarized-dark","family":"Solarized","type":"dark","surface":"#00212B","hover":"#004454AA","border":"#2b2b4a","fg":"#839496","muted":"#5e747a","accent":"#2AA198"},{"id":"solarized-light","family":"Solarized","type":"light","surface":"#EEE8D5","hover":"#DFCA8844","border":"#DDD6C1","fg":"#5b6f76","muted":"#829294","accent":"#9b8d4e"},{"id":"tokyo-night","family":"Tokyo Night","type":"dark","surface":"#16161e","hover":"#13131a","border":"#101014","fg":"#a9b1d6","muted":"#5e668a","accent":"#506aaa"},{"id":"temple-dark","family":"Temple","type":"dark","surface":"#1d2d0f","hover":"#1d2d0f","border":"#ffffff22","fg":"#c7e6da","muted":"#4e645c","accent":"#e4f222"},{"id":"vercel-dark","family":"Vercel","type":"dark","surface":"#000000","hover":"#000000","border":"#ffffff22","fg":"#ededed","muted":"#666666","accent":"#006efe"},{"id":"vercel-light","family":"Vercel","type":"light","surface":"#ffffff","hover":"#ffffff","border":"#00000022","fg":"#171717","muted":"#666666","accent":"#006aff"},{"id":"vscode-dark","family":"VS Code Plus","type":"dark","surface":"#1E1E1E","hover":"#1E1E1E","border":"#ffffff22","fg":"#D4D4D4","muted":"#6A9955","accent":"#58a6ff"},{"id":"vscode-light","family":"VS Code Plus","type":"light","surface":"#FFFFFF","hover":"#E8E8E8","border":"#00000022","fg":"#000000","muted":"#008000","accent":"#0969da"},{"id":"xcode-dark","family":"Xcode","type":"dark","surface":"#1f1f24","hover":"#1f1f24","border":"#ffffff22","fg":"#ffffff","muted":"#6c7986","accent":"#5482ff"},{"id":"xcode-light","family":"Xcode","type":"light","surface":"#ffffff","hover":"#ffffff","border":"#00000022","fg":"#000000","muted":"#5d6c79","accent":"#0e0eff"}];
   const THEME_FAMILIES=[...new Set(THEME_PRESETS.map(p=>p.family))].sort((a,b)=>a.localeCompare(b));
-  const BAR_ROLES={remaining:'Remaining allowance',normal:'Normal usage',warn:'High usage',bad:'Limit reached',track:'Bar background',gradientStart:'Gradient at 0%',gradientEnd:'Gradient at 100%'};
-  const BAR_CHOICES={auto:'Match theme',blue:'Blue',red:'Red',white:'White',green:'Green',yellow:'Yellow',pink:'Pink',orange:'Orange',purple:'Purple',neutral:'Black / White',gray:'Gray',custom:'Custom…'};
-  const validBarColor=value=>Object.hasOwn(BAR_CHOICES,value)&&value!=='custom'||typeof value==='string'&&/^#[0-9a-f]{6}$/i.test(value);
+  const LEGACY_BAR_PALETTE={blue:'#60a5fa',red:'#ff7983',white:'#ffffff',green:'#4ade80',yellow:'#facc15',pink:'#f472b6',orange:'#fb923c',purple:'#c084fc',neutral:'#ececec',gray:'#a3a3a3'};
+  const isHex=value=>typeof value==='string'&&/^#[0-9a-f]{6}$/i.test(value);
+  const legacyBarColor=(value,fallback)=>isHex(value)?value:LEGACY_BAR_PALETTE[value]||fallback;
   const SETTINGS_TABS={panel:'General',modules:'Modules',appearance:'Appearance',spacing:'Spacing'};
   const SPACING_AREAS={
     outer:{label:'Frame margins (outside)',selector:'.panel-layout',kind:'padding',normal:[6,0,0,0]},
@@ -66,20 +66,20 @@
   };
   function defaultPreferences(){return {
     hideFrame:false,hover:Object.fromEntries(Object.keys(HOVER_OPTIONS).map(key=>[key,true])),collapsed:false,compact:false,compactHeight:null,hideCollapsed:false,hideWithSidebar:true,footerPosition:'top',showUpdateTime:true,showDetails:true,marginTop:6,marginBottom:6,
-    showAddCredits:true,showPlanTooltips:false,showRemainingPlan:true,showCreditBar:false,showCreditBalance:true,creditReference:null,creditReferencePending:false,
+    showPaidReset:false,showAddCredits:true,showPlanTooltips:false,showRemainingPlan:true,showCreditBar:false,showCreditBalance:true,creditReference:null,creditReferencePending:false,
     position:'bottom',sections:['plan','credits','features'],closed:{credits:true},
     hidden:{features:true},hiddenFeatures:{deep_research:true,file_upload:true,paste_text_to_file:true},
-    theme:'auto',preset:'auto',accent:'auto',contrast:'auto',barColors:{},barGradient:false,gradientStops:[],floating:{x:24,y:100},size:{width:300,height:null},
+    theme:'auto',preset:'auto',accent:'auto',contrast:'auto',barMode:'auto',barColor:'#60a5fa',barStart:'#60a5fa',barEnd:'#ff7983',barGradient:false,barGradientVisible:false,gradientStops:[],floating:{x:24,y:100},size:{width:300,height:null},
     settingsTab:'panel',settingsPosition:null,settingsSize:null,spacingMode:'auto',spacing:{normal:{},compact:{}},settingsClosed:{hover:true,appearance:false,colors:true,status:true,placement:false,visibility:true,plan:false,credits:true,features:true,spacePanel:false,spaceStatus:true,spaceModules:true,spaceItems:true,spaceBars:true,spaceDetails:true}
   };}
   const state = {
-    usage:null,plan:null,usageAt:0,error:null,models:{},showRaw:false,
+    usage:null,plan:null,usageAt:0,error:null,models:{},showRaw:false,resetInfo:null,
     ...defaultPreferences()
   };
   let lastRefresh = 0;
 
   // ---------- persistence ----------
-  const saveKeys = ["gradientStops", "barGradient", "barColors", "hideFrame", "hover", "usage", "plan", "usageAt", "models", "collapsed", "position", "sections", "closed", "hidden", "theme", "preset", "accent", "contrast", "floating", "size", "compact", "compactHeight", "hideCollapsed", "hideWithSidebar", "hiddenFeatures", "showAddCredits", "showPlanTooltips", "showRemainingPlan", "settingsClosed", "settingsTab", "settingsPosition", "settingsSize", "spacing", "spacingMode", "footerPosition", "showUpdateTime", "showDetails", "marginTop", "marginBottom", "showCreditBar", "showCreditBalance", "creditReference", "creditReferencePending"];
+  const saveKeys = ["barGradientVisible", "showPaidReset", "barMode", "barColor", "barStart", "barEnd", "gradientStops", "barGradient", "hideFrame", "hover", "usage", "plan", "usageAt", "models", "collapsed", "position", "sections", "closed", "hidden", "theme", "preset", "accent", "contrast", "floating", "size", "compact", "compactHeight", "hideCollapsed", "hideWithSidebar", "hiddenFeatures", "showAddCredits", "showPlanTooltips", "showRemainingPlan", "settingsClosed", "settingsTab", "settingsPosition", "settingsSize", "spacing", "spacingMode", "footerPosition", "showUpdateTime", "showDetails", "marginTop", "marginBottom", "showCreditBar", "showCreditBalance", "creditReference", "creditReferencePending"];
   function persist() {
     const o = {};
     for (const k of saveKeys) o[k] = state[k];
@@ -90,6 +90,11 @@
       const r = await store.local.get("gptu");
       if (r && r.gptu) {
         for (const k of saveKeys) if (r.gptu[k] !== undefined) state[k] = r.gptu[k];
+        if(r.gptu.barMode===undefined){
+          const old=r.gptu.barColors||{};state.barMode=r.gptu.barGradient||Object.values(old).some(value=>value!=='auto')?'custom':'auto';
+          state.barColor=legacyBarColor(old.remaining||old.normal,'#60a5fa');
+          state.barStart=legacyBarColor(old.gradientStart,'#60a5fa');state.barEnd=legacyBarColor(old.gradientEnd,'#ff7983');
+        }
         if(!r.gptu.spacing)state.spacing={normal:{frame:[state.marginTop,0,state.marginBottom,0]},compact:{frame:[state.marginTop,0,state.marginBottom,0]}};
       }
     } catch (_) {}
@@ -114,9 +119,12 @@
     if(!['auto','chatgpt',...THEME_FAMILIES].includes(state.preset))state.preset='auto';
     if(!['auto','default','blue','green','yellow','pink','orange','purple','neutral'].includes(state.accent))state.accent='auto';
     if(!['auto','system','medium','increased'].includes(state.contrast))state.contrast='auto';
-    state.gradientStops=Array.isArray(state.gradientStops)?state.gradientStops.filter(stop=>stop&&Number.isFinite(stop.at)&&stop.at>0&&stop.at<100&&/^#[0-9a-f]{6}$/i.test(stop.color)).slice(0,8):[];
-    state.barGradient=state.barGradient===true;
-    state.barColors=Object.fromEntries(Object.keys(BAR_ROLES).map(key=>[key,validBarColor(state.barColors?.[key])?state.barColors[key]:'auto']));
+    state.gradientStops=(Array.isArray(state.gradientStops)?state.gradientStops:[]).filter(stop=>stop&&isHex(stop.color)&&Number.isFinite(stop.from??stop.at)&&Number.isFinite(stop.to??stop.at)).slice(0,8).map(stop=>({from:Math.max(1,Math.min(99,stop.from??stop.at)),to:Math.max(1,Math.min(99,stop.to??stop.at)),color:stop.color})).sort((a,b)=>a.from-b.from);
+    for(let i=0;i<state.gradientStops.length;i++){const stop=state.gradientStops[i];stop.from=Math.max(i?state.gradientStops[i-1].to:1,stop.from);stop.to=Math.max(stop.from,stop.to);}
+    state.barGradient=state.barGradient===true;state.barGradientVisible=state.barGradientVisible===true;
+    if(!['auto','custom'].includes(state.barMode))state.barMode='auto';
+    for(const key of ['barColor','barStart','barEnd'])if(!isHex(state[key]))state[key]=defaultPreferences()[key];
+    state.showPaidReset=state.showPaidReset===true;
     if (!["top", "bottom", "floating"].includes(state.position)) state.position = "bottom";
   }
 
@@ -206,7 +214,7 @@
     const { type, payload } = ev.data;
     if (type === "ready") requestRefresh(true);
     else if (type === "usage") {
-      state.usage = payload.data;
+      state.usage = payload.data;state.resetInfo=null;
       state.plan = payload.plan || state.plan;
       state.usageAt = payload.at;
       state.error = null;
@@ -218,6 +226,13 @@
       for (const it of payload.items) state.models[it.name] = { ...it, seenAt: payload.at };
       persist(); render();
       if(settingsOpen){renderFeatureSettings();positionSettings();}
+    } else if(type==='reset-summary'){
+      state.resetInfo=payload;render();
+    } else if(type==='reset-details'){
+      if(resetFlow?.id===payload.flowId){resetFlow.data=payload.data;resetFlow.error=payload.error;resetFlow.loading=false;if(payload.data)state.resetInfo=payload.data;renderResetDialog();render();}
+    } else if(type==='reset-result'){
+      resetPending=false;render();
+      if(resetFlow?.id===payload.flowId){resetFlow.busy=false;resetFlow.finished=true;resetFlow.message=payload.error||(payload.code==='reset'?'Reset applied. Updating usage…':`No reset confirmed (${String(payload.code||'unknown result')}). Review Usage before trying again.`);renderResetDialog();}
     } else if (type === "activity") {
       setTimeout(() => requestRefresh(false), 4000);
     }
@@ -229,7 +244,7 @@
     * { box-sizing:border-box; }
     [hidden] { display:none !important; }
     .panel-layout { display:flow-root; min-width:0; padding:6px 0; }
-    .card, .settings, .credits-modal, .dock-zone { --fg:#202123; --muted:#656565; --line:#e3e3e3; --surface:#f9f9f9; --hover:#ededed; --track:#e5e5e5; --ok:#087f65; --remaining:#2563eb; --warn:#966000; --bad:#c53240;
+    .card, .settings, .credits-modal, .reset-dialog, .dock-zone { --fg:#202123; --muted:#656565; --line:#e3e3e3; --surface:#f9f9f9; --hover:#ededed; --track:#e5e5e5; --ok:#087f65; --remaining:#2563eb; --warn:#966000; --bad:#c53240;
       color:var(--fg); background:var(--surface); font:13px/1.45 ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
       margin:0 8px; border:1px solid var(--line); border-radius:14px; overflow:hidden; text-align:left; display:flex; flex-direction:column; }
     .card { position:relative; border-color:transparent; padding-top:var(--gptu-margin-top,6px); padding-bottom:var(--gptu-margin-bottom,6px); }
@@ -295,16 +310,17 @@
     .rl,.kv { display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
     .rl>span:first-child { min-width:0; overflow-wrap:anywhere; }
     .v { font-size:12px; font-weight:600; font-variant-numeric:tabular-nums; flex-shrink:0; }
-    .bar { height:4px; background:var(--bar-track,var(--track)); border-radius:9px; overflow:hidden; margin:7px 0 5px; }
-    .bar i { display:block; height:100%; border-radius:9px; background:var(--bar-normal,var(--ok)); }
-    .bar i.remaining { background:var(--bar-remaining,var(--remaining)); }
-    .bar i.warn { background:var(--bar-warn,var(--warn)); } .bar i.bad { background:var(--bar-bad,var(--bad)); }
+    .bar { height:4px; background:var(--track); border-radius:9px; overflow:hidden; margin:7px 0 5px; }
+    .bar i { display:block; height:100%; border-radius:9px; background:var(--bar-fill,var(--remaining)); }
+    .bar i.remaining { background:var(--bar-fill,var(--remaining)); }
+    .bar i.warn { background:var(--bar-fill,var(--remaining)); } .bar i.bad { background:var(--bar-fill,var(--remaining)); }
     .sub,.empty,.note { color:var(--muted); font-size:11px; line-height:1.5; }
     .empty { padding-bottom:8px; }
     .credit { font-size:23px; font-weight:600; letter-spacing:-.6px; font-variant-numeric:tabular-nums; }
     .foot { flex-shrink:0; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:2px 22px 2px 12px; line-height:1.45; color:var(--muted); font-size:10px; }
     .text-btn { color:var(--muted); border-radius:4px; padding:3px; font-size:10px; }
-    .card[data-bar-gradient] .bar i { background-image:var(--bar-gradient); background-size:var(--bar-scale,100%) 100%; background-repeat:no-repeat; }
+
+    .card[data-meter-gradient] .bar i { background-image:var(--meter-gradient); background-size:var(--meter-scale,100%) 100%; background-repeat:no-repeat; }
     .err { margin:8px 12px; font-size:11px; color:var(--bad); overflow-wrap:anywhere; }
     pre { margin:0 12px 10px; padding:8px; background:var(--hover); border-radius:8px; max-height:160px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; font:10px/1.5 ui-monospace,monospace; }
     .settings { position:fixed; inset:auto; margin:0; padding:14px; width:min(300px,calc(100vw - 16px)); max-height:calc(100dvh - 16px); overflow:auto; border:1px solid var(--line); border-radius:14px; box-shadow:0 10px 40px #0004; }
@@ -402,6 +418,16 @@
     .settings::-webkit-scrollbar-thumb { background:var(--track); border-radius:6px; }
     .card:hover .body::-webkit-scrollbar-thumb,.card:has(:focus-visible) .body::-webkit-scrollbar-thumb { background:var(--track); }
     @media(hover:none) { .body { scrollbar-color:var(--track) transparent; } }
+    .reset-tools { display:flex; align-items:center; gap:5px; flex:none; font-size:9px; white-space:nowrap; }
+    .use-reset,.confirm-reset { border:1px solid var(--line); padding:4px 6px; border-radius:6px; }
+    .reset-dialog { position:fixed; inset:0; margin:auto; width:min(420px,calc(100vw - 32px)); max-height:calc(100dvh - 32px); overflow:auto; padding:20px; border:1px solid var(--line); border-radius:14px; }
+    .reset-dialog:not([open]) { display:none; }
+    .reset-dialog::backdrop { background:#0009; }
+    .reset-dialog h2 { margin:0 0 12px; font-size:15px; }
+    .reset-dialog p,.reset-dialog label { font-size:12px; line-height:1.5; }
+    .reset-dialog select { max-width:100%; padding:6px; background:var(--surface); border:1px solid var(--line); border-radius:6px; }
+    .reset-dialog .reset-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:16px; }
+    .reset-dialog button:disabled { opacity:.5; cursor:default; }
     .credits-modal { position:fixed; inset:0; margin:auto; padding:0; width:min(900px,calc(100vw - 40px)); height:min(740px,calc(100dvh - 40px)); max-width:none; max-height:none; border:1px solid var(--line); border-radius:16px; box-shadow:0 20px 80px #0006; }
     .credits-modal:not([open]) { display:none; }
     .credits-modal::backdrop { background:#0009; }
@@ -415,8 +441,14 @@
     .credits-content { position:relative; display:flex; flex:1; min-height:0; }
     .credits-status { position:absolute; inset:0; display:grid; place-content:center; margin:0; padding:24px; text-align:center; font-size:12px; color:var(--muted); background:var(--surface); }
     .credits-status[hidden] { display:none; }
+    .bar-preview { margin:10px 0 14px; }
+    .bar-preview-title { font-size:11px; color:var(--muted); margin-bottom:6px; }
+    .bar-preview-fill { height:12px; width:100%; border-radius:6px; border:1px solid var(--line); }
+    .bar-preview-labels { display:flex; justify-content:space-between; margin-top:4px; font-size:10px; color:var(--muted); }
     .gradient-stop { display:flex; align-items:center; gap:6px; margin:6px 0; }
-    .gradient-stop input[type=number] { width:54px; background:var(--surface); color:var(--fg); border:1px solid var(--line); border-radius:5px; padding:4px; }
+    .gradient-stop label { display:flex; align-items:center; gap:3px; font-size:10px; }
+    .gradient-stop { flex-wrap:wrap; }
+    .gradient-stop input[type=number] { width:43px; background:var(--surface); color:var(--fg); border:1px solid var(--line); border-radius:5px; padding:4px; }
     .gradient-stop input[type=color] { width:32px; height:28px; background:var(--surface); border:1px solid var(--line); border-radius:5px; }
     .gradient-stop button { margin-left:auto; font-size:11px; }
     .bar-color-controls { display:flex; align-items:center; gap:6px; }
@@ -446,7 +478,7 @@
     <div class="head-title-row"><button class="usage-open" aria-label="Open usage overview" title="Open usage overview"><span class="usage-icon">${USAGE_ICON}</span><span class="title">Usage</span><span class="badge" hidden></span></button><button class="icon toggle collapse-panel" aria-expanded="true" aria-label="Collapse usage panel" title="Collapse usage panel">${icon('chevron')}</button><div class="head-status-slot"></div></div>
     <button class="icon refresh" title="Refresh usage" aria-label="Refresh usage">${icon('refresh')}</button>
     <button class="icon customize" title="Customize panel" aria-label="Customize panel" aria-expanded="false">${icon('settings')}</button></div>
-    <div class="summary" hidden></div><div class="body"></div><button class="resize" aria-label="Resize panel" title="Drag to resize · Arrow keys to resize · Double-click to reset size"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m5 13 8-8m-3 8 3-3"/></svg></button><div class="live" aria-live="polite"></div></div></div><div class="settings" popover="auto" role="dialog" aria-label="Usage settings"></div><dialog class="credits-modal" aria-labelledby="gptu-page-heading"><div class="credits-header"><h2 id="gptu-page-heading">Add credits</h2><a class="credit-external" target="_blank" rel="noopener noreferrer">Open in tab</a><button class="icon credits-close" aria-label="Close credits">✕</button></div><div class="credits-content"><p class="credits-status" role="status">Loading credits…</p><template class="credits-frame-template"><iframe class="credits-frame" title="ChatGPT credits purchase" allow="payment" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads"></iframe></template></div></dialog><div class="dock-targets" hidden aria-hidden="true"><div class="dock-zone" data-dock="top">Dock at top</div><div class="dock-zone" data-dock="bottom">Dock at bottom</div></div>`;
+    <div class="summary" hidden></div><div class="body"></div><button class="resize" aria-label="Resize panel" title="Drag to resize · Arrow keys to resize · Double-click to reset size"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m5 13 8-8m-3 8 3-3"/></svg></button><div class="live" aria-live="polite"></div></div></div><div class="settings" popover="auto" role="dialog" aria-label="Usage settings"></div><dialog class="reset-dialog" aria-labelledby="gptu-reset-title"></dialog><dialog class="credits-modal" aria-labelledby="gptu-page-heading"><div class="credits-header"><h2 id="gptu-page-heading">Add credits</h2><a class="credit-external" target="_blank" rel="noopener noreferrer">Open in tab</a><button class="icon credits-close" aria-label="Close credits">✕</button></div><div class="credits-content"><p class="credits-status" role="status">Loading credits…</p><template class="credits-frame-template"><iframe class="credits-frame" title="ChatGPT credits purchase" allow="payment" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads"></iframe></template></div></dialog><div class="dock-targets" hidden aria-hidden="true"><div class="dock-zone" data-dock="top">Dock at top</div><div class="dock-zone" data-dock="bottom">Dock at bottom</div></div>`;
   const $=s=>root.querySelector(s), card=$('.card');
   let busyTimer, settingsOpen=false, drag=null, resizing=null, sectionDrag=null;
   const ui={ setBusy(b) { card.classList.toggle('busy',b); $('.refresh').disabled=b; $('.refresh').setAttribute('aria-busy',String(b)); clearTimeout(busyTimer); if(b) busyTimer=setTimeout(()=>{ui.setBusy(false); state.error='Refresh timed out. Try again.'; render();},20000); } };
@@ -456,7 +488,22 @@
   const featureNames={deep_research:'Deep Research',file_upload:'File uploads',paste_text_to_file:'Paste text to file',image_gen:'Image generation'};
   const featureLabel=name=>featureNames[name]||name.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
   const format=n=>new Intl.NumberFormat(undefined,{maximumFractionDigits:2}).format(n);
-  const bar=(p,label,remaining=false)=>`<div class="bar" role="progressbar" aria-label="${esc(label)} ${remaining?'remaining':'used'}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${p}"><i class="${remaining?'remaining':level(p)}" style="width:${p}%;--bar-scale:${p>0?10000/p:100}%"></i></div>`;
+  function colorScalePoints(){return [{at:0,color:state.barStart},...state.gradientStops.flatMap(stop=>[{at:stop.from,color:stop.color},{at:stop.to,color:stop.color}]),{at:100,color:state.barEnd}];}
+  function colorScaleGradient(){return `linear-gradient(to right,${colorScalePoints().map(point=>point.color+' '+point.at+'%').join(',')})`;}
+  function updateBarPreview(){
+    const preview=$('.bar-preview-fill');if(!preview)return;
+    preview.style.background=state.barMode==='auto'?'var(--remaining)':state.barGradient?colorScaleGradient():state.barColor;
+  }
+  function percentageColor(value){
+    const points=colorScalePoints(),p=Math.max(0,Math.min(100,value));
+    let left=points[0],right=points[points.length-1];
+    for(let i=1;i<points.length;i++)if(p<=points[i].at){left=points[i-1];right=points[i];break;}
+    const t=right.at===left.at?1:(p-left.at)/(right.at-left.at);
+    const rgb=[1,3,5].map(offset=>Math.round(parseInt(left.color.slice(offset,offset+2),16)*(1-t)+parseInt(right.color.slice(offset,offset+2),16)*t));
+    return `rgb(${rgb.join(',')})`;
+  }
+  const bar=(p,label,remaining=false)=>`<div class="bar" role="progressbar" aria-label="${esc(label)} ${remaining?'remaining':'used'}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${p}"><i class="${remaining?'remaining':level(p)}" style="width:${p}%;--meter-scale:${p>0?10000/p:100}%;${state.barMode==='custom'&&state.barGradient&&!state.barGradientVisible?'background-color:'+percentageColor(p):''}"></i></div>`;
+
   function creditPurchaseUrl(){
     const url=new URL('/pricing/credits',location.origin);
     url.searchParams.set('source','chatgpt_web_merged');
@@ -464,17 +511,42 @@
     return url.href;
   }
   function updateCreditLink(event){
-    const link=event.target.closest?.('.add-credits');
+    const link=event.target.closest?.('.add-credits:not(.paid-reset)');
     if(link)link.href=creditPurchaseUrl();
   }
   root.addEventListener('pointerdown',updateCreditLink);
   root.addEventListener('click',event=>{
-    const link=event.target.closest?.('.add-credits');if(!link)return;
+    const link=event.target.closest?.('.add-credits:not(.paid-reset)');if(!link)return;
     updateCreditLink(event);
     if(event.button!==0||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
     event.preventDefault();openCreditDialog(link);
   });
   root.addEventListener('auxclick',updateCreditLink);
+  let resetFlow=null,resetFocus=null,resetPending=false;
+  function resetCount(){const count=num(state.resetInfo?.available_count??state.usage?.rate_limit_reset_credits?.available_count);return Number.isInteger(count)&&count>=0?count:null;}
+  function availableResets(){return (Array.isArray(resetFlow?.data?.credits)?resetFlow.data.credits:[]).filter(c=>c&&typeof c.id==='string'&&c.status==='available'&&(!c.expires_at||Date.parse(c.expires_at)>Date.now())).sort((a,b)=>(Date.parse(a.expires_at)||Infinity)-(Date.parse(b.expires_at)||Infinity));}
+  function renderResetDialog(){
+    const flow=resetFlow;if(!flow)return;
+    const credits=availableResets();if(!credits.some(c=>c.id===flow.creditId))flow.creditId=credits[0]?.id;
+    const selected=credits.find(c=>c.id===flow.creditId);
+    $('.reset-dialog').innerHTML=`<h2 id="gptu-reset-title">Use a usage limit reset</h2>${flow.loading?'<p role="status">Loading available resets…</p>':flow.error?`<p role="status">${esc(flow.error)}</p>`:`<p>${credits.length?'Choose a banked reset to restore its covered allowances. This consumes one reset immediately; it does not add credits.':'No available, unexpired resets were reported.'}</p>${credits.length?`<label>Available reset <select aria-label="Available reset" ${flow.busy||flow.finished?'disabled':''}>${credits.map(c=>`<option value="${esc(c.id)}" ${c.id===flow.creditId?'selected':''}>${esc(c.title||'Usage reset')}${c.expires_at?' · Expires '+esc(new Date(c.expires_at).toLocaleString()):''}</option>`).join('')}</select></label>${selected?.description?`<p>${esc(selected.description)}</p>`:''}<p>ChatGPT checks eligibility when you confirm. Allowances that qualify are restored, and their next reset times may change.</p>`:''}`}${flow.message?`<p role="status">${esc(flow.message)}</p>`:''}<div class="reset-actions"><button class="text-btn reset-native">Open Usage</button><button class="text-btn cancel-reset">${flow.finished?'Close':'Cancel'}</button>${selected&&!flow.finished?`<button class="confirm-reset" ${flow.busy?'disabled':''}>${flow.busy?'Applying…':'Use this reset'}</button>`:''}</div>`;
+  }
+  root.addEventListener('click',event=>{
+    const target=event.target;
+    if(target.closest('.paid-reset'))openPageDialog(new URL('/settings/usage?tab=overview',location.origin).href,'Usage',target);
+    else if(target.closest('.use-reset')&&!resetPending){
+      if(settingsOpen)closeSettings();resetFocus=target;resetFlow={id:crypto.randomUUID(),loading:true};renderResetDialog();$('.reset-dialog').showModal();
+      window.postMessage({source:TAG_OUT,type:'reset-details',payload:{flowId:resetFlow.id}},location.origin);
+    }else if(target.closest('.cancel-reset'))$('.reset-dialog').close();
+    else if(target.closest('.reset-native')){$('.reset-dialog').close();openPageDialog(new URL('/settings/usage?tab=overview',location.origin).href,'Usage',$('.usage-open'));}
+    else if(target.closest('.confirm-reset')&&resetFlow&&!resetFlow.busy&&!resetFlow.finished){
+      const selected=availableResets().find(c=>c.id===resetFlow.creditId);if(!selected)return;
+      resetFlow.busy=true;resetPending=true;resetFlow.requestId=crypto.randomUUID();renderResetDialog();render();
+      window.postMessage({source:TAG_OUT,type:'use-reset',payload:{flowId:resetFlow.id,creditId:selected.id,requestId:resetFlow.requestId}},location.origin);
+    }
+  });
+  root.addEventListener('change',event=>{if(event.target.matches('.reset-dialog select')&&resetFlow&&!resetFlow.busy){resetFlow.creditId=event.target.value;renderResetDialog();}});
+  $('.reset-dialog').addEventListener('close',()=>{resetFlow=null;const target=resetFocus?.isConnected?resetFocus:$('.usage-open');target?.focus();resetFocus=null;});
   let creditReturnFocus=null,creditReturnPath='',creditWatch=null,creditLoadTimeout=null;
   function openCreditDialog(link){openPageDialog(creditPurchaseUrl(),'Add credits',link,true);}
   function openPageDialog(url,title,returnFocus,closeOnReturn=false){
@@ -499,7 +571,7 @@
   $('.credits-modal').addEventListener('close',()=>{
     clearInterval(creditWatch);clearTimeout(creditLoadTimeout);creditWatch=null;
     $('.credits-frame')?.remove();$('.credits-modal').removeAttribute('aria-busy');
-    const target=creditReturnFocus?.isConnected?creditReturnFocus:$('.add-credits');target?.focus();creditReturnFocus=null;
+    const target=creditReturnFocus?.isConnected?creditReturnFocus:$('.add-credits');target?.focus();creditReturnFocus=null;requestRefresh(false);
   });
   $('.credits-modal').addEventListener('click',event=>{
     if(event.target!==$('.credits-modal'))return;
@@ -561,15 +633,14 @@
     const nativeContrast=(html.dataset.contrast||body.dataset.contrast||html.dataset.colorContrast||body.dataset.colorContrast||'system').toLowerCase();
     const increased=state.contrast==='increased'||(state.contrast==='system'||state.contrast==='auto'&&nativeContrast==='system')&&matchMedia('(prefers-contrast: more)').matches||state.contrast==='auto'&&['increased','high','more'].includes(nativeContrast);
     if(increased)Object.assign(colors,{'--fg':dark?'#ffffff':'#000000','--muted':dark?'#d4d4d4':'#424242','--line':dark?'#858585':'#727272','--track':dark?'#454545':'#d4d4d4'});
-    card.toggleAttribute('data-bar-gradient',state.barGradient);
-    const barPalette={...palette,red:dark?'#ff7983':'#c53240',white:'#ffffff',gray:dark?'#a3a3a3':'#525252'};
-    for(const key of Object.keys(BAR_ROLES)){
-      const choice=state.barColors[key]||'auto',value=choice==='auto'?'':barPalette[choice]||choice;
-      if(value)card.style.setProperty('--bar-'+key,value);else card.style.removeProperty('--bar-'+key);
-    }
-    card.style.setProperty('--bar-gradient',`linear-gradient(to right,var(--bar-gradientStart,var(--remaining)) 0%,${[...state.gradientStops].sort((a,b)=>a.at-b.at).map(stop=>stop.color+' '+stop.at+'%,').join('')}var(--bar-gradientEnd,var(--bad)) 100%)`);
+    if(state.barMode==='custom')card.style.setProperty('--bar-fill',state.barColor);else card.style.removeProperty('--bar-fill');
+    card.toggleAttribute('data-meter-gradient',state.barMode==='custom'&&state.barGradient&&state.barGradientVisible);
+    card.style.setProperty('--meter-gradient',colorScaleGradient());
+    if(state.barMode==='custom'&&state.barGradient&&!state.barGradientVisible)for(const fill of root.querySelectorAll('.bar i'))fill.style.backgroundColor=percentageColor(Number(fill.parentElement.getAttribute('aria-valuenow')));
+    else for(const fill of root.querySelectorAll('.bar i'))fill.style.removeProperty('background-color');
+    updateBarPreview();
     host.toggleAttribute('data-increased-contrast',increased);
-    for(const el of root.querySelectorAll('.card,.settings,.credits-modal,.dock-zone'))for(const key of ['--remaining','--ok','--fg','--surface','--muted','--line','--hover','--track']){
+    for(const el of root.querySelectorAll('.card,.settings,.credits-modal,.reset-dialog,.dock-zone'))for(const key of ['--remaining','--ok','--fg','--surface','--muted','--line','--hover','--track']){
       const value=colors[key]||'';
       if(value){if(el.style.getPropertyValue(key)!==value)el.style.setProperty(key,value);}else if(el.style.getPropertyValue(key))el.style.removeProperty(key);
     }
@@ -583,18 +654,18 @@
     const profile=spacingProfile();
     const box=key=>`<div class="spacing-box"><span class="spacing-box-title">${SPACING_AREAS[key].label}</span><div class="spacing-grid">${spacingValues(profile,key).map((value,side)=>`<label><span>${SPACING_SIDES[side]}</span><input type="number" min="0" max="120" step="1" value="${value}" aria-label="${SPACING_AREAS[key].label} ${SPACING_SIDES[side].toLowerCase()} spacing" data-space-area="${key}" data-space-side="${side}" data-space-profile="${profile}"></label>`).join('')}</div></div>`;
     const tab=(key,content)=>`<div class="settings-panel" role="tabpanel" id="gptu-settings-${key}" aria-labelledby="gptu-tab-${key}" ${state.settingsTab===key?'':'hidden'}>${content}</div>`;
-    const barControls=toggle('Gradient bars','data-bar-gradient',state.barGradient)+Object.entries(BAR_ROLES).map(([key,label])=>{
-      const value=state.barColors[key]||'auto',custom=value.startsWith('#');
-      return `<label class="setting"><span>${label}</span><span class="bar-color-controls"><select aria-label="${label} color" data-bar-color="${key}">${Object.entries(BAR_CHOICES).map(([id,name])=>`<option value="${id}" ${(custom?id==='custom':id===value)?'selected':''}>${name}</option>`).join('')}</select>${custom?`<input type="color" aria-label="Custom ${label.toLowerCase()} color" data-bar-custom="${key}" value="${value}">`:''}</span></label>`;
-    }).join('')+`<div class="feature-settings-title">Middle colors</div>${state.gradientStops.map((stop,index)=>`<div class="gradient-stop"><input type="number" min="1" max="99" step="1" value="${stop.at}" data-gradient-position="${index}" aria-label="Middle color ${index+1} position"><span>%</span><input type="color" value="${stop.color}" data-gradient-color="${index}" aria-label="Middle color ${index+1}"><button class="text-btn" data-remove-stop="${index}" aria-label="Remove middle color ${index+1}">Remove</button></div>`).join('')}<button class="text-btn" data-add-stop ${state.gradientStops.length>=8?'disabled':''}>Add middle color</button><div class="note">Up to eight middle colors. Position each between 1% and 99%.</div><div class="note">Applies to plan, credit and feature bars. Match theme follows your theme and accent. Custom colors stay saved when you change themes. Gradient bars replace solid status colors; the endpoint colors correspond to the full 0–100% scale.</div><button class="text-btn" data-reset-bar-colors>Reset bar colors</button>`;
+    const colorInput=(label,key)=>`<label class="setting"><span>${label}</span><input type="color" aria-label="${label}" data-simple-bar-color="${key}" value="${state[key]}"></label>`;
+    const barControls=select('Bar color','barMode',{auto:'Match theme',custom:'Custom'})+`<div class="bar-preview"><div class="bar-preview-title">Color scale preview</div><div class="bar-preview-fill" role="img" aria-label="Bar color scale from 0 to 100 percent"></div><div class="bar-preview-labels"><span>0%</span><span>50%</span><span>100%</span></div></div>`+(state.barMode==='custom'?toggle('Color by percentage','data-bar-gradient',state.barGradient)+(state.barGradient?
+      toggle('Show gradient across meters','data-visible-gradient',state.barGradientVisible)+`<div class="note">Off: one color based on the current percentage. On: the fill shows the corresponding part of the full 0–100% color scale.</div>`+colorInput('Color at 0%','barStart')+colorInput('Color at 100%','barEnd')+`<div class="feature-settings-title">Middle colors</div>${state.gradientStops.map((stop,index)=>`<div class="gradient-stop"><input type="color" value="${stop.color}" data-gradient-color="${index}" aria-label="Middle color ${index+1}"><label>From <input type="number" min="1" max="99" step="1" value="${stop.from}" data-gradient-from="${index}" aria-label="Middle color ${index+1} from">%</label><label>To <input type="number" min="1" max="99" step="1" value="${stop.to}" data-gradient-to="${index}" aria-label="Middle color ${index+1} to">%</label><button class="text-btn" data-remove-stop="${index}" aria-label="Remove middle color ${index+1}">Remove</button></div>`).join('')}<button class="text-btn" data-add-stop ${state.gradientStops.length>=8?'disabled':''}>Add middle color</button><div class="note">A middle color stays constant from From to To, with blends in the gaps. Set both to the same value for a single point. Ranges stay ordered without overlap. 0% is empty; 100% is full.</div>`:
+      colorInput('Custom bar color','barColor')):'')+`<div class="note">Applies to all plan, credit and feature fills. Match theme uses the current theme accent.</div>`;
     const themeSelect=`<label class="setting"><span>Theme preset</span><select aria-label="Theme preset" data-setting="preset"><optgroup label="ChatGPT"><option value="auto" ${state.preset==='auto'?'selected':''}>Match ChatGPT</option><option value="chatgpt" ${state.preset==='chatgpt'?'selected':''}>ChatGPT</option></optgroup><optgroup label="Codex themes">${THEME_FAMILIES.map(name=>`<option value="${esc(name)}" ${state.preset===name?'selected':''}>${esc(name)}</option>`).join('')}</optgroup></select></label>`;
     $('.settings').innerHTML=`<div class="settings-header"><div class="settings-title" title="Drag to move settings · Double-click to reset position"><button class="icon settings-grab" aria-label="Move settings" title="Drag or use arrow keys · Home resets position">${icon('grip')}</button><span>Usage settings</span><button class="icon close-settings" aria-label="Close settings">✕</button></div><div class="settings-tabs" role="tablist" aria-label="Settings categories">${Object.entries(SETTINGS_TABS).map(([key,label])=>`<button class="settings-tab" role="tab" id="gptu-tab-${key}" aria-controls="gptu-settings-${key}" aria-selected="${state.settingsTab===key}" tabindex="${state.settingsTab===key?0:-1}" data-settings-tab="${key}">${label}</button>`).join('')}</div></div><div class="settings-body">${
       tab('panel',group('placement','Layout',select('Placement','position',{top:'Sidebar top',bottom:'Sidebar bottom',floating:'Floating'})+toggle('Compact mode','data-compact',state.compact))+group('visibility','Visibility',toggle('Hide docked panel with sidebar','data-hide-with-sidebar',state.hideWithSidebar)+toggle('Hide frame completely','data-hide-frame',state.hideFrame))+group('hover','Hover behavior',`<div class="note">Turn a switch off to keep that element visible. Keyboard focus also reveals hover-only controls.</div>`+Object.entries(HOVER_OPTIONS).map(([key,item])=>toggle(item.label,`data-hover="${key}" ${key==='frame'&&state.hideFrame?'disabled':''}`,state.hover[key])).join('')+toggle('Hide collapsed Usage until hover','data-hide-collapsed',state.hideCollapsed))+group('status','Update time & Details',toggle('Show update time','data-show-update',state.showUpdateTime)+toggle('Show Details button','data-show-details',state.showDetails)+select('Status position','footerPosition',{header:'Next to Usage',top:'Above modules',bottom:'Below modules'})))+
-      tab('modules',group('plan','Plan limits',moduleToggle('plan')+toggle('Show remaining plan allowance','data-remaining-plan',state.showRemainingPlan)+`<div class="note">Also applies to the credits bar: remaining when enabled, used when disabled.</div>`+toggle('Plan limit tooltips','data-plan-tooltips',state.showPlanTooltips))+group('credits','Credits',moduleToggle('credits')+toggle('Show credit balance bar','data-credit-bar',state.showCreditBar)+`<div class="credit-reference-controls" ${state.showCreditBar?'':'hidden'}>${toggle('Show available balance','data-credit-balance',state.showCreditBalance)}<label class="setting"><span>Full balance</span><span class="margin-input"><input type="number" aria-label="Full credit balance" min="0.01" step="any" data-credit-reference value="${state.creditReference??''}" placeholder="e.g. 1000">credits</span></label><div class="note">This amount counts as 100%. Initially uses your balance when enabled; you can change it.</div></div>`+toggle('Add credits button','data-add-credits',state.showAddCredits))+group('features','Models & features',moduleToggle('features')+`<div class="feature-settings"><div class="feature-settings-title">Individual counters</div><div class="feature-options" role="group" aria-label="Models & features to show"></div><div class="note">Selections are kept when the module is hidden.</div></div>`))+
+      tab('modules',group('plan','Plan limits',moduleToggle('plan')+toggle('Show paid reset button','data-paid-reset',state.showPaidReset)+toggle('Show remaining plan allowance','data-remaining-plan',state.showRemainingPlan)+`<div class="note">Also applies to the credits bar: remaining when enabled, used when disabled.</div>`+toggle('Plan limit tooltips','data-plan-tooltips',state.showPlanTooltips))+group('credits','Credits',moduleToggle('credits')+toggle('Show credit balance bar','data-credit-bar',state.showCreditBar)+`<div class="credit-reference-controls" ${state.showCreditBar?'':'hidden'}>${toggle('Show available balance','data-credit-balance',state.showCreditBalance)}<label class="setting"><span>Full balance</span><span class="margin-input"><input type="number" aria-label="Full credit balance" min="0.01" step="any" data-credit-reference value="${state.creditReference??''}" placeholder="e.g. 1000">credits</span></label><div class="note">This amount counts as 100%. Initially uses your balance when enabled; you can change it.</div></div>`+toggle('Add credits button','data-add-credits',state.showAddCredits))+group('features','Models & features',moduleToggle('features')+`<div class="feature-settings"><div class="feature-settings-title">Individual counters</div><div class="feature-options" role="group" aria-label="Models & features to show"></div><div class="note">Selections are kept when the module is hidden.</div></div>`))+
       tab('appearance',group('appearance','Theme & mode',themeSelect+select('Appearance','theme',{auto:'Match ChatGPT',system:'System',light:'Light',dark:'Dark'})+`<div class="note">Match ChatGPT follows the page palette and custom colors. Codex presets use available light/dark variants; some have only one mode.</div>`)+group('colors','Accent & contrast',select('Accent color','accent',accentNames)+select('Contrast','contrast',{auto:'Match ChatGPT',system:'System',medium:'Medium',increased:'Increased'}))+group('barColors','Bar colors',barControls))+
       tab('spacing',`${select('Editing spacing','spacingMode',{auto:'Current density',normal:'Normal',compact:'Compact'})}<div class="note">Editing ${profile==='normal'?'normal':'compact'} mode. All values are in pixels. Inside frame controls the space within the border; outside frame controls the surrounding gap.</div>`+group('spacePanel','Panel & header',['outer','frame','header'].map(box).join(''))+group('spaceStatus','Update time & summary',['status','headerStatus','statusButton','summary'].map(box).join(''))+group('spaceModules','Module spacing',['plan','credits','features','sectionHeader','sectionContent'].map(box).join(''))+group('spaceItems','Items & credits',['planRows','featureRows','creditBalance','creditMeter','addCredits'].map(box).join(''))+group('spaceBars','Bars & captions',['planBars','creditBars','featureBars','captions'].map(box).join(''))+group('spaceDetails','Expanded Details',['details','detailsContent'].map(box).join(''))+`<button class="text-btn reset-spacing" data-reset-spacing="${profile}">Reset ${profile} spacing</button>`)
     }</div><div class="settings-help"><details><summary>Moving & keyboard controls</summary><div class="note">Drag this window by its title. Double-click the title to return it beside the panel. Use arrow keys on a move or reorder handle.</div></details><button class="text-btn reset">Reset all settings</button></div><button class="icon settings-resize" aria-label="Resize settings" title="Drag to resize · Arrow keys resize · Double-click resets size"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m5 13 8-8m-3 8 3-3"/></svg></button>`;
-    renderFeatureSettings();positionSettings();
+    renderFeatureSettings();updateBarPreview();positionSettings();
   }
   function selectSettingsTab(key,focus=false){
     if(!Object.hasOwn(SETTINGS_TABS,key))return;
@@ -635,6 +706,7 @@
       const caption=state.compact?(left==null?'Reset unknown':left>0?`Resets ${fmtDur(left)}`:'Refresh to update'):`${r.reached?'Limit reached · ':''}${left==null?'':reset}`;
       return `<div class="row plan-row" ${state.compact?`tabindex="0" role="group" aria-label="${esc(full)}"`:''}><div class="rl"><span>${esc(r.label)}</span><span class="v ${r.reached&&!state.showRemainingPlan?'at-limit':''}">${displayed==null?'—':Math.round(displayed)+(state.showRemainingPlan?'% left':'%')}</span></div>${displayed==null?'':bar(displayed,r.label,state.showRemainingPlan)}<div class="sub">${esc(caption)}</div>${state.compact&&state.showPlanTooltips?`<div class="plan-tip" aria-hidden="true">${esc(full)}</div>`:''}</div>`;
     }).join('')}</div>`:`<div class="empty">${state.error?'Usage unavailable. Try refreshing.':state.usageAt?'No plan limits reported.':'Waiting for usage…'}</div>`;
+    if(state.showPaidReset)blocks.plan+=`<button class="add-credits paid-reset" title="Open ChatGPT Usage to review paid reset offers">Paid reset…</button>`;
     const balance=num(parsed.credits);
     if(state.showCreditBar&&state.creditReferencePending&&balance>0){state.creditReference=Number(balance.toFixed(2))||balance;state.creditReferencePending=false;persist();syncCreditBarSettings();}
     const creditText=balance!=null?format(balance):parsed.credits??'—';
@@ -665,7 +737,7 @@
     const footer=state.showUpdateTime||(!inHeader&&state.showDetails)?`<div class="foot ${inHeader?'head-status':''}">${state.showUpdateTime?`<span class="updated-at" title="Updated ${esc(fmtAgo(state.usageAt))}">${inHeader?'':'Updated '}${fmtAgo(state.usageAt)}</span>`:''}${!inHeader&&state.showDetails?`<button class="text-btn raw" aria-expanded="${state.showRaw}">${state.showRaw?'Hide data':'Details'}</button>`:''}</div>`:'';
     $('.head-status-slot').innerHTML=state.footerPosition==='header'?footer:'';
     $('.head').classList.toggle('has-header-status',state.footerPosition==='header'&&!!footer);
-    $('.body').innerHTML=(state.footerPosition==='top'?footer:'')+state.sections.filter(k=>!state.hidden[k]).map(k=>`<section class="section" data-section="${k}"><div class="section-head"><button class="section-toggle" data-collapse="${k}" aria-expanded="${!state.closed[k]}" aria-controls="gptu-${k}">${icon(k)}<span>${labels[k]}</span>${k==='credits'&&state.closed.credits?`<span class="credit-inline">${esc(creditText)}</span>`:''}${icon('chevron')}</button><button class="icon section-handle" draggable="true" data-handle="${k}" aria-label="Reorder ${labels[k]}" title="Drag to reorder · ↑ / ↓">${icon('grip')}</button></div><div class="section-content" id="gptu-${k}" ${state.closed[k]?'hidden':''}>${blocks[k]}</div></section>`).join('')+
+    $('.body').innerHTML=(state.footerPosition==='top'?footer:'')+state.sections.filter(k=>!state.hidden[k]).map(k=>`<section class="section" data-section="${k}"><div class="section-head"><button class="section-toggle" data-collapse="${k}" aria-expanded="${!state.closed[k]}" aria-controls="gptu-${k}">${icon(k)}<span>${labels[k]}</span>${k==='credits'&&state.closed.credits?`<span class="credit-inline">${esc(creditText)}</span>`:''}${icon('chevron')}</button>${k==='plan'&&resetCount()!=null?`<span class="reset-tools" title="Available usage limit resets"><span>${resetCount()} ${resetCount()===1?'reset':'resets'}</span>${resetCount()>0?`<button class="use-reset" aria-label="Use usage limit reset" ${resetPending?'disabled':''}>Use</button>`:''}</span>`:''}<button class="icon section-handle" draggable="true" data-handle="${k}" aria-label="Reorder ${labels[k]}" title="Drag to reorder · ↑ / ↓">${icon('grip')}</button></div><div class="section-content" id="gptu-${k}" ${state.closed[k]?'hidden':''}>${blocks[k]}</div></section>`).join('')+
       `${state.error?`<div class="err" role="status">${esc(state.error)}</div>`:''}${state.footerPosition==='bottom'?footer:''}${state.showRaw?`<pre>${esc(JSON.stringify({usage:state.usage,models:state.models},null,2))}</pre>`:''}`;
     $('.body').scrollTop=scroll;
     if(host.hasAttribute('data-bottom')) layoutBottom();
@@ -761,30 +833,38 @@
     const input=controls.querySelector('[data-credit-reference]');if(root.activeElement!==input)input.value=state.creditReference??'';
   }
   root.addEventListener('change',event=>{
-    if(event.target.hasAttribute('data-bar-gradient')){state.barGradient=event.target.checked;persist();applyTheme();return;}
-    const key=event.target.dataset.barColor;if(!Object.hasOwn(BAR_ROLES,key))return;
-    const value=event.target.value;state.barColors[key]=value==='custom'?'#60a5fa':validBarColor(value)?value:'auto';
-    persist();applyTheme();renderSettings();
+    if(event.target.hasAttribute('data-visible-gradient')){state.barGradientVisible=event.target.checked;persist();render();}
+    if(event.target.hasAttribute('data-bar-gradient')){state.barGradient=event.target.checked;persist();render();renderSettings();}
+    if(event.target.hasAttribute('data-paid-reset')){state.showPaidReset=event.target.checked;persist();render();}
+    if(event.target.dataset.setting==='barMode'){state.barMode=event.target.value;persist();render();renderSettings();}
   });
   root.addEventListener('input',event=>{
-    const key=event.target.dataset.barCustom,value=event.target.value;if(!Object.hasOwn(BAR_ROLES,key)||!/^#[0-9a-f]{6}$/i.test(value))return;
-    state.barColors[key]=value;persist();applyTheme();
+    const key=event.target.dataset.simpleBarColor,value=event.target.value;if(!['barColor','barStart','barEnd'].includes(key)||!isHex(value))return;
+    state[key]=value;persist();render();
   });
-  root.addEventListener('click',event=>{if(!event.target.hasAttribute('data-reset-bar-colors'))return;state.barColors={};state.barGradient=false;state.gradientStops=[];persist();applyTheme();renderSettings();});
-  root.addEventListener('input',event=>{
-    const target=event.target,index=Number(target.dataset.gradientColor??target.dataset.gradientPosition);
-    if(!Number.isInteger(index)||!state.gradientStops[index])return;
-    if(target.hasAttribute('data-gradient-color'))state.gradientStops[index].color=target.value;
-    else if(target.hasAttribute('data-gradient-position')&&target.validity.valid&&target.value!=='')state.gradientStops[index].at=Number(target.value);
-    else return;
+  function editMiddleColor(event){
+    const target=event.target,index=Number(target.dataset.gradientColor??target.dataset.gradientFrom??target.dataset.gradientTo);
+    const stop=state.gradientStops[index];if(!Number.isInteger(index)||!stop)return;
+    if(target.hasAttribute('data-gradient-color')&&isHex(target.value))stop.color=target.value;
+    else if((target.hasAttribute('data-gradient-from')||target.hasAttribute('data-gradient-to'))&&target.value!==''&&target.validity.valid){
+      const lower=index?state.gradientStops[index-1].to:1,upper=state.gradientStops[index+1]?.from??99;
+      const value=Math.max(lower,Math.min(upper,Number(target.value)));
+      if(target.hasAttribute('data-gradient-from')){stop.from=value;stop.to=Math.max(value,stop.to);}
+      else{stop.to=value;stop.from=Math.min(value,stop.from);}
+      const other=target.parentElement.parentElement.querySelector(target.hasAttribute('data-gradient-from')?'[data-gradient-to]':'[data-gradient-from]');
+      if(other)other.value=target.hasAttribute('data-gradient-from')?stop.to:stop.from;
+      if(event.type==='change')target.value=target.hasAttribute('data-gradient-from')?stop.from:stop.to;
+    }else return;
     persist();applyTheme();
-  });
+  }
+  root.addEventListener('input',editMiddleColor);root.addEventListener('change',editMiddleColor);
   root.addEventListener('click',event=>{
     const target=event.target;
     if(target.hasAttribute('data-add-stop')&&state.gradientStops.length<8){
-      const points=[0,...state.gradientStops.map(stop=>stop.at).sort((a,b)=>a-b),100];let left=0,right=100,gap=0;
+      const points=[0,...state.gradientStops.flatMap(stop=>[stop.from,stop.to]),100];let left=0,right=100,gap=0;
       for(let i=1;i<points.length;i++)if(points[i]-points[i-1]>gap){left=points[i-1];right=points[i];gap=right-left;}
-      state.gradientStops.push({at:Math.round((left+right)/2),color:'#a78bfa'});
+      const at=Math.max(1,Math.min(99,Math.round((left+right)/2)));
+      state.gradientStops.push({from:at,to:at,color:'#a78bfa'});state.gradientStops.sort((a,b)=>a.from-b.from);
     }else if(target.hasAttribute('data-remove-stop'))state.gradientStops.splice(Number(target.dataset.removeStop),1);
     else return;
     persist();applyTheme();renderSettings();
@@ -1013,6 +1093,7 @@
     if(hidden){
       if(settingsOpen)closeSettings();
       if($('.credits-modal').open)$('.credits-modal').close();
+      if($('.reset-dialog').open)$('.reset-dialog').close();
       host.removeAttribute('data-floating');applySize();return;
     }
     const floating=state.position==='floating'||!nav, bottom=!floating&&state.position==='bottom';

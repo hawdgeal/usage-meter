@@ -49,9 +49,35 @@
     try {
       const usage = await authedGet("/backend-api/wham/usage");
       post("usage", { data: usage, plan: session && session.plan, at: Date.now() });
+      if(!Number.isInteger(usage.rate_limit_reset_credits?.available_count)){
+        try{const details=await authedGet('/backend-api/wham/rate-limit-reset-credits');post('reset-summary',{available_count:details.available_count});}catch(_){}
+      }
     } catch (e) {
       post("usage-error", { message: String(e && e.message || e), at: Date.now() });
     }
+  }
+
+  let resetInFlight=false;
+  async function resetDetails(flowId){
+    try{const data=await authedGet('/backend-api/wham/rate-limit-reset-credits');post('reset-details',{flowId,data});}
+    catch(_){post('reset-details',{flowId,error:'Unable to load available resets. Open Usage to review them.'});}
+  }
+  async function useReset(payload){
+    if(resetInFlight)return;
+    if(typeof payload?.creditId!=='string'||typeof payload?.requestId!=='string'||!/^[0-9a-f-]{36}$/i.test(payload.requestId))return;
+    resetInFlight=true;
+    try{
+      const details=await authedGet('/backend-api/wham/rate-limit-reset-credits');
+      const credit=details.credits?.find(c=>c.id===payload.creditId&&c.status==='available'&&(!c.expires_at||Date.parse(c.expires_at)>Date.now()));
+      if(!credit)throw Error('unavailable');
+      const auth=await getSession(false),headers={Authorization:`Bearer ${auth.token}`,Accept:'application/json','Content-Type':'application/json'};
+      if(auth.accountId)headers['ChatGPT-Account-Id']=auth.accountId;
+      const response=await origFetch('/backend-api/wham/rate-limit-reset-credits/consume',{method:'POST',headers,credentials:'include',body:JSON.stringify({redeem_request_id:payload.requestId,credit_id:credit.id})});
+      if(!response.ok)throw Error('request failed');
+      const result=await response.json();
+      post('reset-result',{flowId:payload.flowId,code:result.code,windows:result.windows_reset});
+    }catch(_){post('reset-result',{flowId:payload.flowId,error:'The reset could not be confirmed. Refresh Usage and check your reset balance before trying again.'});}
+    finally{resetInFlight=false;refreshUsage();}
   }
 
   // ---------- passive scan for per-model limits ----------
@@ -129,6 +155,8 @@
   window.addEventListener("message", (ev) => {
     if (ev.source !== window || !ev.data || ev.data.source !== TAG_IN) return;
     if (ev.data.type === "refresh") refreshUsage();
+    else if(ev.data.type==='reset-details')resetDetails(ev.data.payload?.flowId);
+    else if(ev.data.type==='use-reset')useReset(ev.data.payload);
   });
 
   post("ready", {});
