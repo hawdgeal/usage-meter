@@ -6,21 +6,26 @@ A browser extension that adds a **Usage** card to ChatGPT's left sidebar, showin
 - **Credits** — your pay-as-you-go usage-credit balance, or "Unlimited".
 - **Model & feature limits** — remaining messages/uses per model or feature (Deep Research, image generation…), captured whenever ChatGPT reports them.
 
-## Panel controls (0.3.8)
+## Panel controls (0.3.11)
 
+- **Add credits button** in settings shows or hides the action in expanded Credits. It opens the [Codex usage dashboard](https://chatgpt.com/codex/settings/usage) in a new tab; buying credits happens there.
+- **Show remaining plan allowance** switches plan percentages, bars, tooltips and the collapsed summary to remaining allowance, matching the original usage page. Full neutral bars mean 100% left; empty bars mean 0% left. Feature counters are unaffected.
+- **Plan limit tooltips** in settings enables or disables the compact limit detail popups. Short reset captions remain visible.
+- **Models & features to show** in settings lets you toggle individual counters (Deep Research, File uploads, Paste text to file, Image generation, and reported models). These choices are saved separately from the whole module switch. Hiding a counter keeps its cached data and does not affect your account limits. Counters still require data reported by ChatGPT.
 - Drag, refresh, customize, reorder, collapse arrows, update time, and Details appear on panel hover or keyboard focus. Touch devices keep controls visible. Hidden controls retain their space so rows do not jump.
 - Compact plan limits use responsive columns with short reset captions. Hover or focus a limit for its full status and reset time. Narrow panels stack them automatically.
-- **Compact mode** in settings uses tighter spacing, smaller icons and a shorter credit display while retaining readable text. It fits the content automatically instead of retaining an oversized panel height, and remembers your preference. Turn it off to restore your previous size.
+- **Compact mode** in settings uses tighter spacing, smaller icons and a shorter credit display while retaining readable text. The Usage title keeps the same size in both modes. It fits the content automatically instead of retaining an oversized panel height, and remembers your preference. Turn it off to restore your previous size.
 - Bottom mode removes footer-sized padding or margins from the history scroll area to avoid leaving unused space above Usage. Those page styles are restored in other placements.
 - The panel border and resize handle appear on hover or keyboard focus; touch devices keep the handle accessible.
 - Settings open as a separate popover without shifting the panel. Click outside or press Escape to dismiss it. Choosing a placement closes the popover.
 - Sidebar bottom inserts the panel into the sidebar layout directly above the account footer, located using the visible Open profile menu button in the active Chat history navigation. Hidden controls in the collapsed sidebar rail are ignored. It does not use floating or fixed positioning. When the account footer is absolutely positioned, bottom mode reserves its measured height, including through display:contents wrappers.
-- When the panel is collapsed, its label, summary, and controls appear on hover or keyboard focus.
+- **Hide collapsed Usage until hover** in settings controls whether the collapsed label and summary stay visible. It defaults to the existing hover behavior and remembers your choice. Other controls still reveal on hover or keyboard navigation.
+- The hidden drag handle releases its horizontal space, aligning Usage further left until the handle is revealed.
 - Drag the bottom-right corner to resize the height in the sidebar, or both width and height when floating. Focus that handle and use arrow keys for keyboard resizing. Double-click it to reset the size. Your dimensions are saved locally.
 - Dark mode uses a true black background.
 - Automatically follows ChatGPT's light or dark theme, with explicit readable colors. Use **Customize panel → Appearance** to override it.
 - Click **Usage** to collapse the panel into a one-line summary.
-- Collapse **Plan limits**, **Credits**, and **Models & features** independently.
+- Collapse **Plan limits**, **Credits**, and **Models & features** independently. Collapsed Credits shows its current balance beside the title, including in compact mode.
 - Drag the dotted handle beside a section to reorder it. Focus the handle and press **↑ / ↓** to reorder with a keyboard.
 - Drag the dotted handle beside **Usage** to detach and move the panel anywhere in the viewport. Arrow keys move it by 10 pixels (Shift for 30). Press **Escape** on that handle to dock it at the top of the sidebar.
 - **Customize panel → Placement** offers Sidebar top, Sidebar bottom, and Floating. The same menu has **Visible modules** switches to show or hide Plan limits, Credits, and Models & features independently of their collapsed state, plus a layout reset.

@@ -15,11 +15,16 @@
     collapsed: false,
     compact: false,
     compactHeight: null,
+    hideCollapsed: true,
+    showAddCredits: true,
+    showPlanTooltips: true,
+    showRemainingPlan: false,
     position: "top", // "top" | "bottom" inside the sidebar
     showRaw: false,
     sections: ["plan", "credits", "features"],
     closed: {},
     hidden: {},
+    hiddenFeatures: {},
     theme: "auto",
     floating: { x: 24, y: 100 },
     size: { width: 300, height: null },
@@ -27,7 +32,7 @@
   let lastRefresh = 0;
 
   // ---------- persistence ----------
-  const saveKeys = ["usage", "plan", "usageAt", "models", "collapsed", "position", "sections", "closed", "hidden", "theme", "floating", "size", "compact", "compactHeight"];
+  const saveKeys = ["usage", "plan", "usageAt", "models", "collapsed", "position", "sections", "closed", "hidden", "theme", "floating", "size", "compact", "compactHeight", "hideCollapsed", "hiddenFeatures", "showAddCredits", "showPlanTooltips", "showRemainingPlan"];
   function persist() {
     const o = {};
     for (const k of saveKeys) o[k] = state[k];
@@ -39,7 +44,7 @@
       if (r && r.gptu) for (const k of saveKeys) if (r.gptu[k] !== undefined) state[k] = r.gptu[k];
     } catch (_) {}
     if (!Array.isArray(state.sections)) state.sections = ["plan", "credits", "features"];
-    for (const key of ["closed", "hidden", "models"]) if (!state[key] || typeof state[key] !== "object") state[key] = {};
+    for (const key of ["closed", "hidden", "models", "hiddenFeatures"]) if (!state[key] || typeof state[key] !== "object") state[key] = {};
     if (!state.floating || !Number.isFinite(state.floating.x) || !Number.isFinite(state.floating.y)) state.floating = {x:24,y:100};
     if (!state.size || !Number.isFinite(state.size.width)) state.size = {width:300,height:null};
     if (!Number.isFinite(state.size.height)) state.size.height = null;
@@ -144,6 +149,7 @@
     } else if (type === "model-limits") {
       for (const it of payload.items) state.models[it.name] = { ...it, seenAt: payload.at };
       persist(); render();
+      if(settingsOpen){renderFeatureSettings();positionSettings();}
     } else if (type === "activity") {
       setTimeout(() => requestRefresh(false), 4000);
     }
@@ -164,13 +170,10 @@
     @media(hover:none) { .resize { opacity:1; pointer-events:auto; } }
     :host([data-bottom]) { position:relative; margin-top:0; width:auto; flex:0 0 auto; }
     :host([data-bottom]) .card { margin:6px 8px; }
-    .card.collapsed .grab, .card.collapsed .refresh, .card.collapsed .customize,
-    .card.collapsed .title, .card.collapsed .badge, .card.collapsed .summary, .card.collapsed .toggle .chev { opacity:0; pointer-events:none; }
-    .card.collapsed:hover .grab, .card.collapsed:hover .refresh, .card.collapsed:hover .customize,
-    .card.collapsed:hover .title, .card.collapsed:hover .badge, .card.collapsed:hover .summary, .card.collapsed:hover .toggle .chev,
-    .card.collapsed:has(:focus-visible) .grab, .card.collapsed:has(:focus-visible) .refresh, .card.collapsed:has(:focus-visible) .customize,
-    .card.collapsed:has(:focus-visible) .title, .card.collapsed:has(:focus-visible) .badge, .card.collapsed:has(:focus-visible) .summary, .card.collapsed:has(:focus-visible) .toggle .chev { opacity:1; pointer-events:auto; }
-    @media(hover:none) { .card.collapsed .icon, .card.collapsed .toggle .chev { opacity:1; pointer-events:auto; } }
+    .card.collapsed.hide-collapsed .title,.card.collapsed.hide-collapsed .badge,.card.collapsed.hide-collapsed .summary { opacity:0; pointer-events:none; }
+    .card.collapsed.hide-collapsed:hover .title,.card.collapsed.hide-collapsed:hover .badge,.card.collapsed.hide-collapsed:hover .summary,
+    .card.collapsed.hide-collapsed:has(:focus-visible) .title,.card.collapsed.hide-collapsed:has(:focus-visible) .badge,.card.collapsed.hide-collapsed:has(:focus-visible) .summary { opacity:1; pointer-events:auto; }
+    @media(hover:none) { .card.collapsed.hide-collapsed .title,.card.collapsed.hide-collapsed .badge,.card.collapsed.hide-collapsed .summary { opacity:1; pointer-events:auto; } }
     :host([data-dark]) { color-scheme:dark; }
     :host([data-dark]) .card, :host([data-dark]) .settings { --fg:#ececec; --muted:#ababab; --line:#292929; --surface:#000000; --hover:#171717; --track:#292929; --ok:#57c7a6; --warn:#e9b55f; --bad:#ff7983; }
     button,select { font:inherit; color:inherit; }
@@ -183,7 +186,7 @@
     .grab { cursor:grab; touch-action:none; }
     .grab:active { cursor:grabbing; }
     .toggle { display:flex; align-items:center; gap:6px; min-width:0; flex:1; border-radius:7px; padding:5px 2px; text-align:left; }
-    .title { font-weight:600; white-space:nowrap; }
+    .title { font-size:13px; font-weight:600; white-space:nowrap; }
     .badge { color:var(--muted); border:1px solid var(--line); font-size:9px; padding:1px 4px; border-radius:5px; text-transform:uppercase; max-width:58px; overflow:hidden; text-overflow:ellipsis; }
     .chev { width:13px; transition:transform .15s; }
     [aria-expanded="false"] .chev { transform:rotate(-90deg); }
@@ -191,6 +194,12 @@
     .section { margin:0 10px; border-top:1px solid var(--line); }
     .section-head { display:flex; align-items:center; gap:2px; padding:5px 0; }
     .section-toggle { display:flex; flex:1; align-items:center; gap:7px; min-width:0; text-align:left; padding:6px 2px; border-radius:6px; font-size:11px; font-weight:600; color:var(--muted); }
+    .add-credits { display:inline-flex; align-items:center; justify-content:center; gap:5px; align-self:flex-start; margin-top:8px; border:1px solid var(--line); border-radius:7px; padding:5px 9px; color:var(--fg); background:var(--surface); font:12px/1.4 ui-sans-serif,system-ui,sans-serif; text-decoration:none; }
+    .add-credits:hover { background:var(--hover); }
+    .add-credits:focus-visible { outline:2px solid var(--ok); outline-offset:2px; }
+    .add-credits svg { width:13px; height:13px; }
+    .compact .add-credits { margin-top:5px; padding:3px 7px; font-size:11px; }
+    .credit-inline { color:var(--fg); font-size:12px; font-weight:600; font-variant-numeric:tabular-nums; }
     .section-toggle .chev { margin-left:auto; }
     .section-handle { width:22px; height:24px; cursor:grab; }
     .section-content { padding:1px 2px 6px; }
@@ -200,6 +209,7 @@
     .v { font-size:12px; font-weight:600; font-variant-numeric:tabular-nums; flex-shrink:0; }
     .bar { height:4px; background:var(--track); border-radius:9px; overflow:hidden; margin:7px 0 5px; }
     .bar i { display:block; height:100%; border-radius:9px; background:var(--ok); }
+    .bar i.remaining { background:var(--fg); }
     .bar i.warn { background:var(--warn); } .bar i.bad { background:var(--bad); }
     .sub,.empty,.note { color:var(--muted); font-size:11px; line-height:1.5; }
     .empty { padding-bottom:8px; }
@@ -236,7 +246,6 @@
     .compact .icon { width:24px; height:24px; }
     .compact svg { width:14px; height:14px; }
     .compact .chev { width:11px; }
-    .compact .title { font-size:12px; }
     .compact .badge { font-size:9px; }
     .compact .section { margin:0 8px; }
     .compact .section-head { padding:2px 0; }
@@ -265,6 +274,15 @@
     .plan-row:hover .plan-tip,.plan-row:focus-visible .plan-tip { display:block; }
     .plan-row:focus-visible { outline:2px solid var(--ok); outline-offset:2px; }
     @media(hover:none) { .card .grab,.card .refresh,.card .customize,.card .section-handle,.card .foot,.card .chev { opacity:1; pointer-events:auto; } }
+    .card .head .grab { width:0; min-width:0; margin-right:-3px; overflow:hidden; }
+    .card:hover .head .grab,.card:has(:focus-visible) .head .grab { width:28px; margin-right:0; overflow:visible; }
+    .card.compact:hover .head .grab,.card.compact:has(:focus-visible) .head .grab { width:24px; }
+    @media(hover:none) { .card .head .grab { width:28px; margin-right:0; overflow:visible; } .card.compact .head .grab { width:24px; } }
+    .feature-options { margin:0; padding:0 0 0 10px; border-left:1px solid var(--line); }
+    .feature-settings { border-top:1px solid var(--line); padding-top:9px; margin-top:4px; }
+    .feature-settings-title { font-size:11px; font-weight:600; color:var(--muted); margin-bottom:6px; }
+    .feature-options label { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:5px 0; font-size:11px; overflow-wrap:anywhere; }
+    .feature-options input { flex-shrink:0; }
     .live { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
     @media(prefers-reduced-motion:reduce) { * { animation:none !important; transition:none !important; } }
   `;
@@ -292,8 +310,10 @@
   const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const level=p=>p>=90?'bad':p>=75?'warn':'';
   const labels={plan:'Plan limits',credits:'Credits',features:'Models & features'};
+  const featureNames={deep_research:'Deep Research',file_upload:'File uploads',paste_text_to_file:'Paste text to file',image_gen:'Image generation'};
+  const featureLabel=name=>featureNames[name]||name.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
   const format=n=>new Intl.NumberFormat(undefined,{maximumFractionDigits:2}).format(n);
-  const bar=(p,label)=>`<div class="bar" role="progressbar" aria-label="${esc(label)} used" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${p}"><i class="${level(p)}" style="width:${p}%"></i></div>`;
+  const bar=(p,label,remaining=false)=>`<div class="bar" role="progressbar" aria-label="${esc(label)} ${remaining?'remaining':'used'}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${p}"><i class="${remaining?'remaining':level(p)}" style="width:${p}%"></i></div>`;
   function applyTheme() {
     const html=document.documentElement;
     const dark=state.theme==='dark'||state.theme==='auto'&&(html.classList.contains('dark')||html.dataset.theme==='dark'||(!html.classList.contains('light')&&html.dataset.theme!=='light'&&(getComputedStyle(html).colorScheme==='dark'||getComputedStyle(html).colorScheme!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches)));
@@ -305,13 +325,26 @@
     $('.settings').innerHTML=`<div class="settings-title"><span>Usage settings</span><button class="icon close-settings" aria-label="Close settings">✕</button></div><div class="setting"><span>Appearance</span><select aria-label="Appearance" data-setting="theme">${['auto','light','dark'].map(k=>`<option value="${k}" ${state.theme===k?'selected':''}>${k==='auto'?'Match ChatGPT':k==='light'?'Light':'Dark'}</option>`).join('')}</select></div>
     <div class="setting"><span>Placement</span><select aria-label="Placement" data-setting="position">${['top','bottom','floating'].map(k=>`<option value="${k}" ${state.position===k?'selected':''}>${k==='top'?'Sidebar top':k==='bottom'?'Sidebar bottom':'Floating'}</option>`).join('')}</select></div>
     <label class="setting compact-toggle"><span>Compact mode</span><input type="checkbox" role="switch" aria-label="Compact mode" data-compact ${state.compact?'checked':''}></label>
+    <label class="setting"><span>Hide collapsed Usage until hover</span><input type="checkbox" role="switch" aria-label="Hide collapsed Usage until hover" data-hide-collapsed ${state.hideCollapsed?'checked':''}></label>
+    <label class="setting"><span>Add credits button</span><input type="checkbox" role="switch" aria-label="Add credits button" data-add-credits ${state.showAddCredits?'checked':''}></label>
+    <label class="setting"><span>Plan limit tooltips</span><input type="checkbox" role="switch" aria-label="Plan limit tooltips" data-plan-tooltips ${state.showPlanTooltips?'checked':''}></label>
+    <label class="setting"><span>Show remaining plan allowance</span><input type="checkbox" role="switch" aria-label="Show remaining plan allowance" data-remaining-plan ${state.showRemainingPlan?'checked':''}></label>
     <div class="modules-title" id="gptu-modules-label">Visible modules</div><div class="checks" role="group" aria-labelledby="gptu-modules-label">${Object.keys(labels).map(k=>`<label><span>${labels[k]}</span><input type="checkbox" role="switch" aria-label="Show ${labels[k]}" data-visible="${k}" ${!state.hidden[k]?'checked':''}></label>`).join('')}</div>
+    <div class="feature-settings"><div class="feature-settings-title" id="gptu-feature-options-label">Models &amp; features to show</div><div class="feature-options" role="group" aria-labelledby="gptu-feature-options-label"></div><div class="note">Counters appear when ChatGPT reports them. New models are added here automatically.</div></div>
     <div class="note">Drag section handles to reorder. Use ↑ / ↓ on a section handle for keyboard reordering.</div><button class="text-btn reset">Reset layout</button>`;
+    renderFeatureSettings();
+  }
+  function renderFeatureSettings(){
+    const active=root.activeElement?.dataset.feature;
+    const names=[...new Set([...Object.keys(featureNames),...Object.keys(state.models),...Object.keys(state.hiddenFeatures)])];
+    $('.feature-options').innerHTML=names.map(name=>`<label><span>${esc(featureLabel(name))}</span><input type="checkbox" role="switch" aria-label="Show ${esc(featureLabel(name))} counter" data-feature="${esc(name)}" ${state.hiddenFeatures[name]!==true?'checked':''}></label>`).join('');
+    if(active)[...$('.feature-options').querySelectorAll('[data-feature]')].find(el=>el.dataset.feature===active)?.focus();
   }
   function render() {
     applyTheme();
     card.classList.toggle('collapsed',!!state.collapsed);
     card.classList.toggle('compact',!!state.compact);
+    card.classList.toggle('hide-collapsed',!!state.hideCollapsed);
     applySize();
     const parsed=parseUsage(state.usage), plan=parsed.plan||state.plan;
     $('.badge').hidden=!plan; $('.badge').textContent=plan||'';
@@ -319,29 +352,31 @@
     $('.body').hidden=!!state.collapsed;
     const pcts=parsed.rows.map(r=>r.pct).filter(p=>p!=null);
     $('.summary').hidden=!state.collapsed;
-    $('.summary').textContent=pcts.length?`${Math.round(Math.max(...pcts))}% used · ${fmtAgo(state.usageAt)}`:'No usage reported yet';
+    $('.summary').textContent=pcts.length?`${Math.round(state.showRemainingPlan?100-Math.max(...pcts):Math.max(...pcts))}% ${state.showRemainingPlan?'left':'used'} · ${fmtAgo(state.usageAt)}`:'No usage reported yet';
     const blocks={};
     blocks.plan=parsed.rows.length?`<div class="plan-grid">${parsed.rows.map(r=>{
       const left=r.resetsAt?r.resetsAt-Date.now():null;
       const reset=left==null?'Reset not reported':left>0?`Resets in ${fmtDur(left)}`:'Reset · refresh to update';
-      const full=`${r.label}: ${r.pct==null?'Usage not reported':Math.round(r.pct)+'% used'}${r.reached?' · Limit reached':''} · ${reset}${r.resetsAt?' · '+new Date(r.resetsAt).toLocaleString():''}`;
+      const displayed=r.pct==null?null:state.showRemainingPlan?100-r.pct:r.pct;
+      const full=`${r.label}: ${displayed==null?'Usage not reported':Math.round(displayed)+(state.showRemainingPlan?'% left':'% used')}${r.reached?' · Limit reached':''} · ${reset}${r.resetsAt?' · '+new Date(r.resetsAt).toLocaleString():''}`;
       const caption=state.compact?(left==null?'Reset unknown':left>0?`Resets ${fmtDur(left)}`:'Refresh to update'):`${r.reached?'Limit reached · ':''}${left==null?'':reset}`;
-      return `<div class="row plan-row" ${state.compact?`tabindex="0" role="group" aria-label="${esc(full)}"`:''}><div class="rl"><span>${esc(r.label)}</span><span class="v ${r.reached?'at-limit':''}">${r.pct==null?'—':Math.round(r.pct)+'%'}</span></div>${r.pct==null?'':bar(r.pct,r.label)}<div class="sub">${esc(caption)}</div>${state.compact?`<div class="plan-tip" aria-hidden="true">${esc(full)}</div>`:''}</div>`;
+      return `<div class="row plan-row" ${state.compact?`tabindex="0" role="group" aria-label="${esc(full)}"`:''}><div class="rl"><span>${esc(r.label)}</span><span class="v ${r.reached&&!state.showRemainingPlan?'at-limit':''}">${displayed==null?'—':Math.round(displayed)+(state.showRemainingPlan?'% left':'%')}</span></div>${displayed==null?'':bar(displayed,r.label,state.showRemainingPlan)}<div class="sub">${esc(caption)}</div>${state.compact&&state.showPlanTooltips?`<div class="plan-tip" aria-hidden="true">${esc(full)}</div>`:''}</div>`;
     }).join('')}</div>`:`<div class="empty">${state.error?'Usage unavailable. Try refreshing.':state.usageAt?'No plan limits reported.':'Waiting for usage…'}</div>`;
     const balance=num(parsed.credits);
-    blocks.credits=`<div class="credit">${balance!=null?format(balance):esc(parsed.credits??'—')}</div><div class="sub">${parsed.credits==null?'No credit balance reported':'Available balance'}</div>`;
-    const models=Object.entries(state.models).sort((a,b)=>(b[1].seenAt||0)-(a[1].seenAt||0)).slice(0,12);
+    const creditText=balance!=null?format(balance):parsed.credits??'—';
+    blocks.credits=`<div class="credit">${esc(creditText)}</div><div class="sub">${parsed.credits==null?'No credit balance reported':'Available balance'}</div>${state.showAddCredits?'<a class="add-credits" href="https://chatgpt.com/codex/settings/usage" target="_blank" rel="noopener noreferrer"><svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M3 8h10"/></svg>Add credits</a>':''}`;
+    const models=Object.entries(state.models).filter(([name])=>state.hiddenFeatures[name]!==true).sort((a,b)=>(b[1].seenAt||0)-(a[1].seenAt||0)).slice(0,12);
     blocks.features=models.map(([name,m])=>{
       const expired=m.resetsAt&&m.resetsAt<=Date.now();
       const val=expired?'Refresh needed':m.remaining!=null?(m.limit!=null?`${format(m.remaining)} / ${format(m.limit)} left`:`${format(m.remaining)} left`):m.used!=null&&m.limit!=null?`${format(m.used)} / ${format(m.limit)} used`:'—';
-      const label=name.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+      const label=featureLabel(name);
       const pct=!expired&&m.limit>0?(m.remaining!=null?100-m.remaining/m.limit*100:m.used!=null?m.used/m.limit*100:null):null;
-      return `<div class="row"><div class="rl"><span>${esc(label)}</span><span class="v">${esc(val)}</span></div>${pct==null?'':bar(Math.max(0,Math.min(100,pct)),label)}<div class="sub">${!expired&&m.resetsAt?`Resets in ${fmtDur(m.resetsAt-Date.now())} · `:''}Seen ${fmtAgo(m.seenAt)}</div></div>`;
-    }).join('')||'<div class="empty">Limits appear here when ChatGPT reports them.</div>';
+      return `<div class="row" data-counter="${esc(name)}"><div class="rl"><span>${esc(label)}</span><span class="v">${esc(val)}</span></div>${pct==null?'':bar(Math.max(0,Math.min(100,pct)),label)}<div class="sub">${!expired&&m.resetsAt?`Resets in ${fmtDur(m.resetsAt-Date.now())} · `:''}Seen ${fmtAgo(m.seenAt)}</div></div>`;
+    }).join('')||`<div class="empty">${Object.keys(state.models).length?'All reported counters are hidden. Choose which to show in settings.':'Limits appear here when ChatGPT reports them.'}</div>`;
     const scroll=$('.body').scrollTop;
     const focused=root.activeElement?.dataset;
     const rawFocused=root.activeElement?.classList.contains('raw');
-    $('.body').innerHTML=state.sections.filter(k=>!state.hidden[k]).map(k=>`<section class="section" data-section="${k}"><div class="section-head"><button class="section-toggle" data-collapse="${k}" aria-expanded="${!state.closed[k]}" aria-controls="gptu-${k}">${icon(k)}<span>${labels[k]}</span>${icon('chevron')}</button><button class="icon section-handle" draggable="true" data-handle="${k}" aria-label="Reorder ${labels[k]}" title="Drag to reorder · ↑ / ↓">${icon('grip')}</button></div><div class="section-content" id="gptu-${k}" ${state.closed[k]?'hidden':''}>${blocks[k]}</div></section>`).join('')+
+    $('.body').innerHTML=state.sections.filter(k=>!state.hidden[k]).map(k=>`<section class="section" data-section="${k}"><div class="section-head"><button class="section-toggle" data-collapse="${k}" aria-expanded="${!state.closed[k]}" aria-controls="gptu-${k}">${icon(k)}<span>${labels[k]}</span>${k==='credits'&&state.closed.credits?`<span class="credit-inline">${esc(creditText)}</span>`:''}${icon('chevron')}</button><button class="icon section-handle" draggable="true" data-handle="${k}" aria-label="Reorder ${labels[k]}" title="Drag to reorder · ↑ / ↓">${icon('grip')}</button></div><div class="section-content" id="gptu-${k}" ${state.closed[k]?'hidden':''}>${blocks[k]}</div></section>`).join('')+
       `${state.error?`<div class="err" role="status">${esc(state.error)}</div>`:''}<div class="foot"><span>Updated ${fmtAgo(state.usageAt)}</span><button class="text-btn raw" aria-expanded="${state.showRaw}">${state.showRaw?'Hide data':'Details'}</button></div>${state.showRaw?`<pre>${esc(JSON.stringify({usage:state.usage,models:state.models},null,2))}</pre>`:''}`;
     $('.body').scrollTop=scroll;
     if(host.hasAttribute('data-bottom')) layoutBottom();
@@ -368,9 +403,14 @@
     const k=e.target.closest('[data-collapse]')?.dataset.collapse;
     if(k){state.closed[k]=!state.closed[k];persist();render();}
     if(e.target.closest('.raw')){state.showRaw=!state.showRaw;render();$('.raw').focus();}
-    if(e.target.closest('.reset')){Object.assign(state,{sections:['plan','credits','features'],closed:{},hidden:{},theme:'auto',position:'top',floating:{x:24,y:100},size:{width:300,height:null},compact:false,compactHeight:null});persist();closeSettings(true);render();place(true);}
+    if(e.target.closest('.reset')){Object.assign(state,{sections:['plan','credits','features'],closed:{},hidden:{},hiddenFeatures:{},theme:'auto',position:'top',floating:{x:24,y:100},size:{width:300,height:null},compact:false,compactHeight:null,hideCollapsed:true,showAddCredits:true,showPlanTooltips:true,showRemainingPlan:false});persist();closeSettings(true);render();place(true);}
   });
   root.addEventListener('change',e=>{
+    if(e.target.hasAttribute('data-remaining-plan')){state.showRemainingPlan=e.target.checked;persist();render();positionSettings();}
+    if(e.target.hasAttribute('data-add-credits')){state.showAddCredits=e.target.checked;persist();render();positionSettings();}
+    if(e.target.hasAttribute('data-plan-tooltips')){state.showPlanTooltips=e.target.checked;persist();render();positionSettings();}
+    if(e.target.hasAttribute('data-feature')){state.hiddenFeatures={...state.hiddenFeatures,[e.target.dataset.feature]:!e.target.checked};persist();render();positionSettings();}
+    if(e.target.hasAttribute('data-hide-collapsed')){state.hideCollapsed=e.target.checked;persist();render();positionSettings();}
     if(e.target.hasAttribute('data-compact')){state.compact=e.target.checked;persist();render();place(true);positionSettings();}
     if(e.target.dataset.setting){const placement=e.target.dataset.setting==='position';state[e.target.dataset.setting]=e.target.value;if(placement)closeSettings(true);persist();render();place(true);positionSettings();}
     if(e.target.dataset.visible){state.hidden[e.target.dataset.visible]=!e.target.checked;persist();render();}
