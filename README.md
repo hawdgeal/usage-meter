@@ -6,7 +6,7 @@ A browser extension that adds a **Usage** card to ChatGPT's left sidebar, showin
 - **Credits** — your pay-as-you-go usage-credit balance, or "Unlimited".
 - **Model & feature limits** — remaining messages/uses per model or feature (Deep Research, image generation…), captured whenever ChatGPT reports them.
 
-## Panel controls (0.3.12)
+## Panel controls (0.3.13)
 
 - **Add credits button** in settings shows or hides the action in expanded Credits. It opens the [Codex usage dashboard](https://chatgpt.com/codex/settings/usage) in a new tab; buying credits happens there.
 - **Show remaining plan allowance** switches plan percentages, bars, tooltips and the collapsed summary to remaining allowance, matching the original usage page. Full neutral bars mean 100% left; empty bars mean 0% left. Feature counters are unaffected.
