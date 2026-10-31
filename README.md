@@ -2,6 +2,12 @@
 
 One browser extension that adds a **Usage** card to the left sidebar of **ChatGPT** (chatgpt.com) and **Claude** (claude.ai, including Claude Code on the web). Each site keeps its own settings, and the **Sync** tab copies settings between them in either direction.
 
+## What's new in 0.4.1
+
+- **Claude Code menus:** opening a menu (for example right-click) no longer turns the panel black or moves it below the account row.
+- **Claude icon:** the panel heading on Claude uses Claude's own Usage icon. ChatGPT keeps its gauge.
+- **Claude margins:** when docked, the panel sits 8px from the sidebar edges, the same as on ChatGPT.
+
 ## What's new in 0.4.0
 
 - **Claude support.** Shows plan limits (5-hour, weekly and per-model weekly), **Extra usage** (amount left of your monthly limit) and your plan (Free, Pro, Max 5x/20x, Team, Enterprise). Data comes from claude.ai's own usage endpoint, using your existing login.

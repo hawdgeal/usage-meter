@@ -659,7 +659,7 @@
   }
   function exportSettings(){
     const settings=Object.fromEntries(Object.keys(defaultPreferences()).filter(key=>key!=='creditReferencePending').map(key=>[key,structuredClone(state[key])]));
-    const data={format:'usage-meter-settings',site:SITE.id,version:1,extensionVersion:globalThis.chrome?.runtime?.getManifest?.().version||globalThis.browser?.runtime?.getManifest?.().version||'0.3.34',exportedAt:new Date().toISOString(),settings};
+    const data={format:'usage-meter-settings',site:SITE.id,version:1,extensionVersion:globalThis.chrome?.runtime?.getManifest?.().version||globalThis.browser?.runtime?.getManifest?.().version||'0.4.1',exportedAt:new Date().toISOString(),settings};
     let url;
     try{
       url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)+'\n'],{type:'application/json'}));
