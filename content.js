@@ -160,8 +160,8 @@
     .resize { opacity:0; pointer-events:none; }
     .card:hover .resize, .card:focus-within .resize { opacity:1; pointer-events:auto; }
     @media(hover:none) { .resize { opacity:1; pointer-events:auto; } }
-    :host([data-bottom]) { position:fixed; z-index:2147482999; margin:0; }
-    :host([data-bottom]) .card { margin:0; }
+    :host([data-bottom]) { position:relative; margin-top:auto; width:auto; flex:0 0 auto; }
+    :host([data-bottom]) .card { margin:6px 8px; }
     .card.collapsed .grab, .card.collapsed .refresh, .card.collapsed .customize,
     .card.collapsed .title, .card.collapsed .badge, .card.collapsed .summary, .card.collapsed .toggle .chev { opacity:0; pointer-events:none; }
     .card.collapsed:hover .grab, .card.collapsed:hover .refresh, .card.collapsed:hover .customize,
@@ -337,7 +337,7 @@
   root.addEventListener('keydown',e=>{const k=e.target.dataset.handle;if(!k||!['ArrowUp','ArrowDown'].includes(e.key))return;e.preventDefault();const visible=state.sections.filter(x=>!state.hidden[x]), i=visible.indexOf(k)+(e.key==='ArrowUp'?-1:1);if(visible[i]){reorder(k,visible[i]);root.querySelector(`[data-handle="${k}"]`).focus();}});
   function applySize() {
     const floating=host.hasAttribute('data-floating');
-    if(floating)host.style.width=Math.max(Math.min(240,innerWidth-16),Math.min(state.size.width,innerWidth-16))+'px';else if(!host.hasAttribute('data-bottom'))host.style.width='';
+    if(floating)host.style.width=Math.max(Math.min(240,innerWidth-16),Math.min(state.size.width,innerWidth-16))+'px';else host.style.width='';
     const height=state.size.height==null||state.collapsed?null:Math.max(Math.min(140,innerHeight-16),Math.min(state.size.height,innerHeight-16));
     card.style.height=height==null?'':height+'px';
     card.classList.toggle('sized',height!=null);
@@ -372,8 +372,8 @@
   const endDrag=()=>{if(drag?.started){persist();if(settingsOpen)renderSettings();}drag=null;};
   window.addEventListener('pointerup',endDrag);window.addEventListener('pointercancel',endDrag);window.addEventListener('blur',endDrag);
   $('.grab').addEventListener('keydown',e=>{if(e.key==='Escape'){state.position='top';persist();place(true);if(settingsOpen)renderSettings();return;}if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key))return;e.preventDefault();if(state.position!=='floating'){const r=host.getBoundingClientRect();state.floating={x:r.left,y:r.top};state.position='floating';}const step=e.shiftKey?30:10;state.floating.x+=e.key==='ArrowRight'?step:e.key==='ArrowLeft'?-step:0;state.floating.y+=e.key==='ArrowDown'?step:e.key==='ArrowUp'?-step:0;place(false);persist();if(settingsOpen)renderSettings();});
-  function findSidebarNav(){for(const selector of ['#stage-slideover-sidebar nav','nav[aria-label="Chat history"]','[data-testid="sidebar"] nav','nav'])for(const el of document.querySelectorAll(selector)){const r=el.getBoundingClientRect();if(r.width>120&&r.height>200&&r.left>=0&&r.left<innerWidth/2&&r.right>100&&getComputedStyle(el).visibility!=='hidden')return el;}return null;}
-  let bottomSpacer=null;
+  function findSidebarNav(){for(const selector of ['#stage-slideover-sidebar nav','nav[aria-label="Chat history"]','[data-testid="sidebar"] nav','nav'])for(const el of document.querySelectorAll(selector)){const r=el.getBoundingClientRect();if(r.width>120&&r.height>(selector==='nav'?160:40)&&r.left>=0&&r.left<innerWidth/2&&r.right>100&&getComputedStyle(el).visibility!=='hidden')return el;}return null;}
+
   function bottomTarget(nav) {
     // The account footer can live outside the history nav, below its scroll area.
     let container=nav;
@@ -383,40 +383,41 @@
       container=parent;
       if(container.matches('#stage-slideover-sidebar,[data-testid="sidebar"],aside'))break;
     }
-    const account=container.querySelector('[data-testid="accounts-profile-button"], [data-testid="user-menu-button"], [data-testid="profile-button"], button[aria-label="Open profile menu"], footer');
-    return {container,account};
+    // Prefer the exact profile control; the absolute button itself is an overlay
+    // inside the account row, so insert beside its containing footer branch.
+    const account=container.querySelector('button[aria-label="Open profile menu"]')||container.querySelector('[data-testid="accounts-profile-button"], [data-testid="user-menu-button"], [data-testid="profile-button"]')||container.querySelector('footer');
+    if(account){
+      let parent=nav;
+      while(parent&&!parent.contains(account))parent=parent.parentElement;
+      if(parent&&parent!==document.body){
+        let before=account;
+        while(before.parentElement!==parent)before=before.parentElement;
+        return {container,parent,before,account};
+      }
+    }
+    return {container,parent:nav,before:null,account:null};
   }
   function layoutBottom(nav=findSidebarNav()) {
     if(!nav||!host.hasAttribute('data-bottom'))return;
-    const {container,account}=bottomTarget(nav), sidebar=container.getBoundingClientRect(), nr=nav.getBoundingClientRect();
-    const ar=account?.getBoundingClientRect();
-    const edge=Math.min(innerHeight-8,sidebar.bottom>0?sidebar.bottom-8:innerHeight-8);
-    const bottom=ar&&ar.width>0&&ar.top>Math.max(60,sidebar.top)&&ar.top<innerHeight?Math.min(edge,ar.top-8):edge;
-    const left=Math.max(8,sidebar.left+8), width=Math.min(sidebar.width-16,innerWidth-left-8);
-    host.style.width=Math.max(120,width)+'px';host.style.left=left+'px';
-    host.style.top='';host.style.bottom=Math.max(8,innerHeight-bottom)+'px';
-    card.style.maxHeight=Math.max(80,bottom-Math.max(8,nr.top)-8)+'px';
-    // Reserve scrollable space so the last history items can scroll above the dock.
-    if(!bottomSpacer){bottomSpacer=document.createElement('div');bottomSpacer.id='gptu-bottom-space';bottomSpacer.setAttribute('aria-hidden','true');}
-    const scrollers=[nav,...nav.querySelectorAll('*')].filter(el=>el!==bottomSpacer&&!host.contains(el)&&el.clientHeight>100&&/(auto|scroll)/.test(getComputedStyle(el).overflowY));
-    const scrollArea=scrollers.sort((a,b)=>b.clientHeight-a.clientHeight)[0]||nav;
-    if(bottomSpacer.parentElement!==scrollArea)scrollArea.appendChild(bottomSpacer);
-    const height=host.getBoundingClientRect().height+16+'px';
-    if(bottomSpacer.style.height!==height){bottomSpacer.style.height=height;bottomSpacer.style.minHeight=height;bottomSpacer.style.flexShrink='0';bottomSpacer.style.pointerEvents='none';}
+    const {parent,before}=bottomTarget(nav);
+    if(host.parentElement!==parent||host.nextElementSibling!==before)parent.insertBefore(host,before);
+    const r=parent.getBoundingClientRect(), account=before?.getBoundingClientRect();
+    // Limit the panel's own height, leaving the account and history room in the layout.
+    const available=Math.max(100,Math.min(innerHeight,r.height||innerHeight)-(account?.height||0)-100);
+    card.style.maxHeight=Math.min(available,innerHeight*.6)+'px';
   }
   function place(force){
     const nav=findSidebarNav(), floating=state.position==='floating'||!nav, bottom=!floating&&state.position==='bottom';
     if(nav&&observedSidebar!==nav){sidebarResizeObserver.disconnect();sidebarResizeObserver.observe(nav);const {container}=bottomTarget(nav);if(container!==nav)sidebarResizeObserver.observe(container);sidebarAttributes.disconnect();sidebarAttributes.observe(container,{attributes:true,attributeFilter:['class','style','hidden']});observedSidebar=nav;}
     host.toggleAttribute('data-floating',floating);host.toggleAttribute('data-bottom',bottom);
     applySize();
-    if(!bottom){bottomSpacer?.remove();host.style.bottom='';}
+    host.style.bottom='';host.style.left='';host.style.top='';
     if(floating){if(host.parentElement!==document.body)document.body.appendChild(host);clampFloat();}
     else if(bottom){
-      if(host.parentElement!==document.body)document.body.appendChild(host);
       layoutBottom(nav);
     }else{
       host.style.left='';host.style.top='';card.style.maxHeight='';
-      const kids=[...nav.children].filter(c=>c!==host&&c!==bottomSpacer), before=kids[1]||null;
+      const kids=[...nav.children].filter(c=>c!==host), before=kids[1]||null;
       if(host.parentElement!==nav||host.nextElementSibling!==before)nav.insertBefore(host,before);
     }
     positionSettings();
