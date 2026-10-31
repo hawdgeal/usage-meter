@@ -1,59 +1,52 @@
 # ChatGPT Usage Meter
 
-Browser extension for Chrome, Edge, Brave and Firefox that adds an independently customizable usage panel to ChatGPT's sidebar.
+A browser extension that adds a **Usage** card to ChatGPT's left sidebar, showing:
 
-## What's new in 0.2
+- **Plan limits** — your ChatGPT/Codex rate-limit windows (e.g. 5-hour and weekly) as % used, with time until reset, plus any extra per-model windows (e.g. Codex Spark).
+- **Credits** — your pay-as-you-go usage-credit balance, or "Unlimited".
+- **Model & feature limits** — remaining messages/uses per model or feature (Deep Research, image generation…), captured whenever ChatGPT reports them.
 
-- **Matching dark and light themes:** automatically follows ChatGPT's current theme, with readable text, consistent spacing, subdued surfaces, vector icons, and contrast-safe progress bars.
-- **Four independent sections:** Plan limits, Credits, Models & features, and Diagnostics. Each can be expanded or collapsed, reordered, or hidden separately.
-- **Movable panel:** drag the six-dot grip in the header to move the entire panel. Drop it over the sidebar to dock it, or leave it anywhere else as a floating panel. The dock button also switches between the top and bottom of the sidebar.
-- **Layout customization:** select the sliders icon to show or hide sections, drag them into a preferred order, move them using keyboard-accessible arrows, enable compact spacing, or restore defaults.
-- **Saved preferences:** collapse state, visible sections, ordering, spacing, panel position, and cached usage survive page reloads.
-- **More accurate data presentation:** an exhausted weekly window no longer incorrectly labels a separate 0%-used five-hour window as exhausted; credit balances are displayed to two decimal places while preserving full-precision raw data.
-- **Reduced clutter:** diagnostics are collapsed by default, model lists initially show up to six entries, and the entire panel can be minimized to one line.
+## Panel controls (0.3.0)
 
-The panel continues to show usage windows, reset estimates, credit balances, and per-model limits whenever ChatGPT reports them. A refresh runs on page load, every two minutes while the tab is visible, following relevant activity, and when you click Refresh.
+- Automatically follows ChatGPT's light or dark theme, with explicit readable colors. Use **Customize panel → Appearance** to override it.
+- Click **Usage** to collapse the panel into a one-line summary.
+- Collapse **Plan limits**, **Credits**, and **Models & features** independently.
+- Drag the dotted handle beside a section to reorder it. Focus the handle and press **↑ / ↓** to reorder with a keyboard.
+- Drag the dotted handle beside **Usage** to detach and move the panel anywhere in the viewport. Arrow keys move it by 10 pixels (Shift for 30). Press **Escape** on that handle to dock it at the top of the sidebar.
+- **Customize panel → Placement** offers Sidebar top, Sidebar bottom, and Floating. The same menu lets you hide individual sections or reset the layout.
+- Preferences and the floating position are saved locally. If the sidebar disappears, the panel temporarily floats and returns when the sidebar reappears, unless Floating was selected.
+- **Refresh usage** updates the data; **Details** shows the raw response for troubleshooting.
 
-## Install or upgrade — Chrome / Edge / Brave
+The panel refreshes on load, every two minutes while visible, shortly after a message, and on demand. Reset countdowns are estimates based on the last response. Credits are displayed to at most two decimal places. Plan percentages are **used**, while feature counters show **remaining** where available.
 
-1. Extract the ZIP into a permanent folder (for example, `Documents/ChatGPT Usage Meter`).
-2. Open `chrome://extensions` (Chrome/Brave) or `edge://extensions` (Edge).
-3. Enable **Developer mode**.
-4. **First install:** select **Load unpacked** and choose the extracted `chatgpt-usage-meter` folder containing `manifest.json`.
-5. **Already installed:** replace your previous extension's files in the *same existing folder*, then select **Reload** on its extension card. Alternatively, remove the old unpacked extension and load this folder; doing so can reset locally saved preferences.
-6. Reload the open `https://chatgpt.com` tab.
+## Update an existing installation
 
-## Firefox 128+
+Replace the files in your existing extension folder with this version. On `chrome://extensions`, click the extension's **Reload** button, then reload your ChatGPT tabs. Keeping the same extension folder preserves its stored settings. For Firefox temporary add-ons, reload from `about:debugging`.
 
-1. Visit `about:debugging#/runtime/this-firefox`, choose **Load Temporary Add-on…**, and select `manifest.json` in the extracted folder.
-2. In `about:addons`, allow access to chatgpt.com when prompted.
-3. Reload ChatGPT. Temporary add-ons are removed when Firefox exits; a permanent Firefox installation requires signing.
+## Install (Chrome, Edge, Brave, Arc, Opera)
 
-## Controls
+1. Unzip the folder.
+2. Open `chrome://extensions` and turn on **Developer mode**.
+3. Click **Load unpacked** and pick the unzipped `chatgpt-usage-meter` folder.
+4. Open or reload https://chatgpt.com.
 
-| Control | Action |
-| --- | --- |
-| Chevron beside **Usage** | Minimize / expand the whole panel |
-| Chevron beside a section | Minimize / expand that section |
-| Six-dot grip in panel header | Drag the panel anywhere; drop over sidebar to dock |
-| Dock / move button | Return to sidebar, or switch top / bottom position |
-| Sliders icon | Customize section order, visibility, and compact spacing |
-| Six-dot grip beside a section | Drag that section above or below another (when customizing) |
-| Up / down buttons beside a section | Move a section using keyboard or mouse |
-| Refresh | Recheck current plan data |
-| Diagnostics | Show / copy the received API response for troubleshooting |
-| Reset layout | Restore section order, visibility, spacing, and panel position |
+## Install (Firefox 128+)
 
-## Architecture and privacy
+1. Open `about:debugging#/runtime/this-firefox` → **Load Temporary Add-on…** and pick `manifest.json`.
+2. Firefox treats host access as optional: in `about:addons` → the extension → **Permissions**, allow access to chatgpt.com.
+   For a permanent install, package and sign it via addons.mozilla.org.
+
+## How it works
 
 | File | Role |
 | --- | --- |
-| `manifest.json` | Browser configuration and host access |
-| `page-hook.js` | Reads ChatGPT's own usage API and observes model-limit data reported in responses |
-| `content.js` | UI, normalization, local preferences, interaction, and sidebar placement |
-| `meter.css` | Isolated dark/light design tokens and component styles |
-| `icons/` | Browser extension icons |
+| `page-hook.js` | Runs in the page's own context. Reads your session token from `/api/auth/session`, calls `/backend-api/wham/usage`, and watches ChatGPT's own JSON responses for `limits_progress`-style fields. |
+| `content.js` | Draws the card (inside a Shadow DOM, so ChatGPT's styles can't break it) and keeps it attached to the sidebar as ChatGPT re-renders. |
 
-No external font, analytics, or styling service is used. Usage API requests are made only to chatgpt.com with the browser's existing sign-in. Preferences and the last usage snapshot are stored locally in the extension's storage.
+Privacy: the only requests made go to chatgpt.com using your existing login. Nothing is sent anywhere else; the last snapshot is cached in the extension's local storage.
 
-**Note:** The APIs used for usage information are internal and undocumented. They may change or be unavailable; use the Diagnostics section if data stops appearing. ChatGPT does not always expose remaining-message counts for each model. Moving the widget depends on ChatGPT's sidebar DOM, which can also change between site updates.
+## Caveats
+
+- These are **undocumented internal endpoints**. OpenAI can change or remove them at any time; if the card shows an error, click **Details** at the bottom to see what the extension received.
+- ChatGPT doesn't publish a live counter for most per-model message caps. That section only fills in when ChatGPT itself sends the numbers (usually once you're close to a limit, or for metered features like Deep Research).
+- The sidebar is located with heuristics (`#stage-slideover-sidebar nav`, then `nav[aria-label="Chat history"]`, then any tall left-hand `nav`). If a ChatGPT redesign breaks placement, adjust `findSidebarNav()` in `content.js`.
