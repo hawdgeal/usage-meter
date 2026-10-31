@@ -404,6 +404,7 @@
     .credit-external:hover { background:var(--hover); }
     .credit-external:focus-visible { outline:2px solid var(--ok); outline-offset:2px; }
     .credits-frame { display:block; border:0; width:100%; flex:1; min-height:0; background:var(--surface); }
+    .credits-frame[data-loading] { visibility:hidden; pointer-events:none; }
     .credits-status { margin:0; padding:8px 16px; font-size:11px; color:var(--muted); border-bottom:1px solid var(--line); flex-shrink:0; }
     @media(max-width:480px) { .credits-modal { width:calc(100vw - 16px); height:calc(100dvh - 16px); } .credits-header { padding:10px; gap:4px; } }
     .dock-zone { position:fixed; z-index:2147483001; margin:0; height:36px; padding:7px 10px; flex-direction:row; justify-content:center; align-items:center; border:1px dashed var(--muted); border-radius:9px; background:var(--surface); color:var(--muted); font-size:12px; pointer-events:none; box-shadow:0 2px 12px #0003; }
@@ -465,6 +466,8 @@
     if(dialog.open){$('.credits-close').focus();return;}
     if(settingsOpen)closeSettings();
     const frame=$('.credits-frame-template').content.firstElementChild.cloneNode(true);
+    frame.setAttribute('data-loading','');frame.setAttribute('aria-hidden','true');frame.tabIndex=-1;
+    dialog.setAttribute('aria-busy','true');
     frame.addEventListener('load',()=>creditFrameLoaded(frame));
     creditReturnFocus=returnFocus;creditReturnPath=location.pathname+location.search+location.hash;
     $('#gptu-page-heading').textContent=title;frame.title=title==='Add credits'?'ChatGPT credits purchase':'ChatGPT usage overview';
@@ -479,7 +482,7 @@
   $('.credits-close').onclick=()=>$('.credits-modal').close();
   $('.credits-modal').addEventListener('close',()=>{
     clearInterval(creditWatch);clearTimeout(creditLoadTimeout);creditWatch=null;
-    $('.credits-frame')?.remove();
+    $('.credits-frame')?.remove();$('.credits-modal').removeAttribute('aria-busy');
     const target=creditReturnFocus?.isConnected?creditReturnFocus:$('.add-credits');target?.focus();creditReturnFocus=null;
   });
   $('.credits-modal').addEventListener('click',event=>{
@@ -488,7 +491,7 @@
   });
   function prepareEmbeddedPage(frame){
     try{
-      const doc=frame.contentDocument;if(!doc?.head||doc.getElementById('gptu-embedded-page-style'))return;
+      const doc=frame.contentDocument;if(!doc?.head)return false;if(doc.getElementById('gptu-embedded-page-style'))return true;
       const style=doc.createElement('style');style.id='gptu-embedded-page-style';
       style.textContent=`
         .app-shell-left-panel, #stage-slideover-sidebar, [data-testid="sidebar"],
@@ -496,13 +499,20 @@
         [data-testid="open-sidebar-button"], [data-testid="close-sidebar-button"],
         button[aria-label="Open sidebar"], button[aria-label="Close sidebar"], button[aria-label="Show sidebar"] { display:none !important; }
       `;
-      doc.head.appendChild(style);
-    }catch(_){}
+      doc.head.appendChild(style);return true;
+    }catch(_){return false;}
   }
   function creditFrameLoaded(frame){
     if(!$('.credits-modal').open||frame!==$('.credits-frame'))return;
-    prepareEmbeddedPage(frame);
-    clearTimeout(creditLoadTimeout);$('.credits-status').hidden=true;
+    const prepared=prepareEmbeddedPage(frame);
+    // Cross-origin checkout pages cannot be styled, but must remain usable.
+    if(!prepared&&frame.contentDocument){$('.credits-status').textContent='Unable to prepare the page. Choose Open in tab.';return;}
+    requestAnimationFrame(()=>{
+      if(!$('.credits-modal').open||frame!==$('.credits-frame'))return;
+      frame.removeAttribute('data-loading');frame.removeAttribute('aria-hidden');frame.removeAttribute('tabindex');
+      $('.credits-modal').removeAttribute('aria-busy');
+      clearTimeout(creditLoadTimeout);$('.credits-status').hidden=true;
+    });
     try{frame.contentDocument?.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();$('.credits-modal').close();}});}catch(_){}
   }
   const accentNames={auto:'Match theme',default:'Default',blue:'Blue',green:'Green',yellow:'Yellow',pink:'Pink',orange:'Orange',purple:'Purple',neutral:'Black / White'};

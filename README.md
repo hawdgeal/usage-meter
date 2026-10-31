@@ -6,7 +6,7 @@ A browser extension that adds a **Usage** card to ChatGPT's left sidebar, showin
 - **Credits** — your pay-as-you-go usage-credit balance, or "Unlimited".
 - **Model & feature limits** — remaining messages/uses per model or feature (Deep Research, image generation…), captured whenever ChatGPT reports them.
 
-## Panel controls (0.3.23)
+## Panel controls (0.3.24)
 
 - The settings window has a lower-right resize handle. Its size is saved separately from the Usage panel; resizing fixes its current position. Double-click the handle or press Home while it is focused to restore automatic sizing.
 
@@ -23,7 +23,7 @@ A browser extension that adds a **Usage** card to ChatGPT's left sidebar, showin
 - **Spacing** has separate normal/compact profiles and independent top/right/bottom/left controls for the outside and inside frame, Usage header, status row, collapsed summary, each module, headings, content, items, balance, credits actions, bars, captions, and expanded Details. Changes are saved and applied live; each profile can reset independently. Existing frame margins migrate automatically.
 - **Show available balance** in Modules → Credits can hide the numeric balance and caption while the remaining bar is enabled. When the larger balance display is hidden, the available amount appears beside the meter percentage. The choice is saved; turning the bar off always restores the larger balance. In compact mode, Add credits sits beside the remaining meter.
 - **Show credit balance bar** in Modules → Credits adds a blue remaining-balance bar with a percentage. **Full balance** defines 100%; it initially captures your current balance when enabled and is editable. The reference is saved and does not reset as credits are spent or added. Balances above the reference show more than 100%, with a full bar.
-- Embedded Usage and credits frames hide ChatGPT’s navigation sidebar inside the dialog, are created only when opened, and are removed when closed. Open in tab keeps the normal page layout.
+- Embedded Usage and credits frames stay concealed behind a themed loading state until their load-time preparation completes, preventing an initial flash of native navigation. Close and Open in tab remain available while loading. Embedded Usage and credits frames hide ChatGPT’s navigation sidebar inside the dialog, are created only when opened, and are removed when closed. Open in tab keeps the normal page layout.
 - **Add credits button** in settings shows or hides the action in expanded Credits. It opens the [ChatGPT credits purchase page](https://chatgpt.com/pricing/credits) in a centered dialog, with the return path set to the current chat when clicked. Close it with ✕, Escape, or a click outside. **Open in tab** is available if the checkout cannot be embedded. Buying credits happens on the official page. Returning to the original chat in the frame closes the dialog and refreshes usage.
 - **Show remaining plan allowance** switches plan percentages, bars, tooltips and the collapsed summary to remaining allowance, matching the original usage page. Full blue bars mean 100% left; empty bars mean 0% left. Feature counters are unaffected.
 - **Plan limit tooltips** in settings enables or disables the compact limit detail popups. Short reset captions remain visible.
