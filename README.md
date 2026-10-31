@@ -6,13 +6,15 @@ A browser extension that adds a **Usage** card to ChatGPT's left sidebar, showin
 - **Credits** — your pay-as-you-go usage-credit balance, or "Unlimited".
 - **Model & feature limits** — remaining messages/uses per model or feature (Deep Research, image generation…), captured whenever ChatGPT reports them.
 
-## Panel controls (0.3.14)
+## Panel controls (0.3.15)
 
 - **Add credits button** in settings shows or hides the action in expanded Credits. It opens the [ChatGPT credits purchase page](https://chatgpt.com/pricing/credits) in a centered dialog, with the return path set to the current chat when clicked. Close it with ✕, Escape, or a click outside. **Open in tab** is available if the checkout cannot be embedded. Buying credits happens on the official page. Returning to the original chat in the frame closes the dialog and refreshes usage.
 - **Show remaining plan allowance** switches plan percentages, bars, tooltips and the collapsed summary to remaining allowance, matching the original usage page. Full neutral bars mean 100% left; empty bars mean 0% left. Feature counters are unaffected.
 - **Plan limit tooltips** in settings enables or disables the compact limit detail popups. Short reset captions remain visible.
 - **Models & features to show** in settings lets you toggle individual counters (Deep Research, File uploads, Paste text to file, Image generation, and reported models). These choices are saved separately from the whole module switch. Hiding a counter keeps its cached data and does not affect your account limits. Counters still require data reported by ChatGPT.
-- **Update time and Details at top** in Panel → Appearance moves the status row above the modules (the default). Turn it off for bottom placement. The row uses reduced vertical spacing in both modes, and the choice is saved.
+- **Show update time** and **Show Details button** in Panel → Status & details independently control visibility. Turning both off removes the status row and its spacing.
+- **Top margin** and **Bottom margin** in Panel → Placement & visibility independently set the panel’s vertical spacing, from 0–120 px. Both default to 6 px and are saved.
+- **Update time and Details at top** in Panel → Status & details moves the status row above the modules (the default). Turn it off for bottom placement. The row uses reduced vertical spacing in both modes, and the choice is saved.
 - The Usage panel scrollbar appears on hover or keyboard focus, with its space reserved to avoid text shifting. Settings retain a normal scrollbar.
 - Drag, refresh, customize, reorder, collapse arrows, update time, and Details appear on panel hover or keyboard focus. Touch devices keep controls visible. Hidden controls retain their space so rows do not jump.
 - Compact plan limits use responsive columns with short reset captions. Hover or focus a limit for its full status and reset time. Narrow panels stack them automatically.
@@ -29,7 +31,7 @@ A browser extension that adds a **Usage** card to ChatGPT's left sidebar, showin
 - Click **Usage** to collapse the panel into a one-line summary.
 - Collapse **Plan limits**, **Credits**, and **Models & features** independently. Collapsed Credits shows its current balance beside the title, including in compact mode.
 - Drag the dotted handle beside a section to reorder it. Focus the handle and press **↑ / ↓** to reorder with a keyboard.
-- Drag the dotted handle beside **Usage** to detach and move the panel anywhere in the viewport. Arrow keys move it by 10 pixels (Shift for 30). Press **Escape** on that handle to dock it at the top of the sidebar.
+- Drag the dotted handle beside **Usage** to detach and move the panel anywhere in the viewport. During a drag, the sidebar shows **Dock at top** and **Dock at bottom** targets; release over the desired half of the sidebar to dock there, or outside the sidebar to keep floating. Arrow keys move it by 10 pixels (Shift for 30). Press **Escape** on that handle to dock it at the top of the sidebar.
 - **Customize panel → Placement** offers Sidebar top, Sidebar bottom, and Floating. The same menu has **Visible modules** switches to show or hide Plan limits, Credits, and Models & features independently of their collapsed state, plus a layout reset.
 - Preferences and the floating position are saved locally. If the sidebar disappears, the panel temporarily floats and returns when the sidebar reappears, unless Floating was selected.
 - **Refresh usage** updates the data; **Details** shows the raw response for troubleshooting.
@@ -72,4 +74,4 @@ Privacy: the only requests made go to chatgpt.com using your existing login. Not
 
 New installations use Match ChatGPT, Sidebar bottom, normal density, visible collapsed Usage, Add credits enabled, tooltips disabled, and used percentages. Plan limits and Credits are visible (Credits starts collapsed); Models & features starts hidden, with Image generation selected and Deep Research, File uploads, and Paste text to file unselected.
 
-Saved choices take precedence on upgrades and reloads. Settings have two tabs: **Panel** (Appearance; Placement & visibility) and **Modules** (Plan limits; Credits; Models & features). Each module owns its master switch and related display options. The selected tab is saved. Each group can collapse independently, and its open/closed state is remembered. **Reset settings** applies the pictured defaults to an existing installation.
+Saved choices take precedence on upgrades and reloads. Settings have two tabs: **Panel** (Appearance; Status & details; Placement & visibility) and **Modules** (Plan limits; Credits; Models & features). Each module owns its master switch and related display options. The selected tab is saved. Each group can collapse independently, and its open/closed state is remembered. **Reset settings** applies the pictured defaults to an existing installation.

@@ -7,12 +7,12 @@
   const store = (globalThis.browser && browser.storage) || chrome.storage;
 
   function defaultPreferences(){return {
-    collapsed:false,compact:false,compactHeight:null,hideCollapsed:false,footerPosition:'top',
+    collapsed:false,compact:false,compactHeight:null,hideCollapsed:false,footerPosition:'top',showUpdateTime:true,showDetails:true,marginTop:6,marginBottom:6,
     showAddCredits:true,showPlanTooltips:false,showRemainingPlan:false,
     position:'bottom',sections:['plan','credits','features'],closed:{credits:true},
     hidden:{features:true},hiddenFeatures:{deep_research:true,file_upload:true,paste_text_to_file:true},
     theme:'auto',floating:{x:24,y:100},size:{width:300,height:null},
-    settingsTab:'panel',settingsClosed:{appearance:false,placement:false,plan:false,credits:true,features:true}
+    settingsTab:'panel',settingsClosed:{appearance:false,status:true,placement:false,plan:false,credits:true,features:true}
   };}
   const state = {
     usage:null,plan:null,usageAt:0,error:null,models:{},showRaw:false,
@@ -21,7 +21,7 @@
   let lastRefresh = 0;
 
   // ---------- persistence ----------
-  const saveKeys = ["usage", "plan", "usageAt", "models", "collapsed", "position", "sections", "closed", "hidden", "theme", "floating", "size", "compact", "compactHeight", "hideCollapsed", "hiddenFeatures", "showAddCredits", "showPlanTooltips", "showRemainingPlan", "settingsClosed", "settingsTab", "footerPosition"];
+  const saveKeys = ["usage", "plan", "usageAt", "models", "collapsed", "position", "sections", "closed", "hidden", "theme", "floating", "size", "compact", "compactHeight", "hideCollapsed", "hiddenFeatures", "showAddCredits", "showPlanTooltips", "showRemainingPlan", "settingsClosed", "settingsTab", "footerPosition", "showUpdateTime", "showDetails", "marginTop", "marginBottom"];
   function persist() {
     const o = {};
     for (const k of saveKeys) o[k] = state[k];
@@ -32,10 +32,12 @@
       const r = await store.local.get("gptu");
       if (r && r.gptu) for (const k of saveKeys) if (r.gptu[k] !== undefined) state[k] = r.gptu[k];
     } catch (_) {}
+    for(const key of ['marginTop','marginBottom'])state[key]=Number.isFinite(state[key])?Math.max(0,Math.min(120,state[key])):6;
     if(!['top','bottom'].includes(state.footerPosition))state.footerPosition='top';
     if(!['panel','modules'].includes(state.settingsTab))state.settingsTab='panel';
     if (!Array.isArray(state.sections)) state.sections = ["plan", "credits", "features"];
     for (const key of ["closed", "hidden", "models", "hiddenFeatures", "settingsClosed"]) if (!state[key] || typeof state[key] !== "object") state[key] = {};
+    state.settingsClosed={...defaultPreferences().settingsClosed,...state.settingsClosed};
     if (!state.floating || !Number.isFinite(state.floating.x) || !Number.isFinite(state.floating.y)) state.floating = {x:24,y:100};
     if (!state.size || !Number.isFinite(state.size.width)) state.size = {width:300,height:null};
     if (!Number.isFinite(state.size.height)) state.size.height = null;
@@ -148,25 +150,25 @@
 
   // All panel colors are owned here: page custom properties can change independently.
   const CSS = `
-    :host { all:initial; display:block; min-width:0; flex-shrink:0; color-scheme:light; }
+    :host { all:initial; display:block; box-sizing:border-box; padding-top:var(--gptu-margin-top,6px); padding-bottom:var(--gptu-margin-bottom,6px); min-width:0; flex-shrink:0; color-scheme:light; }
     * { box-sizing:border-box; }
     [hidden] { display:none !important; }
-    .card, .settings, .credits-modal { --fg:#202123; --muted:#656565; --line:#e3e3e3; --surface:#f9f9f9; --hover:#ededed; --track:#e5e5e5; --ok:#087f65; --warn:#966000; --bad:#c53240;
+    .card, .settings, .credits-modal, .dock-zone { --fg:#202123; --muted:#656565; --line:#e3e3e3; --surface:#f9f9f9; --hover:#ededed; --track:#e5e5e5; --ok:#087f65; --warn:#966000; --bad:#c53240;
       color:var(--fg); background:var(--surface); font:13px/1.45 ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-      margin:6px 8px; border:1px solid var(--line); border-radius:14px; overflow:hidden; text-align:left; display:flex; flex-direction:column; }
+      margin:0 8px; border:1px solid var(--line); border-radius:14px; overflow:hidden; text-align:left; display:flex; flex-direction:column; }
     .card { position:relative; border-color:transparent; }
     .card:hover, .card:has(:focus-visible) { border-color:var(--line); }
     .resize { opacity:0; pointer-events:none; }
     .card:hover .resize, .card:has(:focus-visible) .resize { opacity:1; pointer-events:auto; }
     @media(hover:none) { .resize { opacity:1; pointer-events:auto; } }
     :host([data-bottom]) { position:relative; margin-top:0; width:auto; flex:0 0 auto; }
-    :host([data-bottom]) .card { margin:6px 8px; }
+    :host([data-bottom]) .card { margin:0 8px; }
     .card.collapsed.hide-collapsed .usage-icon,.card.collapsed.hide-collapsed .title,.card.collapsed.hide-collapsed .badge,.card.collapsed.hide-collapsed .summary { opacity:0; pointer-events:none; }
     .card.collapsed.hide-collapsed:hover .usage-icon,.card.collapsed.hide-collapsed:hover .title,.card.collapsed.hide-collapsed:hover .badge,.card.collapsed.hide-collapsed:hover .summary,
     .card.collapsed.hide-collapsed:has(:focus-visible) .usage-icon,.card.collapsed.hide-collapsed:has(:focus-visible) .title,.card.collapsed.hide-collapsed:has(:focus-visible) .badge,.card.collapsed.hide-collapsed:has(:focus-visible) .summary { opacity:1; pointer-events:auto; }
     @media(hover:none) { .card.collapsed.hide-collapsed .usage-icon,.card.collapsed.hide-collapsed .title,.card.collapsed.hide-collapsed .badge,.card.collapsed.hide-collapsed .summary { opacity:1; pointer-events:auto; } }
     :host([data-dark]) { color-scheme:dark; }
-    :host([data-dark]) .card, :host([data-dark]) .settings, :host([data-dark]) .credits-modal { --fg:#ececec; --muted:#ababab; --line:#292929; --surface:#000000; --hover:#171717; --track:#292929; --ok:#57c7a6; --warn:#e9b55f; --bad:#ff7983; }
+    :host([data-dark]) .card, :host([data-dark]) .settings, :host([data-dark]) .credits-modal, :host([data-dark]) .dock-zone { --fg:#ececec; --muted:#ababab; --line:#292929; --surface:#000000; --hover:#171717; --track:#292929; --ok:#57c7a6; --warn:#e9b55f; --bad:#ff7983; }
     button,select { font:inherit; color:inherit; }
     button { border:0; background:none; cursor:pointer; padding:0; }
     button:hover { background:var(--hover); }
@@ -248,6 +250,9 @@
     .compact .bar { height:3px; margin:4px 0; }
     .compact .credit { font-size:19px; line-height:1.3; }
     .compact .foot { padding:1px 22px 1px 9px; }
+    .foot:not(:has(.updated-at)) { justify-content:flex-end; }
+    .margin-input { display:flex; align-items:center; gap:5px; color:var(--muted); }
+    .margin-input input { width:62px; padding:4px 5px; border:1px solid var(--line); border-radius:6px; background:var(--surface); color:var(--fg); font:inherit; }
     .foot .text-btn { padding:1px 3px; }
     .compact .summary { padding:0 9px 5px; }
     .compact-toggle { padding-top:8px; border-top:1px solid var(--line); }
@@ -322,6 +327,8 @@
     .credits-frame { display:block; border:0; width:100%; flex:1; min-height:0; background:var(--surface); }
     .credits-status { margin:0; padding:8px 16px; font-size:11px; color:var(--muted); border-bottom:1px solid var(--line); flex-shrink:0; }
     @media(max-width:480px) { .credits-modal { width:calc(100vw - 16px); height:calc(100dvh - 16px); } .credits-header { padding:10px; gap:4px; } }
+    .dock-zone { position:fixed; z-index:2147483001; margin:0; height:36px; padding:7px 10px; flex-direction:row; justify-content:center; align-items:center; border:1px dashed var(--muted); border-radius:9px; background:var(--surface); color:var(--muted); font-size:12px; pointer-events:none; box-shadow:0 2px 12px #0003; }
+    .dock-zone.active { border:2px solid var(--ok); color:var(--fg); background:var(--hover); }
     .live { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
     @media(prefers-reduced-motion:reduce) { * { animation:none !important; transition:none !important; } }
   `;
@@ -343,7 +350,7 @@
     <button class="toggle" aria-expanded="true"><span class="usage-icon">${USAGE_ICON}</span><span class="title">Usage</span><span class="badge" hidden></span>${icon('chevron')}</button>
     <button class="icon refresh" title="Refresh usage" aria-label="Refresh usage">${icon('refresh')}</button>
     <button class="icon customize" title="Customize panel" aria-label="Customize panel" aria-expanded="false">${icon('settings')}</button></div>
-    <div class="summary" hidden></div><div class="body"></div><button class="resize" aria-label="Resize panel" title="Drag to resize · Arrow keys to resize · Double-click to reset size"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m5 13 8-8m-3 8 3-3"/></svg></button><div class="live" aria-live="polite"></div></div><div class="settings" popover="auto" role="dialog" aria-label="Usage settings"></div><dialog class="credits-modal" aria-labelledby="gptu-credits-heading"><div class="credits-header"><h2 id="gptu-credits-heading">Add credits</h2><a class="credit-external" target="_blank" rel="noopener noreferrer">Open in tab</a><button class="icon credits-close" aria-label="Close credits">✕</button></div><p class="credits-status" role="status">Loading credits…</p><iframe class="credits-frame" title="ChatGPT credits purchase" allow="payment" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads"></iframe></dialog>`;
+    <div class="summary" hidden></div><div class="body"></div><button class="resize" aria-label="Resize panel" title="Drag to resize · Arrow keys to resize · Double-click to reset size"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m5 13 8-8m-3 8 3-3"/></svg></button><div class="live" aria-live="polite"></div></div><div class="settings" popover="auto" role="dialog" aria-label="Usage settings"></div><dialog class="credits-modal" aria-labelledby="gptu-credits-heading"><div class="credits-header"><h2 id="gptu-credits-heading">Add credits</h2><a class="credit-external" target="_blank" rel="noopener noreferrer">Open in tab</a><button class="icon credits-close" aria-label="Close credits">✕</button></div><p class="credits-status" role="status">Loading credits…</p><iframe class="credits-frame" title="ChatGPT credits purchase" allow="payment" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads"></iframe></dialog><div class="dock-targets" hidden aria-hidden="true"><div class="dock-zone" data-dock="top">Dock at top</div><div class="dock-zone" data-dock="bottom">Dock at bottom</div></div>`;
   const $=s=>root.querySelector(s), card=$('.card');
   let busyTimer, settingsOpen=false, drag=null, resizing=null, sectionDrag=null;
   const ui={ setBusy(b) { card.classList.toggle('busy',b); $('.refresh').disabled=b; $('.refresh').setAttribute('aria-busy',String(b)); clearTimeout(busyTimer); if(b) busyTimer=setTimeout(()=>{ui.setBusy(false); state.error='Refresh timed out. Try again.'; render();},20000); } };
@@ -409,12 +416,13 @@
     $('.customize').setAttribute('aria-expanded',String(settingsOpen));
     const toggle=(label,attr,checked)=>`<label class="setting"><span>${label}</span><input type="checkbox" role="switch" aria-label="${label}" ${attr} ${checked?'checked':''}></label>`;
     const moduleToggle=key=>toggle('Show '+labels[key],`data-visible="${key}"`,!state.hidden[key]);
-    const group=(key,label,content)=>`<details class="settings-section" data-settings-section="${key}" ${!state.settingsClosed[key]?'open':''}><summary>${icon(['appearance','placement'].includes(key)?'settings':key==='features'?'features':key)}<span>${label}</span>${icon('chevron')}</summary><div class="settings-section-content">${content}</div></details>`;
+    const group=(key,label,content)=>`<details class="settings-section" data-settings-section="${key}" ${!state.settingsClosed[key]?'open':''}><summary>${icon(['appearance','placement','status'].includes(key)?'settings':key==='features'?'features':key)}<span>${label}</span>${icon('chevron')}</summary><div class="settings-section-content">${content}</div></details>`;
     const tabs=['panel','modules'].map(key=>`<button class="settings-tab" role="tab" id="gptu-tab-${key}" aria-controls="gptu-settings-${key}" aria-selected="${state.settingsTab===key}" tabindex="${state.settingsTab===key?0:-1}" data-settings-tab="${key}">${key==='panel'?'Panel':'Modules'}</button>`).join('');
     $('.settings').innerHTML=`<div class="settings-header"><div class="settings-title"><span>Usage settings</span><button class="icon close-settings" aria-label="Close settings">✕</button></div><div class="settings-tabs" role="tablist" aria-label="Settings categories">${tabs}</div></div><div class="settings-body">
       <div class="settings-panel" role="tabpanel" id="gptu-settings-panel" aria-labelledby="gptu-tab-panel" ${state.settingsTab==='panel'?'':'hidden'}>${
-        group('appearance','Appearance',`<div class="setting"><span>Theme</span><select aria-label="Appearance" data-setting="theme">${['auto','light','dark'].map(k=>`<option value="${k}" ${state.theme===k?'selected':''}>${k==='auto'?'Match ChatGPT':k==='light'?'Light':'Dark'}</option>`).join('')}</select></div>${toggle('Compact mode','data-compact',state.compact)}${toggle('Update time and Details at top','data-footer-top',state.footerPosition==='top')}`)+
-        group('placement','Placement & visibility',`<div class="setting"><span>Placement</span><select aria-label="Placement" data-setting="position">${['top','bottom','floating'].map(k=>`<option value="${k}" ${state.position===k?'selected':''}>${k==='top'?'Sidebar top':k==='bottom'?'Sidebar bottom':'Floating'}</option>`).join('')}</select></div>${toggle('Hide collapsed Usage until hover','data-hide-collapsed',state.hideCollapsed)}`)
+        group('appearance','Appearance',`<div class="setting"><span>Theme</span><select aria-label="Appearance" data-setting="theme">${['auto','light','dark'].map(k=>`<option value="${k}" ${state.theme===k?'selected':''}>${k==='auto'?'Match ChatGPT':k==='light'?'Light':'Dark'}</option>`).join('')}</select></div>${toggle('Compact mode','data-compact',state.compact)}`)+
+        group('status','Status & details',`${toggle('Show update time','data-show-update',state.showUpdateTime)}${toggle('Show Details button','data-show-details',state.showDetails)}${toggle('Update time and Details at top','data-footer-top',state.footerPosition==='top')}`)+
+        group('placement','Placement & visibility',`<div class="setting"><span>Placement</span><select aria-label="Placement" data-setting="position">${['top','bottom','floating'].map(k=>`<option value="${k}" ${state.position===k?'selected':''}>${k==='top'?'Sidebar top':k==='bottom'?'Sidebar bottom':'Floating'}</option>`).join('')}</select></div>${toggle('Hide collapsed Usage until hover','data-hide-collapsed',state.hideCollapsed)}<label class="setting"><span>Top margin</span><span class="margin-input"><input type="number" aria-label="Top margin" min="0" max="120" step="1" data-margin="marginTop" value="${state.marginTop}">px</span></label><label class="setting"><span>Bottom margin</span><span class="margin-input"><input type="number" aria-label="Bottom margin" min="0" max="120" step="1" data-margin="marginBottom" value="${state.marginBottom}">px</span></label>`)
       }</div>
       <div class="settings-panel" role="tabpanel" id="gptu-settings-modules" aria-labelledby="gptu-tab-modules" ${state.settingsTab==='modules'?'':'hidden'}>${
         group('plan','Plan limits',`${moduleToggle('plan')}<div class="module-hint">Choose how the allowance is displayed.</div>${toggle('Show remaining plan allowance','data-remaining-plan',state.showRemainingPlan)}${toggle('Plan limit tooltips','data-plan-tooltips',state.showPlanTooltips)}`)+
@@ -449,7 +457,7 @@
     $('.body').hidden=!!state.collapsed;
     const pcts=parsed.rows.map(r=>r.pct).filter(p=>p!=null);
     $('.summary').hidden=!state.collapsed;
-    $('.summary').textContent=pcts.length?`${Math.round(state.showRemainingPlan?100-Math.max(...pcts):Math.max(...pcts))}% ${state.showRemainingPlan?'left':'used'} · ${fmtAgo(state.usageAt)}`:'No usage reported yet';
+    $('.summary').textContent=pcts.length?`${Math.round(state.showRemainingPlan?100-Math.max(...pcts):Math.max(...pcts))}% ${state.showRemainingPlan?'left':'used'}${state.showUpdateTime?' · '+fmtAgo(state.usageAt):''}`:'No usage reported yet';
     const blocks={};
     blocks.plan=parsed.rows.length?`<div class="plan-grid">${parsed.rows.map(r=>{
       const left=r.resetsAt?r.resetsAt-Date.now():null;
@@ -473,7 +481,7 @@
     const scroll=$('.body').scrollTop;
     const focused=root.activeElement?.dataset;
     const rawFocused=root.activeElement?.classList.contains('raw');
-    const footer=`<div class="foot"><span>Updated ${fmtAgo(state.usageAt)}</span><button class="text-btn raw" aria-expanded="${state.showRaw}">${state.showRaw?'Hide data':'Details'}</button></div>`;
+    const footer=state.showUpdateTime||state.showDetails?`<div class="foot">${state.showUpdateTime?`<span class="updated-at">Updated ${fmtAgo(state.usageAt)}</span>`:''}${state.showDetails?`<button class="text-btn raw" aria-expanded="${state.showRaw}">${state.showRaw?'Hide data':'Details'}</button>`:''}</div>`:'';
     $('.body').innerHTML=(state.footerPosition==='top'?footer:'')+state.sections.filter(k=>!state.hidden[k]).map(k=>`<section class="section" data-section="${k}"><div class="section-head"><button class="section-toggle" data-collapse="${k}" aria-expanded="${!state.closed[k]}" aria-controls="gptu-${k}">${icon(k)}<span>${labels[k]}</span>${k==='credits'&&state.closed.credits?`<span class="credit-inline">${esc(creditText)}</span>`:''}${icon('chevron')}</button><button class="icon section-handle" draggable="true" data-handle="${k}" aria-label="Reorder ${labels[k]}" title="Drag to reorder · ↑ / ↓">${icon('grip')}</button></div><div class="section-content" id="gptu-${k}" ${state.closed[k]?'hidden':''}>${blocks[k]}</div></section>`).join('')+
       `${state.error?`<div class="err" role="status">${esc(state.error)}</div>`:''}${state.footerPosition==='bottom'?footer:''}${state.showRaw?`<pre>${esc(JSON.stringify({usage:state.usage,models:state.models},null,2))}</pre>`:''}`;
     $('.body').scrollTop=scroll;
@@ -513,7 +521,18 @@
     if(e.target.closest('.raw')){state.showRaw=!state.showRaw;render();$('.raw').focus();}
     if(e.target.closest('.reset')){Object.assign(state,defaultPreferences());persist();closeSettings(true);render();place(true);}
   });
+  function changeMargin(event){
+    const key=event.target.dataset?.margin;if(!['marginTop','marginBottom'].includes(key))return;
+    if(event.type==='input'&&(event.target.value===''||!event.target.validity.valid))return;
+    const value=Math.max(0,Math.min(120,Number(event.target.value)||0));
+    state[key]=value;if(event.type==='change')event.target.value=String(value);
+    persist();render();place(true);positionSettings();
+  }
+  root.addEventListener('input',changeMargin);
+  root.addEventListener('change',changeMargin);
   root.addEventListener('change',e=>{
+    if(e.target.hasAttribute('data-show-update')){state.showUpdateTime=e.target.checked;persist();render();positionSettings();}
+    if(e.target.hasAttribute('data-show-details')){state.showDetails=e.target.checked;if(!state.showDetails)state.showRaw=false;persist();render();positionSettings();}
     if(e.target.hasAttribute('data-footer-top')){state.footerPosition=e.target.checked?'top':'bottom';persist();render();positionSettings();}
     if(e.target.hasAttribute('data-remaining-plan')){state.showRemainingPlan=e.target.checked;persist();render();positionSettings();}
     if(e.target.hasAttribute('data-add-credits')){state.showAddCredits=e.target.checked;persist();render();positionSettings();}
@@ -532,6 +551,7 @@
   root.addEventListener('keydown',e=>{const k=e.target.dataset.handle;if(!k||!['ArrowUp','ArrowDown'].includes(e.key))return;e.preventDefault();const visible=state.sections.filter(x=>!state.hidden[x]), i=visible.indexOf(k)+(e.key==='ArrowUp'?-1:1);if(visible[i]){reorder(k,visible[i]);root.querySelector(`[data-handle="${k}"]`).focus();}});
   function setPanelHeight(height){if(state.compact)state.compactHeight=height;else state.size.height=height;}
   function applySize() {
+    for(const key of ['marginTop','marginBottom']){const property=key==='marginTop'?'--gptu-margin-top':'--gptu-margin-bottom',value=state[key]+'px';if(host.style.getPropertyValue(property)!==value)host.style.setProperty(property,value);}
     const floating=host.hasAttribute('data-floating');
     if(floating)host.style.width=Math.max(Math.min(240,innerWidth-16),Math.min(state.size.width,innerWidth-16))+'px';else host.style.width='';
     const requestedHeight=state.compact?state.compactHeight:state.size.height;
@@ -563,10 +583,36 @@
     if(['ArrowUp','ArrowDown'].includes(e.key))setPanelHeight(Math.max(140,Math.min(r.height+(e.key==='ArrowDown'?step:-step),host.hasAttribute('data-bottom')?r.bottom-8:innerHeight-r.top-8)));
     applySize();persist();
   });
-  function clampFloat(){const rect=host.getBoundingClientRect();state.floating.x=Math.max(8,Math.min(state.floating.x,innerWidth-rect.width-8));state.floating.y=Math.max(8,Math.min(state.floating.y,innerHeight-Math.min(rect.height,innerHeight-16)-8));host.style.left=state.floating.x+'px';host.style.top=state.floating.y+'px';card.style.maxHeight='calc(100dvh - 16px)';}
+  function clampFloat(){const rect=host.getBoundingClientRect();state.floating.x=Math.max(8,Math.min(state.floating.x,innerWidth-rect.width-8));state.floating.y=Math.max(8,Math.min(state.floating.y,innerHeight-Math.min(rect.height,innerHeight-16)-8));host.style.left=state.floating.x+'px';host.style.top=state.floating.y+'px';card.style.maxHeight='calc(100dvh - 16px - var(--gptu-margin-top,6px) - var(--gptu-margin-bottom,6px))';}
   $('.grab').addEventListener('pointerdown',e=>{if(e.button!==0)return;const r=host.getBoundingClientRect();drag={x:e.clientX,y:e.clientY,left:r.left,top:r.top,started:false};$('.grab').setPointerCapture(e.pointerId);e.preventDefault();});
-  window.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(!drag.started&&Math.hypot(dx,dy)<5)return;drag.started=true;state.position='floating';state.floating={x:drag.left+dx,y:drag.top+dy};place(false);$('.grab').setPointerCapture(e.pointerId);clampFloat();});
-  const endDrag=()=>{if(drag?.started){persist();if(settingsOpen)renderSettings();}drag=null;};
+  function updateDockTargets(event){
+    const nav=findSidebarNav();
+    if(!nav){$('.dock-targets').hidden=true;if(drag)drag.dockTarget=null;return;}
+    const {container,before}=bottomTarget(nav),r=container.getBoundingClientRect(),nr=nav.getBoundingClientRect(),footer=before?.getBoundingClientRect();
+    const top=Math.max(8,nr.top+8),bottom=Math.max(top+44,Math.min(innerHeight-44,footer&&footer.height>0?footer.top-44:r.bottom-44));
+    const inside=event.clientX>=r.left&&event.clientX<=r.right&&event.clientY>=r.top&&event.clientY<=r.bottom;
+    const target=inside?(event.clientY<(top+bottom+36)/2?'top':'bottom'):null;
+    $('.dock-targets').hidden=false;
+    for(const zone of root.querySelectorAll('[data-dock]')){
+      zone.style.left=Math.max(8,r.left+8)+'px';zone.style.width=Math.max(80,Math.min(r.width-16,innerWidth-16))+'px';zone.style.top=(zone.dataset.dock==='top'?top:bottom)+'px';zone.classList.toggle('active',zone.dataset.dock===target);
+    }
+    if(drag)drag.dockTarget=target;
+  }
+  window.addEventListener('pointermove',e=>{
+    if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;
+    if(!drag.started&&Math.hypot(dx,dy)<5)return;
+    drag.started=true;state.position='floating';state.floating={x:drag.left+dx,y:drag.top+dy};place(false);$('.grab').setPointerCapture(e.pointerId);clampFloat();updateDockTargets(e);
+  });
+  const endDrag=event=>{
+    if(drag?.started){
+      if(event.type==='pointerup')updateDockTargets(event);
+      const dock=event.type==='pointerup'?drag.dockTarget:null;
+      drag=null;$('.dock-targets').hidden=true;
+      if(dock){state.position=dock;place(true);$('.live').textContent=`Docked at ${dock} of sidebar`;}
+      persist();if(settingsOpen)renderSettings();
+    }
+    drag=null;$('.dock-targets').hidden=true;
+  };
   window.addEventListener('pointerup',endDrag);window.addEventListener('pointercancel',endDrag);window.addEventListener('blur',endDrag);
   $('.grab').addEventListener('keydown',e=>{if(e.key==='Escape'){state.position='top';persist();place(true);if(settingsOpen)renderSettings();return;}if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key))return;e.preventDefault();if(state.position!=='floating'){const r=host.getBoundingClientRect();state.floating={x:r.left,y:r.top};state.position='floating';}const step=e.shiftKey?30:10;state.floating.x+=e.key==='ArrowRight'?step:e.key==='ArrowLeft'?-step:0;state.floating.y+=e.key==='ArrowDown'?step:e.key==='ArrowUp'?-step:0;place(false);persist();if(settingsOpen)renderSettings();});
   function isVisibleElement(el) {
@@ -666,7 +712,7 @@
     const margin=reserve?reserve+'px':'';
     if(host.style.marginBottom!==margin)host.style.marginBottom=margin;
     if(observedFooter!==before){footerResizeObserver.disconnect();if(before)footerResizeObserver.observe(before);observedFooter=before;}
-    const available=Math.max(80,Math.min(innerHeight,r.height||innerHeight)-(reserve||(footer?.height||0))-100);
+    const available=Math.max(80,Math.min(innerHeight,r.height||innerHeight)-(reserve||(footer?.height||0))-100-state.marginTop-state.marginBottom);
     card.style.maxHeight=Math.min(available,innerHeight*.6)+'px';
   }
 
