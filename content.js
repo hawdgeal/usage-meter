@@ -158,9 +158,9 @@
       color:var(--fg); background:var(--surface); font:13px/1.45 ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
       margin:6px 8px; border:1px solid var(--line); border-radius:14px; overflow:hidden; text-align:left; display:flex; flex-direction:column; }
     .card { position:relative; border-color:transparent; }
-    .card:hover, .card:focus-within { border-color:var(--line); }
+    .card:hover, .card:has(:focus-visible) { border-color:var(--line); }
     .resize { opacity:0; pointer-events:none; }
-    .card:hover .resize, .card:focus-within .resize { opacity:1; pointer-events:auto; }
+    .card:hover .resize, .card:has(:focus-visible) .resize { opacity:1; pointer-events:auto; }
     @media(hover:none) { .resize { opacity:1; pointer-events:auto; } }
     :host([data-bottom]) { position:relative; margin-top:0; width:auto; flex:0 0 auto; }
     :host([data-bottom]) .card { margin:6px 8px; }
@@ -168,8 +168,8 @@
     .card.collapsed .title, .card.collapsed .badge, .card.collapsed .summary, .card.collapsed .toggle .chev { opacity:0; pointer-events:none; }
     .card.collapsed:hover .grab, .card.collapsed:hover .refresh, .card.collapsed:hover .customize,
     .card.collapsed:hover .title, .card.collapsed:hover .badge, .card.collapsed:hover .summary, .card.collapsed:hover .toggle .chev,
-    .card.collapsed:focus-within .grab, .card.collapsed:focus-within .refresh, .card.collapsed:focus-within .customize,
-    .card.collapsed:focus-within .title, .card.collapsed:focus-within .badge, .card.collapsed:focus-within .summary, .card.collapsed:focus-within .toggle .chev { opacity:1; pointer-events:auto; }
+    .card.collapsed:has(:focus-visible) .grab, .card.collapsed:has(:focus-visible) .refresh, .card.collapsed:has(:focus-visible) .customize,
+    .card.collapsed:has(:focus-visible) .title, .card.collapsed:has(:focus-visible) .badge, .card.collapsed:has(:focus-visible) .summary, .card.collapsed:has(:focus-visible) .toggle .chev { opacity:1; pointer-events:auto; }
     @media(hover:none) { .card.collapsed .icon, .card.collapsed .toggle .chev { opacity:1; pointer-events:auto; } }
     :host([data-dark]) { color-scheme:dark; }
     :host([data-dark]) .card, :host([data-dark]) .settings { --fg:#ececec; --muted:#ababab; --line:#292929; --surface:#000000; --hover:#171717; --track:#292929; --ok:#57c7a6; --warn:#e9b55f; --bad:#ff7983; }
@@ -224,7 +224,7 @@
     .busy .refresh svg { animation:spin 1s linear infinite; } @keyframes spin { to { transform:rotate(360deg); } }
     :host([data-floating]) { position:fixed; width:min(300px,calc(100vw - 16px)); z-index:2147483000; }
     :host([data-floating]) .card { margin:0; }
-    :host([data-floating]) .card:hover, :host([data-floating]) .card:focus-within { box-shadow:0 8px 32px #0003; }
+    :host([data-floating]) .card:hover, :host([data-floating]) .card:has(:focus-visible) { box-shadow:0 8px 32px #0003; }
     .resize { position:absolute; bottom:2px; right:2px; width:22px; height:22px; color:var(--muted); cursor:ns-resize; touch-action:none; border-radius:5px; display:grid; place-items:center; }
     .resize svg { width:12px; height:12px; }
     :host([data-floating]) .resize { cursor:nwse-resize; }
@@ -251,6 +251,20 @@
     .compact .summary { padding:0 9px 5px; }
     .compact-toggle { padding-top:8px; border-top:1px solid var(--line); }
     .compact-toggle input { width:16px; height:16px; cursor:pointer; }
+    /* Opacity preserves layout and tab order while keeping the idle view quiet. */
+    .card .grab,.card .refresh,.card .customize,.card .section-handle,.card .foot,.card .chev { opacity:0; pointer-events:none; }
+    .card:hover .grab,.card:hover .refresh,.card:hover .customize,.card:hover .section-handle,.card:hover .foot,.card:hover .chev,
+    .card:has(:focus-visible) .grab,.card:has(:focus-visible) .refresh,.card:has(:focus-visible) .customize,.card:has(:focus-visible) .section-handle,.card:has(:focus-visible) .foot,.card:has(:focus-visible) .chev { opacity:1; pointer-events:auto; }
+    :host([data-settings-open]) .customize { opacity:1; pointer-events:auto; }
+    .compact .plan-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(112px,100%),1fr)); column-gap:14px; position:relative; }
+    .compact .plan-row { min-width:0; border-radius:4px; }
+    .compact .plan-row .rl { gap:4px; }
+    .compact .plan-row .sub { white-space:nowrap; font-size:11px; }
+    .compact .plan-row .at-limit { color:var(--bad); }
+    .plan-tip { display:none; position:absolute; left:0; right:0; top:0; z-index:2; padding:5px 7px; border:1px solid var(--line); border-radius:6px; background:var(--surface); color:var(--fg); font-size:11px; line-height:1.35; box-shadow:0 2px 8px #0003; pointer-events:none; }
+    .plan-row:hover .plan-tip,.plan-row:focus-visible .plan-tip { display:block; }
+    .plan-row:focus-visible { outline:2px solid var(--ok); outline-offset:2px; }
+    @media(hover:none) { .card .grab,.card .refresh,.card .customize,.card .section-handle,.card .foot,.card .chev { opacity:1; pointer-events:auto; } }
     .live { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
     @media(prefers-reduced-motion:reduce) { * { animation:none !important; transition:none !important; } }
   `;
@@ -307,7 +321,13 @@
     $('.summary').hidden=!state.collapsed;
     $('.summary').textContent=pcts.length?`${Math.round(Math.max(...pcts))}% used · ${fmtAgo(state.usageAt)}`:'No usage reported yet';
     const blocks={};
-    blocks.plan=parsed.rows.map(r=>`<div class="row"><div class="rl"><span>${esc(r.label)}</span><span class="v">${r.pct==null?'—':Math.round(r.pct)+'%'}</span></div>${r.pct==null?'':bar(r.pct,r.label)}<div class="sub">${r.reached?'Limit reached · ':''}${r.resetsAt?(r.resetsAt>Date.now()?`Resets in ${fmtDur(r.resetsAt-Date.now())}`:'Reset · refresh to update'):''}</div></div>`).join('')||`<div class="empty">${state.error?'Usage unavailable. Try refreshing.':state.usageAt?'No plan limits reported.':'Waiting for usage…'}</div>`;
+    blocks.plan=parsed.rows.length?`<div class="plan-grid">${parsed.rows.map(r=>{
+      const left=r.resetsAt?r.resetsAt-Date.now():null;
+      const reset=left==null?'Reset not reported':left>0?`Resets in ${fmtDur(left)}`:'Reset · refresh to update';
+      const full=`${r.label}: ${r.pct==null?'Usage not reported':Math.round(r.pct)+'% used'}${r.reached?' · Limit reached':''} · ${reset}${r.resetsAt?' · '+new Date(r.resetsAt).toLocaleString():''}`;
+      const caption=state.compact?(left==null?'Reset unknown':left>0?`Resets ${fmtDur(left)}`:'Refresh to update'):`${r.reached?'Limit reached · ':''}${left==null?'':reset}`;
+      return `<div class="row plan-row" ${state.compact?`tabindex="0" role="group" aria-label="${esc(full)}"`:''}><div class="rl"><span>${esc(r.label)}</span><span class="v ${r.reached?'at-limit':''}">${r.pct==null?'—':Math.round(r.pct)+'%'}</span></div>${r.pct==null?'':bar(r.pct,r.label)}<div class="sub">${esc(caption)}</div>${state.compact?`<div class="plan-tip" aria-hidden="true">${esc(full)}</div>`:''}</div>`;
+    }).join('')}</div>`:`<div class="empty">${state.error?'Usage unavailable. Try refreshing.':state.usageAt?'No plan limits reported.':'Waiting for usage…'}</div>`;
     const balance=num(parsed.credits);
     blocks.credits=`<div class="credit">${balance!=null?format(balance):esc(parsed.credits??'—')}</div><div class="sub">${parsed.credits==null?'No credit balance reported':'Available balance'}</div>`;
     const models=Object.entries(state.models).sort((a,b)=>(b[1].seenAt||0)-(a[1].seenAt||0)).slice(0,12);
@@ -338,9 +358,9 @@
     const below=innerHeight-anchor.bottom-8;
     menu.style.top=Math.max(8,Math.min(below>=r.height?anchor.bottom+6:anchor.top-r.height-6,innerHeight-r.height-8))+'px';
   }
-  function closeSettings(focus=false) { $('.settings').hidePopover(); settingsOpen=false;$('.customize').setAttribute('aria-expanded','false');if(focus)$('.customize').focus(); }
-  $('.customize').onclick=()=>{if(settingsOpen){closeSettings();return;}settingsOpen=true;renderSettings();$('.settings').showPopover();positionSettings();$('.settings').querySelector('select').focus();};
-  $('.settings').addEventListener('toggle',e=>{settingsOpen=e.newState==='open';$('.customize').setAttribute('aria-expanded',String(settingsOpen));});
+  function closeSettings(focus=false) { host.removeAttribute('data-settings-open');$('.settings').hidePopover(); settingsOpen=false;$('.customize').setAttribute('aria-expanded','false');if(focus)$('.customize').focus(); }
+  $('.customize').onclick=()=>{if(settingsOpen){closeSettings();return;}settingsOpen=true;host.setAttribute('data-settings-open','');renderSettings();$('.settings').showPopover();positionSettings();$('.settings').querySelector('select').focus();};
+  $('.settings').addEventListener('toggle',e=>{settingsOpen=e.newState==='open';host.toggleAttribute('data-settings-open',settingsOpen);$('.customize').setAttribute('aria-expanded',String(settingsOpen));});
   root.addEventListener('click',e=>{if(e.target.closest('.close-settings'))closeSettings(true);});
   window.addEventListener('resize',positionSettings);
   document.addEventListener('scroll',positionSettings,true);
