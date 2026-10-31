@@ -23,13 +23,23 @@
     if (st.cursor === 'pointer') s += ' ptr';
     return s;
   };
+  // Wrappers with display:contents have no box of their own (they measure 0x0) but their children
+  // are laid out in the parent. Walk through them instead of stopping.
+  const isContents = (el) => getComputedStyle(el).display === 'contents';
+  const visibleKids = (el) => [...el.children].flatMap((k) => (isContents(k) ? visibleKids(k) : [k]))
+    .filter((k) => { const b = k.getBoundingClientRect(); return b.width > 0 && b.height > 0; });
   const walk = (el, depth) => {
+    if (depth > 18) return;
+    if (isContents(el)) {
+      lines.push(`${'  '.repeat(depth)}${label(el)} contents kids=${visibleKids(el).length} clickables=${el.querySelectorAll(CLICKABLE).length}`);
+      [...el.children].forEach((k) => walk(k, depth + 1));
+      return;
+    }
     const r = el.getBoundingClientRect();
-    if (r.width < 40 || r.height < 16 || depth > 14) return;
-    const kids = [...el.children].filter((k) => { const b = k.getBoundingClientRect(); return b.width > 0 && b.height > 0; });
-    lines.push(`${'  '.repeat(depth)}${label(el)} @${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}x${Math.round(r.height)} kids=${kids.length} clickables=${el.querySelectorAll(CLICKABLE).length}`);
+    if (r.width < 40 || r.height < 16) return;
+    lines.push(`${'  '.repeat(depth)}${label(el)} @${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}x${Math.round(r.height)} kids=${visibleKids(el).length} clickables=${el.querySelectorAll(CLICKABLE).length}`);
     if (el.matches(CLICKABLE)) return;
-    kids.forEach((k) => walk(k, depth + 1));
+    [...el.children].forEach((k) => walk(k, depth + 1));
   };
   walk(root, 0);
   const out = lines.join('\n');
