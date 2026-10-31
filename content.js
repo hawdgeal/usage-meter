@@ -11,7 +11,7 @@
   const LEGACY_BAR_PALETTE={blue:'#60a5fa',red:'#ff7983',white:'#ffffff',green:'#4ade80',yellow:'#facc15',pink:'#f472b6',orange:'#fb923c',purple:'#c084fc',neutral:'#ececec',gray:'#a3a3a3'};
   const isHex=value=>typeof value==='string'&&/^#[0-9a-f]{6}$/i.test(value);
   const legacyBarColor=(value,fallback)=>isHex(value)?value:LEGACY_BAR_PALETTE[value]||fallback;
-  const SETTINGS_TABS={panel:'General',modules:'Modules',appearance:'Appearance',spacing:'Spacing'};
+  const SETTINGS_TABS={panel:'Layout',modules:'Modules',appearance:'Theme',bars:'Bars',spacing:'Spacing'};
   const SPACING_AREAS={
     outer:{label:'Frame margins (outside)',selector:'.panel-layout',kind:'padding',normal:[6,0,0,0]},
     frame:{label:'Inside frame',selector:'',kind:'padding',normal:[6,0,6,0]},
@@ -70,7 +70,7 @@
     position:'bottom',sections:['plan','credits','features'],closed:{credits:true},
     hidden:{features:true},hiddenFeatures:{deep_research:true,file_upload:true,paste_text_to_file:true},
     theme:'auto',preset:'auto',accent:'auto',contrast:'auto',barMode:'auto',barColor:'#60a5fa',barStart:'#60a5fa',barEnd:'#ff7983',barGradient:false,barGradientVisible:false,gradientStops:[],floating:{x:24,y:100},size:{width:300,height:null},
-    settingsTab:'panel',settingsPosition:null,settingsSize:null,spacingMode:'auto',spacing:{normal:{},compact:{}},settingsClosed:{hover:true,appearance:false,colors:true,status:true,placement:false,visibility:true,plan:false,credits:true,features:true,spacePanel:false,spaceStatus:true,spaceModules:true,spaceItems:true,spaceBars:true,spaceDetails:true}
+    settingsTab:'panel',settingsPosition:null,settingsSize:null,spacingMode:'auto',spacing:{normal:{},compact:{}},settingsClosed:{barSource:false,barDisplay:true,barEnds:false,barMiddle:false,hover:true,appearance:false,colors:true,status:true,placement:false,visibility:true,plan:false,credits:true,features:true,spacePanel:false,spaceStatus:true,spaceModules:true,spaceItems:true,spaceBars:true,spaceDetails:true}
   };}
   const state = {
     usage:null,plan:null,usageAt:0,error:null,models:{},showRaw:false,resetInfo:null,
@@ -119,7 +119,7 @@
     if(!['auto','chatgpt',...THEME_FAMILIES].includes(state.preset))state.preset='auto';
     if(!['auto','default','blue','green','yellow','pink','orange','purple','neutral'].includes(state.accent))state.accent='auto';
     if(!['auto','system','medium','increased'].includes(state.contrast))state.contrast='auto';
-    state.gradientStops=(Array.isArray(state.gradientStops)?state.gradientStops:[]).filter(stop=>stop&&isHex(stop.color)&&Number.isFinite(stop.from??stop.at)&&Number.isFinite(stop.to??stop.at)).slice(0,8).map(stop=>({from:Math.max(1,Math.min(99,stop.from??stop.at)),to:Math.max(1,Math.min(99,stop.to??stop.at)),color:stop.color})).sort((a,b)=>a.from-b.from);
+    state.gradientStops=(Array.isArray(state.gradientStops)?state.gradientStops:[]).filter(stop=>stop&&isHex(stop.color)&&Number.isFinite(stop.from??stop.at)&&Number.isFinite(stop.to??stop.at)).slice(0,8).map(stop=>({from:Math.max(1,Math.min(99,stop.from??stop.at)),to:Math.max(1,Math.min(99,stop.to??stop.at)),color:stop.color,blendBefore:Number.isFinite(stop.blendBefore)?Math.max(0,Math.min(100,stop.blendBefore)):null,blendAfter:Number.isFinite(stop.blendAfter)?Math.max(0,Math.min(100,stop.blendAfter)):null})).sort((a,b)=>a.from-b.from);
     for(let i=0;i<state.gradientStops.length;i++){const stop=state.gradientStops[i];stop.from=Math.max(i?state.gradientStops[i-1].to:1,stop.from);stop.to=Math.max(stop.from,stop.to);}
     state.barGradient=state.barGradient===true;state.barGradientVisible=state.barGradientVisible===true;
     if(!['auto','custom'].includes(state.barMode))state.barMode='auto';
@@ -445,10 +445,13 @@
     .bar-preview-title { font-size:11px; color:var(--muted); margin-bottom:6px; }
     .bar-preview-fill { height:12px; width:100%; border-radius:6px; border:1px solid var(--line); }
     .bar-preview-labels { display:flex; justify-content:space-between; margin-top:4px; font-size:10px; color:var(--muted); }
-    .gradient-stop { display:flex; align-items:center; gap:6px; margin:6px 0; }
+    .gradient-stop::before { content:attr(data-color-label); flex-basis:100%; font-size:11px; font-weight:600; }
+    .gradient-stop { border:1px solid var(--line); padding:8px; border-radius:7px; display:flex; align-items:center; gap:6px; margin:6px 0; }
+    .gradient-blends { display:flex; flex-wrap:wrap; gap:8px; flex-basis:100%; }
     .gradient-stop label { display:flex; align-items:center; gap:3px; font-size:10px; }
     .gradient-stop { flex-wrap:wrap; }
     .gradient-stop input[type=number] { width:43px; background:var(--surface); color:var(--fg); border:1px solid var(--line); border-radius:5px; padding:4px; }
+    .gradient-stop input[data-gradient-before],.gradient-stop input[data-gradient-after] { width:56px; }
     .gradient-stop input[type=color] { width:32px; height:28px; background:var(--surface); border:1px solid var(--line); border-radius:5px; }
     .gradient-stop button { margin-left:auto; font-size:11px; }
     .bar-color-controls { display:flex; align-items:center; gap:6px; }
@@ -488,7 +491,20 @@
   const featureNames={deep_research:'Deep Research',file_upload:'File uploads',paste_text_to_file:'Paste text to file',image_gen:'Image generation'};
   const featureLabel=name=>featureNames[name]||name.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
   const format=n=>new Intl.NumberFormat(undefined,{maximumFractionDigits:2}).format(n);
-  function colorScalePoints(){return [{at:0,color:state.barStart},...state.gradientStops.flatMap(stop=>[{at:stop.from,color:stop.color},{at:stop.to,color:stop.color}]),{at:100,color:state.barEnd}];}
+  function colorScalePoints(){
+    const bands=[{from:0,to:0,color:state.barStart,endpoint:true},...state.gradientStops,{from:100,to:100,color:state.barEnd,endpoint:true}],points=[{at:0,color:state.barStart}];
+    for(let i=1;i<bands.length;i++){
+      const left=bands[i-1],right=bands[i],gap=right.from-left.to;
+      const before=Number.isFinite(right.blendBefore)?Math.min(gap,right.blendBefore):gap;
+      const after=Number.isFinite(left.blendAfter)?Math.min(gap,left.blendAfter):gap;
+      let start=left.to,end=right.from;
+      if(left.endpoint&&!right.endpoint)start=right.from-before;
+      else if(right.endpoint&&!left.endpoint)end=left.to+after;
+      else if(!left.endpoint&&!right.endpoint){start=left.to+(gap-before)/2;end=right.from-(gap-after)/2;}
+      points.push({at:start,color:left.color},{at:end,color:right.color},{at:right.to,color:right.color});
+    }
+    return points;
+  }
   function colorScaleGradient(){return `linear-gradient(to right,${colorScalePoints().map(point=>point.color+' '+point.at+'%').join(',')})`;}
   function updateBarPreview(){
     const preview=$('.bar-preview-fill');if(!preview)return;
@@ -496,9 +512,9 @@
   }
   function percentageColor(value){
     const points=colorScalePoints(),p=Math.max(0,Math.min(100,value));
-    let left=points[0],right=points[points.length-1];
-    for(let i=1;i<points.length;i++)if(p<=points[i].at){left=points[i-1];right=points[i];break;}
-    const t=right.at===left.at?1:(p-left.at)/(right.at-left.at);
+    let index=0;while(index<points.length-1&&points[index+1].at<=p)index++;
+    const left=points[index],right=points[Math.min(index+1,points.length-1)];
+    const t=right.at===left.at?0:(p-left.at)/(right.at-left.at);
     const rgb=[1,3,5].map(offset=>Math.round(parseInt(left.color.slice(offset,offset+2),16)*(1-t)+parseInt(right.color.slice(offset,offset+2),16)*t));
     return `rgb(${rgb.join(',')})`;
   }
@@ -655,14 +671,16 @@
     const box=key=>`<div class="spacing-box"><span class="spacing-box-title">${SPACING_AREAS[key].label}</span><div class="spacing-grid">${spacingValues(profile,key).map((value,side)=>`<label><span>${SPACING_SIDES[side]}</span><input type="number" min="0" max="120" step="1" value="${value}" aria-label="${SPACING_AREAS[key].label} ${SPACING_SIDES[side].toLowerCase()} spacing" data-space-area="${key}" data-space-side="${side}" data-space-profile="${profile}"></label>`).join('')}</div></div>`;
     const tab=(key,content)=>`<div class="settings-panel" role="tabpanel" id="gptu-settings-${key}" aria-labelledby="gptu-tab-${key}" ${state.settingsTab===key?'':'hidden'}>${content}</div>`;
     const colorInput=(label,key)=>`<label class="setting"><span>${label}</span><input type="color" aria-label="${label}" data-simple-bar-color="${key}" value="${state[key]}"></label>`;
-    const barControls=select('Bar color','barMode',{auto:'Match theme',custom:'Custom'})+`<div class="bar-preview"><div class="bar-preview-title">Color scale preview</div><div class="bar-preview-fill" role="img" aria-label="Bar color scale from 0 to 100 percent"></div><div class="bar-preview-labels"><span>0%</span><span>50%</span><span>100%</span></div></div>`+(state.barMode==='custom'?toggle('Color by percentage','data-bar-gradient',state.barGradient)+(state.barGradient?
-      toggle('Show gradient across meters','data-visible-gradient',state.barGradientVisible)+`<div class="note">Off: one color based on the current percentage. On: the fill shows the corresponding part of the full 0–100% color scale.</div>`+colorInput('Color at 0%','barStart')+colorInput('Color at 100%','barEnd')+`<div class="feature-settings-title">Middle colors</div>${state.gradientStops.map((stop,index)=>`<div class="gradient-stop"><input type="color" value="${stop.color}" data-gradient-color="${index}" aria-label="Middle color ${index+1}"><label>From <input type="number" min="1" max="99" step="1" value="${stop.from}" data-gradient-from="${index}" aria-label="Middle color ${index+1} from">%</label><label>To <input type="number" min="1" max="99" step="1" value="${stop.to}" data-gradient-to="${index}" aria-label="Middle color ${index+1} to">%</label><button class="text-btn" data-remove-stop="${index}" aria-label="Remove middle color ${index+1}">Remove</button></div>`).join('')}<button class="text-btn" data-add-stop ${state.gradientStops.length>=8?'disabled':''}>Add middle color</button><div class="note">A middle color stays constant from From to To, with blends in the gaps. Set both to the same value for a single point. Ranges stay ordered without overlap. 0% is empty; 100% is full.</div>`:
-      colorInput('Custom bar color','barColor')):'')+`<div class="note">Applies to all plan, credit and feature fills. Match theme uses the current theme accent.</div>`;
+    const barPreview=`<div class="bar-preview"><div class="bar-preview-title">Color scale preview</div><div class="bar-preview-fill" role="img" aria-label="Bar color scale from 0 to 100 percent"></div><div class="bar-preview-labels"><span>0%</span><span>50%</span><span>100%</span></div></div>`;
+    const middleControls=`${state.gradientStops.map((stop,index)=>`<div class="gradient-stop" data-color-label="Middle color ${index+1}"><input type="color" value="${stop.color}" data-gradient-color="${index}" aria-label="Middle color ${index+1}"><label>From <input type="number" min="1" max="99" step="1" value="${stop.from}" data-gradient-from="${index}" aria-label="Middle color ${index+1} from">%</label><label>To <input type="number" min="1" max="99" step="1" value="${stop.to}" data-gradient-to="${index}" aria-label="Middle color ${index+1} to">%</label><button class="text-btn" data-remove-stop="${index}" aria-label="Remove middle color ${index+1}">Remove</button><div class="gradient-blends"><label>Blend before <input type="number" min="0" max="100" step="1" value="${stop.blendBefore??''}" placeholder="Auto" data-gradient-before="${index}" aria-label="Middle color ${index+1} blend before">%</label><label>Blend after <input type="number" min="0" max="100" step="1" value="${stop.blendAfter??''}" placeholder="Auto" data-gradient-after="${index}" aria-label="Middle color ${index+1} blend after">%</label></div></div>`).join('')}<button class="text-btn" data-add-stop ${state.gradientStops.length>=8?'disabled':''}>Add middle color</button><div class="note">From/To sets the solid color range. Blend before/after sets transition widths in percentage points: smaller is sharper, 0 is a hard edge, blank fills the gap. Neighboring middle colors share the transition between them. 0% is empty; 100% is full.</div>`;
+    const barControls=group('barSource','Color source',select('Bar color','barMode',{auto:'Match theme',custom:'Custom'})+(state.barMode==='custom'?toggle('Color by percentage','data-bar-gradient',state.barGradient)+(state.barGradient?'':colorInput('Custom bar color','barColor')):'')+barPreview+`<div class="note">Applies to plan, credit and feature bars.</div>`)+
+      (state.barMode==='custom'&&state.barGradient?group('barDisplay','Meter display',toggle('Show gradient across meters','data-visible-gradient',state.barGradientVisible)+`<div class="note">Off: one color for the current percentage. On: show the color scale across the fill.</div>`)+group('barEnds','End colors',colorInput('Color at 0%','barStart')+colorInput('Color at 100%','barEnd'))+group('barMiddle','Middle colors & transitions',middleControls):'');
     const themeSelect=`<label class="setting"><span>Theme preset</span><select aria-label="Theme preset" data-setting="preset"><optgroup label="ChatGPT"><option value="auto" ${state.preset==='auto'?'selected':''}>Match ChatGPT</option><option value="chatgpt" ${state.preset==='chatgpt'?'selected':''}>ChatGPT</option></optgroup><optgroup label="Codex themes">${THEME_FAMILIES.map(name=>`<option value="${esc(name)}" ${state.preset===name?'selected':''}>${esc(name)}</option>`).join('')}</optgroup></select></label>`;
     $('.settings').innerHTML=`<div class="settings-header"><div class="settings-title" title="Drag to move settings · Double-click to reset position"><button class="icon settings-grab" aria-label="Move settings" title="Drag or use arrow keys · Home resets position">${icon('grip')}</button><span>Usage settings</span><button class="icon close-settings" aria-label="Close settings">✕</button></div><div class="settings-tabs" role="tablist" aria-label="Settings categories">${Object.entries(SETTINGS_TABS).map(([key,label])=>`<button class="settings-tab" role="tab" id="gptu-tab-${key}" aria-controls="gptu-settings-${key}" aria-selected="${state.settingsTab===key}" tabindex="${state.settingsTab===key?0:-1}" data-settings-tab="${key}">${label}</button>`).join('')}</div></div><div class="settings-body">${
-      tab('panel',group('placement','Layout',select('Placement','position',{top:'Sidebar top',bottom:'Sidebar bottom',floating:'Floating'})+toggle('Compact mode','data-compact',state.compact))+group('visibility','Visibility',toggle('Hide docked panel with sidebar','data-hide-with-sidebar',state.hideWithSidebar)+toggle('Hide frame completely','data-hide-frame',state.hideFrame))+group('hover','Hover behavior',`<div class="note">Turn a switch off to keep that element visible. Keyboard focus also reveals hover-only controls.</div>`+Object.entries(HOVER_OPTIONS).map(([key,item])=>toggle(item.label,`data-hover="${key}" ${key==='frame'&&state.hideFrame?'disabled':''}`,state.hover[key])).join('')+toggle('Hide collapsed Usage until hover','data-hide-collapsed',state.hideCollapsed))+group('status','Update time & Details',toggle('Show update time','data-show-update',state.showUpdateTime)+toggle('Show Details button','data-show-details',state.showDetails)+select('Status position','footerPosition',{header:'Next to Usage',top:'Above modules',bottom:'Below modules'})))+
+      tab('panel',group('placement','Docking & size',select('Placement','position',{top:'Sidebar top',bottom:'Sidebar bottom',floating:'Floating'})+toggle('Compact mode','data-compact',state.compact))+group('visibility','Visibility',toggle('Hide docked panel with sidebar','data-hide-with-sidebar',state.hideWithSidebar)+toggle('Hide frame completely','data-hide-frame',state.hideFrame))+group('hover','Hover behavior',`<div class="note">Turn a switch off to keep that element visible. Keyboard focus also reveals hover-only controls.</div>`+Object.entries(HOVER_OPTIONS).map(([key,item])=>toggle(item.label,`data-hover="${key}" ${key==='frame'&&state.hideFrame?'disabled':''}`,state.hover[key])).join('')+toggle('Hide collapsed Usage until hover','data-hide-collapsed',state.hideCollapsed))+group('status','Update time & Details',toggle('Show update time','data-show-update',state.showUpdateTime)+toggle('Show Details button','data-show-details',state.showDetails)+select('Status position','footerPosition',{header:'Next to Usage',top:'Above modules',bottom:'Below modules'})))+
       tab('modules',group('plan','Plan limits',moduleToggle('plan')+toggle('Show paid reset button','data-paid-reset',state.showPaidReset)+toggle('Show remaining plan allowance','data-remaining-plan',state.showRemainingPlan)+`<div class="note">Also applies to the credits bar: remaining when enabled, used when disabled.</div>`+toggle('Plan limit tooltips','data-plan-tooltips',state.showPlanTooltips))+group('credits','Credits',moduleToggle('credits')+toggle('Show credit balance bar','data-credit-bar',state.showCreditBar)+`<div class="credit-reference-controls" ${state.showCreditBar?'':'hidden'}>${toggle('Show available balance','data-credit-balance',state.showCreditBalance)}<label class="setting"><span>Full balance</span><span class="margin-input"><input type="number" aria-label="Full credit balance" min="0.01" step="any" data-credit-reference value="${state.creditReference??''}" placeholder="e.g. 1000">credits</span></label><div class="note">This amount counts as 100%. Initially uses your balance when enabled; you can change it.</div></div>`+toggle('Add credits button','data-add-credits',state.showAddCredits))+group('features','Models & features',moduleToggle('features')+`<div class="feature-settings"><div class="feature-settings-title">Individual counters</div><div class="feature-options" role="group" aria-label="Models & features to show"></div><div class="note">Selections are kept when the module is hidden.</div></div>`))+
-      tab('appearance',group('appearance','Theme & mode',themeSelect+select('Appearance','theme',{auto:'Match ChatGPT',system:'System',light:'Light',dark:'Dark'})+`<div class="note">Match ChatGPT follows the page palette and custom colors. Codex presets use available light/dark variants; some have only one mode.</div>`)+group('colors','Accent & contrast',select('Accent color','accent',accentNames)+select('Contrast','contrast',{auto:'Match ChatGPT',system:'System',medium:'Medium',increased:'Increased'}))+group('barColors','Bar colors',barControls))+
+      tab('appearance',group('appearance','Theme & mode',themeSelect+select('Appearance','theme',{auto:'Match ChatGPT',system:'System',light:'Light',dark:'Dark'})+`<div class="note">Match ChatGPT follows the page palette and custom colors. Codex presets use available light/dark variants; some have only one mode.</div>`)+group('colors','Accent & contrast',select('Accent color','accent',accentNames)+select('Contrast','contrast',{auto:'Match ChatGPT',system:'System',medium:'Medium',increased:'Increased'})))+
+      tab('bars',barControls)+
       tab('spacing',`${select('Editing spacing','spacingMode',{auto:'Current density',normal:'Normal',compact:'Compact'})}<div class="note">Editing ${profile==='normal'?'normal':'compact'} mode. All values are in pixels. Inside frame controls the space within the border; outside frame controls the surrounding gap.</div>`+group('spacePanel','Panel & header',['outer','frame','header'].map(box).join(''))+group('spaceStatus','Update time & summary',['status','headerStatus','statusButton','summary'].map(box).join(''))+group('spaceModules','Module spacing',['plan','credits','features','sectionHeader','sectionContent'].map(box).join(''))+group('spaceItems','Items & credits',['planRows','featureRows','creditBalance','creditMeter','addCredits'].map(box).join(''))+group('spaceBars','Bars & captions',['planBars','creditBars','featureBars','captions'].map(box).join(''))+group('spaceDetails','Expanded Details',['details','detailsContent'].map(box).join(''))+`<button class="text-btn reset-spacing" data-reset-spacing="${profile}">Reset ${profile} spacing</button>`)
     }</div><div class="settings-help"><details><summary>Moving & keyboard controls</summary><div class="note">Drag this window by its title. Double-click the title to return it beside the panel. Use arrow keys on a move or reorder handle.</div></details><button class="text-btn reset">Reset all settings</button></div><button class="icon settings-resize" aria-label="Resize settings" title="Drag to resize · Arrow keys resize · Double-click resets size"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m5 13 8-8m-3 8 3-3"/></svg></button>`;
     renderFeatureSettings();updateBarPreview();positionSettings();
@@ -843,15 +861,18 @@
     state[key]=value;persist();render();
   });
   function editMiddleColor(event){
-    const target=event.target,index=Number(target.dataset.gradientColor??target.dataset.gradientFrom??target.dataset.gradientTo);
+    const target=event.target,index=Number(target.dataset.gradientColor??target.dataset.gradientFrom??target.dataset.gradientTo??target.dataset.gradientBefore??target.dataset.gradientAfter);
     const stop=state.gradientStops[index];if(!Number.isInteger(index)||!stop)return;
     if(target.hasAttribute('data-gradient-color')&&isHex(target.value))stop.color=target.value;
+    else if(target.hasAttribute('data-gradient-before')||target.hasAttribute('data-gradient-after')){
+      if(!target.validity.valid)return;const key=target.hasAttribute('data-gradient-before')?'blendBefore':'blendAfter';stop[key]=target.value===''?null:Number(target.value);
+    }
     else if((target.hasAttribute('data-gradient-from')||target.hasAttribute('data-gradient-to'))&&target.value!==''&&target.validity.valid){
       const lower=index?state.gradientStops[index-1].to:1,upper=state.gradientStops[index+1]?.from??99;
       const value=Math.max(lower,Math.min(upper,Number(target.value)));
       if(target.hasAttribute('data-gradient-from')){stop.from=value;stop.to=Math.max(value,stop.to);}
       else{stop.to=value;stop.from=Math.min(value,stop.from);}
-      const other=target.parentElement.parentElement.querySelector(target.hasAttribute('data-gradient-from')?'[data-gradient-to]':'[data-gradient-from]');
+      const other=target.closest('.gradient-stop').querySelector(target.hasAttribute('data-gradient-from')?'[data-gradient-to]':'[data-gradient-from]');
       if(other)other.value=target.hasAttribute('data-gradient-from')?stop.to:stop.from;
       if(event.type==='change')target.value=target.hasAttribute('data-gradient-from')?stop.from:stop.to;
     }else return;
@@ -864,7 +885,7 @@
       const points=[0,...state.gradientStops.flatMap(stop=>[stop.from,stop.to]),100];let left=0,right=100,gap=0;
       for(let i=1;i<points.length;i++)if(points[i]-points[i-1]>gap){left=points[i-1];right=points[i];gap=right-left;}
       const at=Math.max(1,Math.min(99,Math.round((left+right)/2)));
-      state.gradientStops.push({from:at,to:at,color:'#a78bfa'});state.gradientStops.sort((a,b)=>a.from-b.from);
+      state.gradientStops.push({from:at,to:at,color:'#a78bfa',blendBefore:null,blendAfter:null});state.gradientStops.sort((a,b)=>a.from-b.from);
     }else if(target.hasAttribute('data-remove-stop'))state.gradientStops.splice(Number(target.dataset.removeStop),1);
     else return;
     persist();applyTheme();renderSettings();
