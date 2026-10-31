@@ -14,6 +14,7 @@
     frame:{label:'Inside frame',selector:'',kind:'padding',normal:[6,0,6,0]},
     header:{label:'Usage header',selector:'.head',kind:'padding',normal:[5,6,5,6]},
     status:{label:'Update time & Details',selector:'.foot',kind:'padding',normal:[7,24,9,12],compact:[4,22,5,9]},
+    headerStatus:{label:'Header update time & Details',selector:'.head-status.foot',kind:'padding',normal:[0,0,0,0]},
     statusButton:{label:'Details button',selector:'.foot .text-btn',kind:'padding',normal:[3,3,3,3]},
     summary:{label:'Collapsed summary',selector:'.summary',kind:'padding',normal:[0,12,8,12],compact:[0,9,5,9]},
     plan:{label:'Plan limits module',selector:'[data-section="plan"]',kind:'margin',normal:[0,10,0,10],compact:[0,8,0,8]},
@@ -48,13 +49,25 @@
       if(el.style.getPropertyValue(prop)!==values)el.style.setProperty(prop,values);
     }
   }
+  const HOVER_OPTIONS={
+    frame:{label:'Frame on hover only'},
+    float:{label:'Drag to float on hover only',selector:'.grab'},
+    refresh:{label:'Refresh on hover only',selector:'.refresh'},
+    customize:{label:'Customize on hover only',selector:'.customize'},
+    collapse:{label:'Collapse arrows on hover only',selector:'.collapse-panel,.section-toggle .chev'},
+    reorder:{label:'Reorder handles on hover only',selector:'.section-handle'},
+    updated:{label:'Update time on hover only',selector:'.foot .updated-at'},
+    details:{label:'Details button on hover only',selector:'.foot .raw'},
+    resize:{label:'Resize handle on hover only',selector:'.resize'},
+    scrollbar:{label:'Scrollbar on hover only'}
+  };
   function defaultPreferences(){return {
-    collapsed:false,compact:false,compactHeight:null,hideCollapsed:false,hideWithSidebar:true,footerPosition:'top',showUpdateTime:true,showDetails:true,marginTop:6,marginBottom:6,
+    hideFrame:false,hover:Object.fromEntries(Object.keys(HOVER_OPTIONS).map(key=>[key,true])),collapsed:false,compact:false,compactHeight:null,hideCollapsed:false,hideWithSidebar:true,footerPosition:'top',showUpdateTime:true,showDetails:true,marginTop:6,marginBottom:6,
     showAddCredits:true,showPlanTooltips:false,showRemainingPlan:true,showCreditBar:false,showCreditBalance:true,creditReference:null,creditReferencePending:false,
     position:'bottom',sections:['plan','credits','features'],closed:{credits:true},
     hidden:{features:true},hiddenFeatures:{deep_research:true,file_upload:true,paste_text_to_file:true},
     theme:'auto',preset:'auto',accent:'auto',contrast:'auto',floating:{x:24,y:100},size:{width:300,height:null},
-    settingsTab:'panel',settingsPosition:null,spacingMode:'auto',spacing:{normal:{},compact:{}},settingsClosed:{appearance:false,colors:true,status:true,placement:false,visibility:true,plan:false,credits:true,features:true,spacePanel:false,spaceStatus:true,spaceModules:true,spaceItems:true,spaceBars:true,spaceDetails:true}
+    settingsTab:'panel',settingsPosition:null,settingsSize:null,spacingMode:'auto',spacing:{normal:{},compact:{}},settingsClosed:{hover:true,appearance:false,colors:true,status:true,placement:false,visibility:true,plan:false,credits:true,features:true,spacePanel:false,spaceStatus:true,spaceModules:true,spaceItems:true,spaceBars:true,spaceDetails:true}
   };}
   const state = {
     usage:null,plan:null,usageAt:0,error:null,models:{},showRaw:false,
@@ -63,7 +76,7 @@
   let lastRefresh = 0;
 
   // ---------- persistence ----------
-  const saveKeys = ["usage", "plan", "usageAt", "models", "collapsed", "position", "sections", "closed", "hidden", "theme", "preset", "accent", "contrast", "floating", "size", "compact", "compactHeight", "hideCollapsed", "hideWithSidebar", "hiddenFeatures", "showAddCredits", "showPlanTooltips", "showRemainingPlan", "settingsClosed", "settingsTab", "settingsPosition", "spacing", "spacingMode", "footerPosition", "showUpdateTime", "showDetails", "marginTop", "marginBottom", "showCreditBar", "showCreditBalance", "creditReference", "creditReferencePending"];
+  const saveKeys = ["hideFrame", "hover", "usage", "plan", "usageAt", "models", "collapsed", "position", "sections", "closed", "hidden", "theme", "preset", "accent", "contrast", "floating", "size", "compact", "compactHeight", "hideCollapsed", "hideWithSidebar", "hiddenFeatures", "showAddCredits", "showPlanTooltips", "showRemainingPlan", "settingsClosed", "settingsTab", "settingsPosition", "settingsSize", "spacing", "spacingMode", "footerPosition", "showUpdateTime", "showDetails", "marginTop", "marginBottom", "showCreditBar", "showCreditBalance", "creditReference", "creditReferencePending"];
   function persist() {
     const o = {};
     for (const k of saveKeys) o[k] = state[k];
@@ -79,10 +92,13 @@
     } catch (_) {}
     if(!Number.isFinite(state.creditReference)||state.creditReference<=0)state.creditReference=null;
     for(const key of ['marginTop','marginBottom'])state[key]=Number.isFinite(state[key])?Math.max(0,Math.min(120,state[key])):6;
-    if(!['top','bottom'].includes(state.footerPosition))state.footerPosition='top';
+    if(!['top','bottom','header'].includes(state.footerPosition))state.footerPosition='top';
     if(!Object.hasOwn(SETTINGS_TABS,state.settingsTab))state.settingsTab='panel';
     if(!state.settingsPosition||!Number.isFinite(state.settingsPosition.x)||!Number.isFinite(state.settingsPosition.y))state.settingsPosition=null;
+    if(!state.settingsSize||!Number.isFinite(state.settingsSize.width)||!Number.isFinite(state.settingsSize.height))state.settingsSize=null;
     if(!['auto','normal','compact'].includes(state.spacingMode))state.spacingMode='auto';
+    const hover=state.hover;state.hover=Object.fromEntries(Object.keys(HOVER_OPTIONS).map(key=>[key,typeof hover?.[key]==='boolean'?hover[key]:true]));
+    state.hideFrame=state.hideFrame===true;
     const spacing=state.spacing;state.spacing={normal:{},compact:{}};
     for(const profile of ['normal','compact'])for(const key of Object.keys(SPACING_AREAS)){const values=spacing?.[profile]?.[key];if(Array.isArray(values)&&values.length===4&&values.every(Number.isFinite))state.spacing[profile][key]=values.map(v=>Math.max(0,Math.min(120,v)));}
     if (!Array.isArray(state.sections)) state.sections = ["plan", "credits", "features"];
@@ -211,10 +227,6 @@
       color:var(--fg); background:var(--surface); font:13px/1.45 ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
       margin:0 8px; border:1px solid var(--line); border-radius:14px; overflow:hidden; text-align:left; display:flex; flex-direction:column; }
     .card { position:relative; border-color:transparent; padding-top:var(--gptu-margin-top,6px); padding-bottom:var(--gptu-margin-bottom,6px); }
-    .card:hover, .card:has(:focus-visible) { border-color:var(--line); }
-    .resize { opacity:0; pointer-events:none; }
-    .card:hover .resize, .card:has(:focus-visible) .resize { opacity:1; pointer-events:auto; }
-    @media(hover:none) { .resize { opacity:1; pointer-events:auto; } }
     :host([data-sidebar-hidden]) { display:none !important; }
     :host([data-bottom]) { position:relative; margin-top:0; width:auto; flex:0 0 auto; }
     :host([data-bottom]) .card { margin:0 8px; }
@@ -229,6 +241,17 @@
     button:hover { background:var(--hover); }
     button:focus-visible,select:focus-visible { outline:2px solid var(--ok); outline-offset:2px; }
     svg { width:16px; height:16px; flex-shrink:0; vertical-align:middle; pointer-events:none; }
+    .head-title-row { display:flex; align-items:center; flex:1; min-width:0; gap:2px; }
+    .head-title-row .usage-open { flex:0 1 auto; }
+    .head-title-row>.collapse-panel { flex:none; }
+    .head-status-slot { display:contents; }
+    .head.has-header-status { flex-wrap:wrap; justify-content:flex-end; row-gap:0; }
+    .head.has-header-status .head-title-row { display:flex; align-items:center; flex:1 1 0; min-width:min-content; max-width:100%; flex-wrap:nowrap; gap:2px; }
+    .head.has-header-status>.refresh,.head.has-header-status>.customize { order:2; }
+    .head.has-header-status .usage-open { flex:0 1 auto; }
+    .head-status.foot { flex:0 1 auto; margin-left:4px; gap:4px; font-size:9px; line-height:1.25; max-width:100%; flex-wrap:wrap; }
+    .head-status .updated-at { white-space:nowrap; }
+    .head-status .text-btn { font-size:9px; }
     .head { flex-shrink:0; display:flex; align-items:center; gap:3px; padding:5px 6px; min-height:38px; }
     .icon { width:28px; height:28px; display:inline-flex; align-items:center; justify-content:center; border-radius:7px; flex-shrink:0; color:var(--muted); }
     .grab { cursor:grab; touch-action:none; }
@@ -250,6 +273,10 @@
     .credit-meter { margin-top:8px; }
     .credit-meter .rl { font-size:11px; }
     .credit-meter .v { font-size:11px; }
+    .credit-meter.has-inline-balance .rl { flex-wrap:wrap; gap:2px 8px; }
+    .credit-meter.has-inline-balance .v { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:2px 6px; max-width:100%; }
+    .credit-meter-balance { color:var(--muted); font-weight:500; }
+    .credit-meter-balance::before { content:"·"; margin-right:6px; }
     .credit-reference-controls [data-credit-reference] { width:94px; }
     .compact .credit-meter { margin-top:5px; }
     .compact .credit-actions { display:flex; align-items:center; gap:10px; }
@@ -321,10 +348,6 @@
     .compact-toggle { padding-top:8px; border-top:1px solid var(--line); }
     .compact-toggle input { width:16px; height:16px; cursor:pointer; }
     /* Opacity preserves layout and tab order while keeping the idle view quiet. */
-    .card .grab,.card .refresh,.card .customize,.card .collapse-panel,.card .section-handle,.card .foot,.card .chev { opacity:0; pointer-events:none; }
-    .card:hover .grab,.card:hover .refresh,.card:hover .customize,.card:hover .collapse-panel,.card:hover .section-handle,.card:hover .foot,.card:hover .chev,
-    .card:has(:focus-visible) .grab,.card:has(:focus-visible) .refresh,.card:has(:focus-visible) .customize,.card:has(:focus-visible) .collapse-panel,.card:has(:focus-visible) .section-handle,.card:has(:focus-visible) .foot,.card:has(:focus-visible) .chev { opacity:1; pointer-events:auto; }
-    :host([data-settings-open]) .customize { opacity:1; pointer-events:auto; }
     .compact .plan-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(112px,100%),1fr)); column-gap:14px; position:relative; }
     .compact .plan-row { min-width:0; border-radius:4px; }
     .compact .plan-row .rl { gap:4px; }
@@ -333,11 +356,6 @@
     .plan-tip { display:none; position:absolute; left:0; right:0; top:0; z-index:2; padding:5px 7px; border:1px solid var(--line); border-radius:6px; background:var(--surface); color:var(--fg); font-size:11px; line-height:1.35; box-shadow:0 2px 8px #0003; pointer-events:none; }
     .plan-row:hover .plan-tip,.plan-row:focus-visible .plan-tip { display:block; }
     .plan-row:focus-visible { outline:2px solid var(--ok); outline-offset:2px; }
-    @media(hover:none) { .card .grab,.card .refresh,.card .customize,.card .collapse-panel,.card .section-handle,.card .foot,.card .chev { opacity:1; pointer-events:auto; } }
-    .card .head .grab { width:0; min-width:0; margin-right:-3px; overflow:hidden; }
-    .card:hover .head .grab,.card:has(:focus-visible) .head .grab { width:28px; margin-right:0; overflow:visible; }
-    .card.compact:hover .head .grab,.card.compact:has(:focus-visible) .head .grab { width:24px; }
-    @media(hover:none) { .card .head .grab { width:28px; margin-right:0; overflow:visible; } .card.compact .head .grab { width:24px; } }
     .feature-options { margin:0; padding:0 0 0 10px; border-left:1px solid var(--line); }
     .feature-settings { border-top:1px solid var(--line); padding-top:9px; margin-top:4px; }
     .feature-settings-title { font-size:11px; font-weight:600; color:var(--muted); margin-bottom:6px; }
@@ -409,7 +427,7 @@
   const root=host.attachShadow({mode:'open'});
   root.innerHTML=`<style>${CSS}</style><div class="panel-layout"><div class="card" part="card">
     <div class="head"><button class="icon grab" aria-label="Drag panel; use arrow keys to move, Escape to dock" title="Drag to float · Arrow keys to move · Escape to dock">${icon('grip')}</button>
-    <button class="usage-open" aria-label="Open usage overview" title="Open usage overview"><span class="usage-icon">${USAGE_ICON}</span><span class="title">Usage</span><span class="badge" hidden></span></button><button class="icon toggle collapse-panel" aria-expanded="true" aria-label="Collapse usage panel" title="Collapse usage panel">${icon('chevron')}</button>
+    <div class="head-title-row"><button class="usage-open" aria-label="Open usage overview" title="Open usage overview"><span class="usage-icon">${USAGE_ICON}</span><span class="title">Usage</span><span class="badge" hidden></span></button><button class="icon toggle collapse-panel" aria-expanded="true" aria-label="Collapse usage panel" title="Collapse usage panel">${icon('chevron')}</button><div class="head-status-slot"></div></div>
     <button class="icon refresh" title="Refresh usage" aria-label="Refresh usage">${icon('refresh')}</button>
     <button class="icon customize" title="Customize panel" aria-label="Customize panel" aria-expanded="false">${icon('settings')}</button></div>
     <div class="summary" hidden></div><div class="body"></div><button class="resize" aria-label="Resize panel" title="Drag to resize · Arrow keys to resize · Double-click to reset size"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m5 13 8-8m-3 8 3-3"/></svg></button><div class="live" aria-live="polite"></div></div></div><div class="settings" popover="auto" role="dialog" aria-label="Usage settings"></div><dialog class="credits-modal" aria-labelledby="gptu-page-heading"><div class="credits-header"><h2 id="gptu-page-heading">Add credits</h2><a class="credit-external" target="_blank" rel="noopener noreferrer">Open in tab</a><button class="icon credits-close" aria-label="Close credits">✕</button></div><p class="credits-status" role="status">Loading credits…</p><template class="credits-frame-template"><iframe class="credits-frame" title="ChatGPT credits purchase" allow="payment" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads"></iframe></template></dialog><div class="dock-targets" hidden aria-hidden="true"><div class="dock-zone" data-dock="top">Dock at top</div><div class="dock-zone" data-dock="bottom">Dock at bottom</div></div>`;
@@ -535,11 +553,11 @@
     const tab=(key,content)=>`<div class="settings-panel" role="tabpanel" id="gptu-settings-${key}" aria-labelledby="gptu-tab-${key}" ${state.settingsTab===key?'':'hidden'}>${content}</div>`;
     const themeSelect=`<label class="setting"><span>Theme preset</span><select aria-label="Theme preset" data-setting="preset"><optgroup label="ChatGPT"><option value="auto" ${state.preset==='auto'?'selected':''}>Match ChatGPT</option><option value="chatgpt" ${state.preset==='chatgpt'?'selected':''}>ChatGPT</option></optgroup><optgroup label="Codex themes">${THEME_FAMILIES.map(name=>`<option value="${esc(name)}" ${state.preset===name?'selected':''}>${esc(name)}</option>`).join('')}</optgroup></select></label>`;
     $('.settings').innerHTML=`<div class="settings-header"><div class="settings-title" title="Drag to move settings · Double-click to reset position"><button class="icon settings-grab" aria-label="Move settings" title="Drag or use arrow keys · Home resets position">${icon('grip')}</button><span>Usage settings</span><button class="icon close-settings" aria-label="Close settings">✕</button></div><div class="settings-tabs" role="tablist" aria-label="Settings categories">${Object.entries(SETTINGS_TABS).map(([key,label])=>`<button class="settings-tab" role="tab" id="gptu-tab-${key}" aria-controls="gptu-settings-${key}" aria-selected="${state.settingsTab===key}" tabindex="${state.settingsTab===key?0:-1}" data-settings-tab="${key}">${label}</button>`).join('')}</div></div><div class="settings-body">${
-      tab('panel',group('placement','Layout',select('Placement','position',{top:'Sidebar top',bottom:'Sidebar bottom',floating:'Floating'})+toggle('Compact mode','data-compact',state.compact))+group('visibility','Visibility',toggle('Hide docked panel with sidebar','data-hide-with-sidebar',state.hideWithSidebar)+toggle('Hide collapsed Usage until hover','data-hide-collapsed',state.hideCollapsed))+group('status','Update time & Details',toggle('Show update time','data-show-update',state.showUpdateTime)+toggle('Show Details button','data-show-details',state.showDetails)+toggle('Update time and Details at top','data-footer-top',state.footerPosition==='top')))+
-      tab('modules',group('plan','Plan limits',moduleToggle('plan')+toggle('Show remaining plan allowance','data-remaining-plan',state.showRemainingPlan)+toggle('Plan limit tooltips','data-plan-tooltips',state.showPlanTooltips))+group('credits','Credits',moduleToggle('credits')+toggle('Show credit balance bar','data-credit-bar',state.showCreditBar)+`<div class="credit-reference-controls" ${state.showCreditBar?'':'hidden'}>${toggle('Show available balance','data-credit-balance',state.showCreditBalance)}<label class="setting"><span>Full balance</span><span class="margin-input"><input type="number" aria-label="Full credit balance" min="0.01" step="any" data-credit-reference value="${state.creditReference??''}" placeholder="e.g. 1000">credits</span></label><div class="note">This amount counts as 100%. Initially uses your balance when enabled; you can change it.</div></div>`+toggle('Add credits button','data-add-credits',state.showAddCredits))+group('features','Models & features',moduleToggle('features')+`<div class="feature-settings"><div class="feature-settings-title">Individual counters</div><div class="feature-options" role="group" aria-label="Models & features to show"></div><div class="note">Selections are kept when the module is hidden.</div></div>`))+
+      tab('panel',group('placement','Layout',select('Placement','position',{top:'Sidebar top',bottom:'Sidebar bottom',floating:'Floating'})+toggle('Compact mode','data-compact',state.compact))+group('visibility','Visibility',toggle('Hide docked panel with sidebar','data-hide-with-sidebar',state.hideWithSidebar)+toggle('Hide frame completely','data-hide-frame',state.hideFrame))+group('hover','Hover behavior',`<div class="note">Turn a switch off to keep that element visible. Keyboard focus also reveals hover-only controls.</div>`+Object.entries(HOVER_OPTIONS).map(([key,item])=>toggle(item.label,`data-hover="${key}" ${key==='frame'&&state.hideFrame?'disabled':''}`,state.hover[key])).join('')+toggle('Hide collapsed Usage until hover','data-hide-collapsed',state.hideCollapsed))+group('status','Update time & Details',toggle('Show update time','data-show-update',state.showUpdateTime)+toggle('Show Details button','data-show-details',state.showDetails)+select('Status position','footerPosition',{header:'Next to Usage',top:'Above modules',bottom:'Below modules'})))+
+      tab('modules',group('plan','Plan limits',moduleToggle('plan')+toggle('Show remaining plan allowance','data-remaining-plan',state.showRemainingPlan)+`<div class="note">Also applies to the credits bar: remaining when enabled, used when disabled.</div>`+toggle('Plan limit tooltips','data-plan-tooltips',state.showPlanTooltips))+group('credits','Credits',moduleToggle('credits')+toggle('Show credit balance bar','data-credit-bar',state.showCreditBar)+`<div class="credit-reference-controls" ${state.showCreditBar?'':'hidden'}>${toggle('Show available balance','data-credit-balance',state.showCreditBalance)}<label class="setting"><span>Full balance</span><span class="margin-input"><input type="number" aria-label="Full credit balance" min="0.01" step="any" data-credit-reference value="${state.creditReference??''}" placeholder="e.g. 1000">credits</span></label><div class="note">This amount counts as 100%. Initially uses your balance when enabled; you can change it.</div></div>`+toggle('Add credits button','data-add-credits',state.showAddCredits))+group('features','Models & features',moduleToggle('features')+`<div class="feature-settings"><div class="feature-settings-title">Individual counters</div><div class="feature-options" role="group" aria-label="Models & features to show"></div><div class="note">Selections are kept when the module is hidden.</div></div>`))+
       tab('appearance',group('appearance','Theme & mode',themeSelect+select('Appearance','theme',{auto:'Match ChatGPT',system:'System',light:'Light',dark:'Dark'})+`<div class="note">Match ChatGPT follows the page palette and custom colors. Codex presets use available light/dark variants; some have only one mode.</div>`)+group('colors','Accent & contrast',select('Accent color','accent',accentNames)+select('Contrast','contrast',{auto:'Match ChatGPT',system:'System',medium:'Medium',increased:'Increased'})))+
-      tab('spacing',`${select('Editing spacing','spacingMode',{auto:'Current density',normal:'Normal',compact:'Compact'})}<div class="note">Editing ${profile==='normal'?'normal':'compact'} mode. All values are in pixels. Inside frame controls the space within the border; outside frame controls the surrounding gap.</div>`+group('spacePanel','Panel & header',['outer','frame','header'].map(box).join(''))+group('spaceStatus','Update time & summary',['status','statusButton','summary'].map(box).join(''))+group('spaceModules','Module spacing',['plan','credits','features','sectionHeader','sectionContent'].map(box).join(''))+group('spaceItems','Items & credits',['planRows','featureRows','creditBalance','creditMeter','addCredits'].map(box).join(''))+group('spaceBars','Bars & captions',['planBars','creditBars','featureBars','captions'].map(box).join(''))+group('spaceDetails','Expanded Details',['details','detailsContent'].map(box).join(''))+`<button class="text-btn reset-spacing" data-reset-spacing="${profile}">Reset ${profile} spacing</button>`)
-    }</div><div class="settings-help"><details><summary>Moving & keyboard controls</summary><div class="note">Drag this window by its title. Double-click the title to return it beside the panel. Use arrow keys on a move or reorder handle.</div></details><button class="text-btn reset">Reset all settings</button></div>`;
+      tab('spacing',`${select('Editing spacing','spacingMode',{auto:'Current density',normal:'Normal',compact:'Compact'})}<div class="note">Editing ${profile==='normal'?'normal':'compact'} mode. All values are in pixels. Inside frame controls the space within the border; outside frame controls the surrounding gap.</div>`+group('spacePanel','Panel & header',['outer','frame','header'].map(box).join(''))+group('spaceStatus','Update time & summary',['status','headerStatus','statusButton','summary'].map(box).join(''))+group('spaceModules','Module spacing',['plan','credits','features','sectionHeader','sectionContent'].map(box).join(''))+group('spaceItems','Items & credits',['planRows','featureRows','creditBalance','creditMeter','addCredits'].map(box).join(''))+group('spaceBars','Bars & captions',['planBars','creditBars','featureBars','captions'].map(box).join(''))+group('spaceDetails','Expanded Details',['details','detailsContent'].map(box).join(''))+`<button class="text-btn reset-spacing" data-reset-spacing="${profile}">Reset ${profile} spacing</button>`)
+    }</div><div class="settings-help"><details><summary>Moving & keyboard controls</summary><div class="note">Drag this window by its title. Double-click the title to return it beside the panel. Use arrow keys on a move or reorder handle.</div></details><button class="text-btn reset">Reset all settings</button></div><button class="icon settings-resize" aria-label="Resize settings" title="Drag to resize · Arrow keys resize · Double-click resets size"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m5 13 8-8m-3 8 3-3"/></svg></button>`;
     renderFeatureSettings();positionSettings();
   }
   function selectSettingsTab(key,focus=false){
@@ -548,7 +566,7 @@
     if(key==='spacing')renderSettings();
     for(const el of root.querySelectorAll('[data-settings-tab]')){const selected=el.dataset.settingsTab===key;el.setAttribute('aria-selected',String(selected));el.tabIndex=selected?0:-1;if(selected&&focus)el.focus();}
     for(const el of root.querySelectorAll('.settings-panel'))el.hidden=el.id!=='gptu-settings-'+key;
-    $('.settings').scrollTop=0;positionSettings();
+    $('.settings-body').scrollTop=0;positionSettings();
   }
   function renderFeatureSettings(){
     const active=root.activeElement?.dataset.feature;
@@ -559,6 +577,8 @@
   function render() {
     applyTheme();
     card.classList.toggle('collapsed',!!state.collapsed);
+    card.toggleAttribute('data-hide-frame',state.hideFrame);
+    for(const key of Object.keys(HOVER_OPTIONS))card.toggleAttribute('data-hover-'+key,state.hover[key]);
     card.classList.toggle('compact',!!state.compact);
     card.classList.toggle('hide-collapsed',!!state.hideCollapsed);
     applySize();
@@ -585,12 +605,13 @@
     let creditMeter='';
     if(state.showCreditBar){
       if(balance!=null&&state.creditReference>0){
-        const percentage=Math.max(0,balance/state.creditReference*100),text=new Intl.NumberFormat(undefined,{maximumFractionDigits:1}).format(percentage);
-        creditMeter=`<div class="credit-meter"><div class="rl"><span>Remaining</span><span class="v">${text}%</span></div>${bar(Math.min(100,percentage),'Credit balance',true)}<div class="sub">of ${format(state.creditReference)} credits</div></div>`;
+        const remaining=Math.max(0,balance/state.creditReference*100),percentage=state.showRemainingPlan?remaining:Math.max(0,100-remaining),text=new Intl.NumberFormat(undefined,{maximumFractionDigits:1}).format(percentage);
+        creditMeter=`<div class="credit-meter ${state.showCreditBalance?'':'has-inline-balance'}"><div class="rl"><span>${state.showRemainingPlan?'Remaining':'Used'}</span><span class="v"><span class="credit-percentage">${text}%</span>${state.showCreditBalance?'':`<span class="credit-meter-balance" role="group" aria-label="Available balance">${esc(creditText)}</span>`}</span></div>${bar(Math.min(100,percentage),'Credit balance',state.showRemainingPlan)}<div class="sub">of ${format(state.creditReference)} credits</div></div>`;
       }else if(balance!=null)creditMeter='<div class="sub credit-meter">Set a full balance in settings to show a percentage.</div>';
       else if(parsed.credits!=='Unlimited')creditMeter='<div class="sub credit-meter">Balance unavailable.</div>';
     }
-    const creditBalance=!state.showCreditBar||state.showCreditBalance?`<div class="credit-balance"><div class="credit">${esc(creditText)}</div><div class="sub">${parsed.credits==null?'No credit balance reported':'Available balance'}</div></div>`:'';
+    const hasCreditPercentage=state.showCreditBar&&balance!=null&&state.creditReference>0;
+    const creditBalance=!hasCreditPercentage||state.showCreditBalance?`<div class="credit-balance"><div class="credit">${esc(creditText)}</div><div class="sub">${parsed.credits==null?'No credit balance reported':'Available balance'}</div></div>`:'';
     const addCredits=state.showAddCredits?'<a class="add-credits" href="'+esc(creditPurchaseUrl())+'" target="_blank" rel="noopener noreferrer"><svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M3 8h10"/></svg>Add credits</a>':'';
     blocks.credits=creditBalance+(state.showCreditBar?`<div class="credit-actions">${creditMeter}${addCredits}</div>`:addCredits);
     const models=Object.entries(state.models).filter(([name])=>state.hiddenFeatures[name]!==true).sort((a,b)=>(b[1].seenAt||0)-(a[1].seenAt||0)).slice(0,12);
@@ -604,7 +625,9 @@
     const scroll=$('.body').scrollTop;
     const focused=root.activeElement?.dataset;
     const rawFocused=root.activeElement?.classList.contains('raw');
-    const footer=state.showUpdateTime||state.showDetails?`<div class="foot">${state.showUpdateTime?`<span class="updated-at">Updated ${fmtAgo(state.usageAt)}</span>`:''}${state.showDetails?`<button class="text-btn raw" aria-expanded="${state.showRaw}">${state.showRaw?'Hide data':'Details'}</button>`:''}</div>`:'';
+    const footer=state.showUpdateTime||state.showDetails?`<div class="foot ${state.footerPosition==='header'?'head-status':''}">${state.showUpdateTime?`<span class="updated-at">Updated ${fmtAgo(state.usageAt)}</span>`:''}${state.showDetails?`<button class="text-btn raw" aria-expanded="${state.showRaw}">${state.showRaw?'Hide data':'Details'}</button>`:''}</div>`:'';
+    $('.head-status-slot').innerHTML=state.footerPosition==='header'?footer:'';
+    $('.head').classList.toggle('has-header-status',state.footerPosition==='header'&&!!footer);
     $('.body').innerHTML=(state.footerPosition==='top'?footer:'')+state.sections.filter(k=>!state.hidden[k]).map(k=>`<section class="section" data-section="${k}"><div class="section-head"><button class="section-toggle" data-collapse="${k}" aria-expanded="${!state.closed[k]}" aria-controls="gptu-${k}">${icon(k)}<span>${labels[k]}</span>${k==='credits'&&state.closed.credits?`<span class="credit-inline">${esc(creditText)}</span>`:''}${icon('chevron')}</button><button class="icon section-handle" draggable="true" data-handle="${k}" aria-label="Reorder ${labels[k]}" title="Drag to reorder · ↑ / ↓">${icon('grip')}</button></div><div class="section-content" id="gptu-${k}" ${state.closed[k]?'hidden':''}>${blocks[k]}</div></section>`).join('')+
       `${state.error?`<div class="err" role="status">${esc(state.error)}</div>`:''}${state.footerPosition==='bottom'?footer:''}${state.showRaw?`<pre>${esc(JSON.stringify({usage:state.usage,models:state.models},null,2))}</pre>`:''}`;
     $('.body').scrollTop=scroll;
@@ -615,8 +638,14 @@
   }
   $('.toggle').onclick=()=>{state.collapsed=!state.collapsed; persist(); render();};
   $('.refresh').onclick=()=>requestRefresh(true);
+  function applySettingsSize(){
+    const menu=$('.settings'),size=state.settingsSize;
+    menu.style.width=size?Math.max(Math.min(240,innerWidth-16),Math.min(size.width,innerWidth-16))+'px':'';
+    menu.style.height=size?Math.max(Math.min(180,innerHeight-16),Math.min(size.height,innerHeight-16))+'px':'';
+  }
   function positionSettings() {
     if(!settingsOpen)return;
+    applySettingsSize();
     const menu=$('.settings'), anchor=$('.customize').getBoundingClientRect(), r=menu.getBoundingClientRect();
     if(state.settingsPosition){menu.style.left=Math.max(8,Math.min(state.settingsPosition.x,innerWidth-r.width-8))+'px';menu.style.top=Math.max(8,Math.min(state.settingsPosition.y,innerHeight-r.height-8))+'px';return;}
     menu.style.left=Math.max(8,Math.min(anchor.right-r.width,innerWidth-r.width-8))+'px';
@@ -638,6 +667,26 @@
     if(state.settingsClosed[key]!==closed){state.settingsClosed[key]=closed;persist();}
     positionSettings();
   },true);
+  let settingsResizing=null;
+  root.addEventListener('pointerdown',event=>{
+    const handle=event.target.closest?.('.settings-resize');if(!handle||event.button!==0)return;
+    const r=$('.settings').getBoundingClientRect();state.settingsPosition={x:r.left,y:r.top};
+    settingsResizing={x:event.clientX,y:event.clientY,width:r.width,height:r.height};handle.setPointerCapture(event.pointerId);event.preventDefault();
+  });
+  window.addEventListener('pointermove',event=>{
+    if(!settingsResizing)return;
+    state.settingsSize={width:settingsResizing.width+event.clientX-settingsResizing.x,height:settingsResizing.height+event.clientY-settingsResizing.y};positionSettings();
+  });
+  const endSettingsResize=()=>{if(!settingsResizing)return;settingsResizing=null;if(settingsOpen){const r=$('.settings').getBoundingClientRect();state.settingsSize={width:r.width,height:r.height};}persist();};
+  window.addEventListener('pointerup',endSettingsResize);window.addEventListener('pointercancel',endSettingsResize);window.addEventListener('blur',endSettingsResize);
+  root.addEventListener('dblclick',event=>{if(event.target.closest?.('.settings-resize')){state.settingsSize=null;persist();positionSettings();}});
+  root.addEventListener('keydown',event=>{
+    if(!event.target.closest?.('.settings-resize'))return;
+    if(event.key==='Home'){event.preventDefault();state.settingsSize=null;persist();positionSettings();return;}
+    if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(event.key))return;
+    event.preventDefault();const r=$('.settings').getBoundingClientRect(),step=event.shiftKey?30:10;
+    state.settingsPosition={x:r.left,y:r.top};state.settingsSize={width:r.width+(event.key==='ArrowRight'?step:event.key==='ArrowLeft'?-step:0),height:r.height+(event.key==='ArrowDown'?step:event.key==='ArrowUp'?-step:0)};positionSettings();persist();
+  });
   let settingsDrag=null;
   function resetSettingsPosition(){state.settingsPosition=null;persist();positionSettings();}
   root.addEventListener('pointerdown',event=>{
@@ -666,7 +715,7 @@
   root.addEventListener('click',e=>{
     const k=e.target.closest('[data-collapse]')?.dataset.collapse;
     if(k){state.closed[k]=!state.closed[k];persist();render();}
-    if(e.target.closest('.raw')){state.showRaw=!state.showRaw;render();$('.raw').focus();}
+    if(e.target.closest('.raw')){state.showRaw=!state.showRaw;if(state.showRaw&&state.collapsed)state.collapsed=false;persist();render();$('.raw').focus();}
     if(e.target.closest('.reset')){Object.assign(state,defaultPreferences());persist();closeSettings(true);render();place(true);}
   });
   function syncCreditBarSettings(){
@@ -704,6 +753,8 @@
     if(e.target.hasAttribute('data-add-credits')){state.showAddCredits=e.target.checked;persist();render();positionSettings();}
     if(e.target.hasAttribute('data-plan-tooltips')){state.showPlanTooltips=e.target.checked;persist();render();positionSettings();}
     if(e.target.hasAttribute('data-feature')){state.hiddenFeatures={...state.hiddenFeatures,[e.target.dataset.feature]:!e.target.checked};persist();render();positionSettings();}
+    if(e.target.hasAttribute('data-hide-frame')){state.hideFrame=e.target.checked;persist();render();const control=$('[data-hover="frame"]');if(control)control.disabled=state.hideFrame;}
+    if(e.target.hasAttribute('data-hover')){const key=e.target.dataset.hover;if(Object.hasOwn(HOVER_OPTIONS,key)){state.hover[key]=e.target.checked;persist();render();}}
     if(e.target.hasAttribute('data-hide-with-sidebar')){state.hideWithSidebar=e.target.checked;persist();render();place(true);positionSettings();}
     if(e.target.hasAttribute('data-hide-collapsed')){state.hideCollapsed=e.target.checked;persist();render();positionSettings();}
     if(e.target.hasAttribute('data-compact')){state.compact=e.target.checked;persist();render();place(true);positionSettings();}
@@ -783,9 +834,9 @@
   };
   window.addEventListener('pointerup',endDrag);window.addEventListener('pointercancel',endDrag);window.addEventListener('blur',endDrag);
   $('.grab').addEventListener('keydown',e=>{if(e.key==='Escape'){state.position='top';persist();place(true);if(settingsOpen)renderSettings();return;}if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key))return;e.preventDefault();if(state.position!=='floating'){const r=host.getBoundingClientRect();state.floating={x:r.left,y:r.top};state.position='floating';}const step=e.shiftKey?30:10;state.floating.x+=e.key==='ArrowRight'?step:e.key==='ArrowLeft'?-step:0;state.floating.y+=e.key==='ArrowDown'?step:e.key==='ArrowUp'?-step:0;place(false);persist();if(settingsOpen)renderSettings();});
-  function isVisibleElement(el) {
+  function isVisibleElement(el,allowZeroHeight=false) {
     const r=el.getBoundingClientRect();
-    if(r.width<=0||r.height<=0||r.right<=0||r.bottom<=0||r.left>=innerWidth||r.top>=innerHeight)return false;
+    if(r.width<=0||(r.height<=0&&!allowZeroHeight)||r.right<=0||r.bottom<=0||r.left>=innerWidth||r.top>=innerHeight)return false;
     for(let node=el;node&&node!==document.body;node=node.parentElement){
       const style=getComputedStyle(node);
       if(style.display==='none'||style.visibility==='hidden'||Number(style.opacity)===0||node.hidden||node.getAttribute('aria-hidden')==='true'||node.hasAttribute('inert'))return false;
@@ -796,7 +847,7 @@
     for(const selector of ['nav[aria-label="Chat history"]','#stage-slideover-sidebar nav','[data-testid="sidebar"] nav','nav']){
       for(const el of document.querySelectorAll(selector)){
         const r=el.getBoundingClientRect();
-        if(el.getAttribute('aria-label')!=='Show sidebar'&&r.width>120&&r.height>(selector==='nav'?160:0)&&r.left>=0&&r.left<innerWidth/2&&isVisibleElement(el))return el;
+        if(el.getAttribute('aria-label')!=='Show sidebar'&&r.width>120&&(selector==='nav'?r.height>160:r.height>=0)&&r.left>=0&&r.left<innerWidth/2&&isVisibleElement(el,selector!=='nav'))return el;
       }
     }
     return null;
@@ -939,6 +990,29 @@
     return `${selector}{${area.kind}:var(--gptu-space-${key});}`;
   }).join('')+`.settings-tabs{gap:2px;padding:0 8px 8px}.settings-tab{padding:6px 3px;font-size:11px;min-width:0}.spacing-box{padding:6px 0 10px;border-bottom:1px solid var(--line)}.spacing-box:last-child{border:0}.spacing-box-title{display:block;font-size:11px;margin-bottom:5px}.spacing-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.spacing-grid label{display:flex;flex-direction:column;gap:3px;font-size:10px;color:var(--muted)}.spacing-grid input{min-width:0;width:100%;padding:5px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--fg);font:inherit}.settings-title{cursor:grab;touch-action:none}.settings-title:active{cursor:grabbing}.settings-grab{flex:none;cursor:grab}.settings-grab svg{width:16px;height:16px}`;
   root.appendChild(spacingStyle);
+  const settingsWindowStyle=document.createElement('style');settingsWindowStyle.textContent=`.settings{overflow:hidden}.settings-header,.settings-help{flex:none}.settings-body{flex:1 1 auto;min-height:0;overflow:auto;scrollbar-width:thin;scrollbar-color:var(--track) transparent;scrollbar-gutter:stable}.settings-body::-webkit-scrollbar{width:6px}.settings-body::-webkit-scrollbar-thumb{background:var(--track);border-radius:6px}.settings-help{padding-right:30px}.settings-resize{position:absolute;right:2px;bottom:2px;z-index:5;cursor:nwse-resize;touch-action:none;width:22px;height:22px}.settings-resize svg{width:12px;height:12px}`;root.appendChild(settingsWindowStyle);
+
+  const hoverStyle=document.createElement('style');
+  const controlSelectors=Object.values(HOVER_OPTIONS).filter(item=>item.selector).flatMap(item=>item.selector.split(',').map(selector=>'.card '+selector));
+  const hoverHidden=Object.entries(HOVER_OPTIONS).filter(([,item])=>item.selector).map(([key,item])=>item.selector.split(',').map(selector=>`.card[data-hover-${key}]:not(:hover):not(:has(:focus-visible)) ${selector}`).join(',')+'{opacity:0;pointer-events:none;}').join('');
+  hoverStyle.textContent=`
+    ${controlSelectors.join(',')},.card .foot{opacity:1;pointer-events:auto;}
+    .card{border-color:var(--line);}
+    :host([data-floating]) .card{box-shadow:0 8px 32px #0003;}
+    .card .body{scrollbar-color:var(--track) transparent;}
+    .card .body::-webkit-scrollbar-thumb{background:var(--track);}
+    @media(hover:hover){
+      ${hoverHidden}
+      .card[data-hover-frame]:not(:hover):not(:has(:focus-visible)){border-color:transparent;box-shadow:none;}
+      .card[data-hover-float]:not(:hover):not(:has(:focus-visible)) .head .grab{width:0;min-width:0;margin-right:-3px;overflow:hidden;}
+      .card[data-hover-scrollbar]:not(:hover):not(:has(:focus-visible)) .body{scrollbar-color:transparent transparent;}
+      .card[data-hover-scrollbar]:not(:hover):not(:has(:focus-visible)) .body::-webkit-scrollbar-thumb{background:transparent;}
+    }
+    :host([data-settings-open]) .card .customize{opacity:1;pointer-events:auto;}
+    .card[data-hide-frame],.card[data-hide-frame]:hover,.card[data-hide-frame]:has(:focus-visible){border-color:transparent;box-shadow:none;}
+    :host([data-floating]) .card[data-hide-frame]{border-color:transparent;box-shadow:none;}
+  `;
+  root.appendChild(hoverStyle);
 
   // ---------- boot ----------
   load().then(() => {

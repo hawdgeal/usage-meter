@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "ChatGPT Usage Meter",
   "short_name": "GPT Usage",
-  "version": "0.3.21",
+  "version": "0.3.22",
   "description": "Shows your ChatGPT / Codex plan usage, credits and per-model limits in ChatGPT's sidebar.",
   "icons": {
     "16": "icons/icon16.png",
