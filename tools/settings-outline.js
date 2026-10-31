@@ -1,5 +1,6 @@
 // Prints the layout of Claude's settings page so the usage dialog can be fixed against the real
-// structure. Read-only. It records element types, sizes, roles and test ids, not text or links.
+// structure. Read-only. It records element types, sizes, roles, test ids and link paths (with
+// chat IDs blanked out). It never records the text on the page.
 // Use: open https://claude.ai/settings/usage in a normal tab, open DevTools (F12) → Console,
 // paste this whole file, press Enter. The outline is copied to the clipboard.
 (() => {
@@ -9,7 +10,7 @@
   const CLICKABLE = 'a[href],button,[role="link"],[role="button"],[role="tab"],[role="menuitem"],[role="option"]';
   const lines = [`viewport ${innerWidth}x${innerHeight} · dialogs ${dialogs.length} · root ${root.tagName.toLowerCase()}${root.getAttribute('role') ? '[' + root.getAttribute('role') + ']' : ''}`];
   const label = (el) => {
-    let s = el.tagName.toLowerCase();
+    let s = el.tagName.toLowerCase() + (el.id ? '#' + el.id.slice(0, 40) : '');
     for (const a of ['role', 'data-testid', 'aria-label', 'aria-current', 'aria-selected', 'data-state']) {
       const v = el.getAttribute(a);
       if (v && a !== 'aria-label') s += `[${a}=${v.slice(0, 40)}]`;
@@ -19,6 +20,7 @@
     const st = getComputedStyle(el);
     if (st.display === 'flex' || st.display === 'grid') s += ` ${st.display}${st.display === 'flex' ? ':' + st.flexDirection : ''}`;
     if (/(auto|scroll)/.test(st.overflowY)) s += ' scroll';
+    if (st.cursor === 'pointer') s += ' ptr';
     return s;
   };
   const walk = (el, depth) => {
