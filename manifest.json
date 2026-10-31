@@ -1,32 +1,32 @@
 {
   "manifest_version": 3,
-  "name": "ChatGPT Usage Meter",
-  "short_name": "GPT Usage",
-  "version": "0.3.31",
-  "description": "Shows your ChatGPT / Codex plan usage, credits and per-model limits in ChatGPT's sidebar.",
+  "name": "Claude Usage Meter",
+  "short_name": "Claude Usage",
+  "version": "0.1.0",
+  "description": "Shows your Claude plan limits (5-hour, weekly, per-model) and extra usage in the claude.ai and Claude Code on the web sidebar.",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
   "permissions": ["storage"],
-  "host_permissions": ["https://chatgpt.com/*"],
+  "host_permissions": ["https://claude.ai/*"],
   "content_scripts": [
     {
-      "matches": ["https://chatgpt.com/*"],
+      "matches": ["https://claude.ai/*"],
       "js": ["page-hook.js"],
       "run_at": "document_start",
       "world": "MAIN"
     },
     {
-      "matches": ["https://chatgpt.com/*"],
+      "matches": ["https://claude.ai/*"],
       "js": ["content.js"],
       "run_at": "document_idle"
     }
   ],
   "browser_specific_settings": {
     "gecko": {
-      "id": "chatgpt-usage-meter@alencar.fr",
+      "id": "claude-usage-meter@alencar.fr",
       "strict_min_version": "128.0"
     }
   }

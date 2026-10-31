@@ -1,4 +1,4 @@
-// Isolated-world content script: draws the usage card inside ChatGPT's left sidebar.
+// Isolated-world content script: draws the usage card inside Claude's left sidebar (claude.ai and claude.ai/code).
 (() => {
   const TAG_IN = "gptu-hook";
   const TAG_OUT = "gptu-ui";
@@ -66,10 +66,10 @@
   };
   function defaultPreferences(){return {
     hideFrame:false,hover:Object.fromEntries(Object.keys(HOVER_OPTIONS).map(key=>[key,true])),collapsed:false,compact:false,compactHeight:null,hideCollapsed:false,hideWithSidebar:true,footerPosition:'top',showUpdateTime:true,showDetails:true,marginTop:6,marginBottom:6,
-    showUsageResets:true,showPaidReset:false,showAddCredits:true,showPlanTooltips:false,showRemainingPlan:true,showCreditBar:false,showCreditBalance:true,creditBalanceInTitle:false,creditReference:null,creditReferencePending:false,
+    showUsageResets:false,showPaidReset:false,showAddCredits:true,showPlanTooltips:false,showRemainingPlan:true,showCreditBar:true,showCreditBalance:true,creditBalanceInTitle:false,creditReference:null,creditReferencePending:false,
     position:'bottom',sections:['plan','credits','features'],closed:{credits:true},
-    hidden:{features:true},hiddenFeatures:{deep_research:true,file_upload:true,paste_text_to_file:true},
-    theme:'auto',preset:'auto',accent:'auto',contrast:'auto',barMode:'auto',barColor:'#60a5fa',barStart:'#60a5fa',barEnd:'#ff7983',barGradient:false,barGradientVisible:false,gradientStops:[],floating:{x:24,y:100},size:{width:300,height:null},
+    hidden:{features:true},hiddenFeatures:{},
+    theme:'auto',preset:'auto',accent:'auto',contrast:'auto',barMode:'auto',barColor:'#d97757',barStart:'#d97757',barEnd:'#ff7983',barGradient:false,barGradientVisible:false,gradientStops:[],floating:{x:24,y:100},size:{width:300,height:null},
     settingsTab:'panel',settingsPosition:null,settingsSize:null,spacingMode:'auto',spacing:{normal:{},compact:{}},settingsClosed:{barSource:false,barDisplay:true,barEnds:false,barMiddle:false,hover:true,appearance:false,colors:true,status:true,placement:false,visibility:true,plan:false,credits:true,features:true,spacePanel:false,spaceStatus:true,spaceModules:true,spaceItems:true,spaceBars:true,spaceDetails:true}
   };}
   const state = {
@@ -146,7 +146,8 @@
     if (!state.size || !Number.isFinite(state.size.width)) state.size = {width:300,height:null};
     if (!Number.isFinite(state.size.height)) state.size.height = null;
     if (!["auto", "system", "light", "dark"].includes(state.theme)) state.theme = "auto";
-    if(!['auto','chatgpt',...THEME_FAMILIES].includes(state.preset))state.preset='auto';
+    if(state.preset==='chatgpt')state.preset='claude';
+    if(!['auto','claude',...THEME_FAMILIES].includes(state.preset))state.preset='auto';
     if(!['auto','default','blue','green','yellow','pink','orange','purple','neutral'].includes(state.accent))state.accent='auto';
     if(!['auto','system','medium','increased'].includes(state.contrast))state.contrast='auto';
     state.gradientStops=(Array.isArray(state.gradientStops)?state.gradientStops:[]).filter(stop=>stop&&isHex(stop.color)&&Number.isFinite(stop.from??stop.at)&&Number.isFinite(stop.to??stop.at)).slice(0,8).map(stop=>({from:Math.max(1,Math.min(99,stop.from??stop.at)),to:Math.max(1,Math.min(99,stop.to??stop.at)),color:stop.color,blendBefore:Number.isFinite(stop.blendBefore)?Math.max(0,Math.min(100,stop.blendBefore)):null,blendAfter:Number.isFinite(stop.blendAfter)?Math.max(0,Math.min(100,stop.blendAfter)):null})).sort((a,b)=>a.from-b.from);
@@ -154,7 +155,7 @@
     state.barGradient=state.barGradient===true;state.barGradientVisible=state.barGradientVisible===true;
     if(!['auto','custom'].includes(state.barMode))state.barMode='auto';
     for(const key of ['barColor','barStart','barEnd'])if(!isHex(state[key]))state[key]=defaultPreferences()[key];
-    state.showPaidReset=state.showPaidReset===true;state.showUsageResets=state.showUsageResets!==false;state.creditBalanceInTitle=state.creditBalanceInTitle===true;
+    state.showPaidReset=false;state.showUsageResets=false;state.creditBalanceInTitle=state.creditBalanceInTitle===true;
     if (!["top", "bottom", "floating"].includes(state.position)) state.position = "bottom";
   }
 
@@ -221,14 +222,16 @@
     if (Array.isArray(extra)) {
       for (const x of extra) addWindows(x && (x.rate_limit || x), x && (x.limit_name || x.name || x.metered_feature || "Other"));
     }
-    let credits = null;
+    let credits = null, creditLimit = null, currency = null;
     const c = u.credits;
     if (c && typeof c === "object") {
-      if (c.unlimited) credits = "Unlimited";
+      creditLimit = num(c.limit); currency = typeof c.currency === "string" && /^[A-Z]{3}$/.test(c.currency) ? c.currency : null;
+      if (c.enabled === false) { credits = "Off"; creditLimit = null; }
+      else if (c.unlimited) credits = "Unlimited";
       else if (c.has_credits || num(c.balance)) credits = `${num(c.balance) ?? c.balance}`;
       else credits = "0";
     }
-    return { rows, credits, plan: u.plan_type || state.plan };
+    return { rows, credits, creditLimit, currency, plan: u.plan_type || state.plan };
   }
 
   // ---------- messaging with page-hook ----------
@@ -244,7 +247,7 @@
     const { type, payload } = ev.data;
     if (type === "ready") requestRefresh(true);
     else if (type === "usage") {
-      state.usage = payload.data;state.resetInfo=null;
+      state.usage = payload.data;state.rawUsage=payload.raw??null;state.resetInfo=null;
       state.plan = payload.plan || state.plan;
       state.usageAt = payload.at;
       state.error = null;
@@ -517,7 +520,7 @@
     <div class="head-title-row"><button class="usage-open" aria-label="Open usage overview" title="Open usage overview"><span class="usage-icon">${USAGE_ICON}</span><span class="title">Usage</span><span class="badge" hidden></span></button><button class="icon toggle collapse-panel" aria-expanded="true" aria-label="Collapse usage panel" title="Collapse usage panel">${icon('chevron')}</button><div class="head-status-slot"></div></div>
     <button class="icon refresh" title="Refresh usage" aria-label="Refresh usage">${icon('refresh')}</button>
     <button class="icon customize" title="Customize panel" aria-label="Customize panel" aria-expanded="false">${icon('settings')}</button></div>
-    <div class="summary" hidden></div><div class="body"></div><button class="resize" aria-label="Resize panel" title="Drag to resize · Arrow keys to resize · Double-click to reset size"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m5 13 8-8m-3 8 3-3"/></svg></button><div class="live" aria-live="polite"></div></div></div><div class="settings" popover="auto" role="dialog" aria-label="Usage settings"></div><dialog class="reset-dialog" aria-labelledby="gptu-reset-title"></dialog><dialog class="credits-modal" aria-labelledby="gptu-page-heading"><div class="credits-header"><h2 id="gptu-page-heading">Add credits</h2><a class="credit-external" target="_blank" rel="noopener noreferrer">Open in tab</a><button class="icon credits-close" aria-label="Close credits">✕</button></div><div class="credits-content"><p class="credits-status" role="status">Loading credits…</p><template class="credits-frame-template"><iframe class="credits-frame" title="ChatGPT credits purchase" allow="payment" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads"></iframe></template></div></dialog><div class="dock-targets" hidden aria-hidden="true"><div class="dock-zone" data-dock="top">Dock at top</div><div class="dock-zone" data-dock="bottom">Dock at bottom</div></div>`;
+    <div class="summary" hidden></div><div class="body"></div><button class="resize" aria-label="Resize panel" title="Drag to resize · Arrow keys to resize · Double-click to reset size"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m5 13 8-8m-3 8 3-3"/></svg></button><div class="live" aria-live="polite"></div></div></div><div class="settings" popover="auto" role="dialog" aria-label="Usage settings"></div><dialog class="reset-dialog" aria-labelledby="gptu-reset-title"></dialog><dialog class="credits-modal" aria-labelledby="gptu-page-heading"><div class="credits-header"><h2 id="gptu-page-heading">Usage</h2><a class="credit-external" target="_blank" rel="noopener noreferrer">Open in tab</a><button class="icon credits-close" aria-label="Close">✕</button></div><div class="credits-content"><p class="credits-status" role="status">Loading credits…</p><template class="credits-frame-template"><iframe class="credits-frame" title="Claude usage" allow="payment" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads"></iframe></template></div></dialog><div class="dock-targets" hidden aria-hidden="true"><div class="dock-zone" data-dock="top">Dock at top</div><div class="dock-zone" data-dock="bottom">Dock at bottom</div></div>`;
   const $=s=>root.querySelector(s), card=$('.card');
   for(const type of ['click','dblclick','change','input','keydown','pointerdown','dragstart'])root.addEventListener(type,event=>{
     const el=event.target;if(!el?.getAttribute)return;
@@ -542,8 +545,8 @@
   const ui={ setBusy(b) { card.classList.toggle('busy',b); $('.refresh').disabled=b; $('.refresh').setAttribute('aria-busy',String(b)); clearTimeout(busyTimer); if(b) busyTimer=setTimeout(()=>{ui.setBusy(false); state.error='Refresh timed out. Try again.'; render();},20000); } };
   const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const level=p=>p>=90?'bad':p>=75?'warn':'';
-  const labels={plan:'Plan limits',credits:'Credits',features:'Models & features'};
-  const featureNames={deep_research:'Deep Research',file_upload:'File uploads',paste_text_to_file:'Paste text to file',image_gen:'Image generation'};
+  const labels={plan:'Plan limits',credits:'Extra usage',features:'Models & features'};
+  const featureNames={};
   const featureLabel=name=>featureNames[name]||name.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
   const format=n=>new Intl.NumberFormat(undefined,{maximumFractionDigits:2}).format(n);
   function colorScalePoints(){
@@ -576,10 +579,7 @@
   const bar=(p,label,remaining=false)=>`<div class="bar" role="progressbar" aria-label="${esc(label)} ${remaining?'remaining':'used'}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${p}"><i class="${remaining?'remaining':level(p)}" style="width:${p}%;--meter-scale:${p>0?10000/p:100}%;${state.barMode==='custom'&&state.barGradient&&!state.barGradientVisible?'background-color:'+percentageColor(p):''}"></i></div>`;
 
   function creditPurchaseUrl(){
-    const url=new URL('/pricing/credits',location.origin);
-    url.searchParams.set('source','chatgpt_web_merged');
-    url.searchParams.set('return_to',location.pathname+location.search+location.hash);
-    return url.href;
+    return new URL('/settings/usage',location.origin).href;
   }
   function updateCreditLink(event){
     const link=event.target.closest?.('.add-credits:not(.paid-reset)');
@@ -604,12 +604,12 @@
   }
   root.addEventListener('click',event=>{
     const target=event.target;
-    if(target.closest('.paid-reset'))openPageDialog(new URL('/settings/usage?tab=overview',location.origin).href,'Usage',target);
+    if(target.closest('.paid-reset'))openPageDialog(new URL('/settings/usage',location.origin).href,'Usage',target);
     else if(target.closest('.use-reset')&&!resetPending){
       if(settingsOpen)closeSettings();resetFocus=target;resetFlow={id:crypto.randomUUID(),loading:true};renderResetDialog();$('.reset-dialog').showModal();
       window.postMessage({source:TAG_OUT,type:'reset-details',payload:{flowId:resetFlow.id}},location.origin);
     }else if(target.closest('.cancel-reset'))$('.reset-dialog').close();
-    else if(target.closest('.reset-native')){$('.reset-dialog').close();openPageDialog(new URL('/settings/usage?tab=overview',location.origin).href,'Usage',$('.usage-open'));}
+    else if(target.closest('.reset-native')){$('.reset-dialog').close();openPageDialog(new URL('/settings/usage',location.origin).href,'Usage',$('.usage-open'));}
     else if(target.closest('.confirm-reset')&&resetFlow&&!resetFlow.busy&&!resetFlow.finished){
       const selected=availableResets().find(c=>c.id===resetFlow.creditId);if(!selected)return;
       resetFlow.busy=true;resetPending=true;resetFlow.requestId=crypto.randomUUID();renderResetDialog();render();
@@ -619,7 +619,7 @@
   root.addEventListener('change',event=>{if(event.target.matches('.reset-dialog select')&&resetFlow&&!resetFlow.busy){resetFlow.creditId=event.target.value;renderResetDialog();}});
   $('.reset-dialog').addEventListener('close',()=>{resetFlow=null;const target=resetFocus?.isConnected?resetFocus:$('.usage-open');target?.focus();resetFocus=null;});
   let creditReturnFocus=null,creditReturnPath='',creditWatch=null,creditLoadTimeout=null;
-  function openCreditDialog(link){openPageDialog(creditPurchaseUrl(),'Add credits',link,true);}
+  function openCreditDialog(link){openPageDialog(creditPurchaseUrl(),'Extra usage',link,false);}
   function openPageDialog(url,title,returnFocus,closeOnReturn=false){
     const dialog=$('.credits-modal');
     if(dialog.open){$('.credits-close').focus();return;}
@@ -629,7 +629,7 @@
     dialog.setAttribute('aria-busy','true');
     frame.addEventListener('load',()=>creditFrameLoaded(frame));
     creditReturnFocus=returnFocus;creditReturnPath=location.pathname+location.search+location.hash;
-    $('#gptu-page-heading').textContent=title;frame.title=title==='Add credits'?'ChatGPT credits purchase':'ChatGPT usage overview';
+    $('#gptu-page-heading').textContent=title;frame.title=title==='Extra usage'?'Claude extra usage settings':'Claude usage overview';
     $('.credit-external').href=url;$('.credits-status').textContent='Loading…';$('.credits-status').hidden=false;
     frame.src=url;$('.credits-content').appendChild(frame);dialog.showModal();$('.credits-close').focus();
     creditLoadTimeout=setTimeout(()=>{if(dialog.open){$('.credits-status').textContent='If the page stays blank, choose Open in tab.';$('.credits-status').hidden=false;}},12000);
@@ -637,7 +637,7 @@
       try{const destination=new URL(frame.contentWindow.location.href);if(destination.origin===location.origin&&destination.pathname+destination.search+destination.hash===creditReturnPath){dialog.close();requestRefresh(false);}}catch(_){}
     },1000);
   }
-  $('.usage-open').onclick=()=>openPageDialog(new URL('/settings/usage?tab=overview',location.origin).href,'Usage',$('.usage-open'));
+  $('.usage-open').onclick=()=>openPageDialog(new URL('/settings/usage',location.origin).href,'Usage',$('.usage-open'));
   $('.credits-close').onclick=()=>$('.credits-modal').close();
   $('.credits-modal').addEventListener('close',()=>{
     clearInterval(creditWatch);clearTimeout(creditLoadTimeout);creditWatch=null;
@@ -656,7 +656,8 @@
         .app-shell-left-panel, #stage-slideover-sidebar, [data-testid="sidebar"],
         aside:has(#app-shell-sidebar), #app-shell-sidebar,
         [data-testid="open-sidebar-button"], [data-testid="close-sidebar-button"],
-        button[aria-label="Open sidebar"], button[aria-label="Close sidebar"], button[aria-label="Show sidebar"] { display:none !important; }
+        button[aria-label="Open sidebar"], button[aria-label="Close sidebar"], button[aria-label="Show sidebar"],
+        nav[aria-label="Sidebar"], [data-testid="menu-sidebar"], nav:has([data-testid="user-menu-button"]) { display:none !important; }
       `;
       doc.head.appendChild(style);return true;
     }catch(_){return false;}
@@ -680,22 +681,22 @@
     const html=document.documentElement,body=document.body,nav=findSidebarNav();
     const htmlStyle=getComputedStyle(html),bodyStyle=getComputedStyle(body),appStyle=getComputedStyle(document.getElementById('root')||body),navStyle=nav?getComputedStyle(nav):appStyle;
     const systemDark=matchMedia('(prefers-color-scheme: dark)').matches;
-    let dark=state.theme==='dark'||state.theme==='system'&&systemDark||state.theme==='auto'&&(html.classList.contains('dark')||html.dataset.theme==='dark'||(!html.classList.contains('light')&&html.dataset.theme!=='light'&&(htmlStyle.colorScheme==='dark'||htmlStyle.colorScheme!=='light'&&systemDark)));
+    let dark=state.theme==='dark'||state.theme==='system'&&systemDark||state.theme==='auto'&&(html.classList.contains('dark')||html.dataset.theme==='dark'||html.dataset.mode==='dark'||(!html.classList.contains('light')&&html.dataset.theme!=='light'&&html.dataset.mode!=='light'&&(htmlStyle.colorScheme==='dark'||htmlStyle.colorScheme!=='light'&&systemDark)));
     const variants=THEME_PRESETS.filter(p=>p.family===state.preset),preset=variants.find(p=>p.type===(dark?'dark':'light'))||variants[0];
     if(preset)dark=preset.type==='dark';
     host.toggleAttribute('data-dark',dark);
     const resolve=value=>{if(!value)return null;if(!globalThis.CSS.supports('color',value)){value=value.includes('%')?`hsl(${value})`:`rgb(${value})`;if(!globalThis.CSS.supports('color',value))return null;}themeProbe.style.color=value;const color=getComputedStyle(themeProbe).color;return color==='transparent'||color==='rgba(0, 0, 0, 0)'?null:color;};
     const nativeColor=(names,fallback)=>{for(const name of names){const value=navStyle.getPropertyValue(name).trim()||appStyle.getPropertyValue(name).trim()||bodyStyle.getPropertyValue(name).trim()||htmlStyle.getPropertyValue(name).trim();const color=resolve(value);if(color)return color;}return fallback;};
-    const palette={default:dark?'#60a5fa':'#2563eb',blue:dark?'#60a5fa':'#2563eb',green:dark?'#4ade80':'#15803d',yellow:dark?'#facc15':'#a16207',pink:dark?'#f472b6':'#be185d',orange:dark?'#fb923c':'#c2410c',purple:dark?'#c084fc':'#7e22ce',neutral:dark?'#ececec':'#202123'};
+    const palette={claude:dark?'#d97757':'#c6613f',default:dark?'#60a5fa':'#2563eb',blue:dark?'#60a5fa':'#2563eb',green:dark?'#4ade80':'#15803d',yellow:dark?'#facc15':'#a16207',pink:dark?'#f472b6':'#be185d',orange:dark?'#fb923c':'#c2410c',purple:dark?'#c084fc':'#7e22ce',neutral:dark?'#ececec':'#202123'};
     const nativeAccent=(html.dataset.accentColor||body.dataset.accentColor||html.dataset.accent||body.dataset.accent||'').toLowerCase();
-    const accent=state.accent==='auto'?(preset?preset.accent:state.preset==='chatgpt'?palette.default:nativeColor(['--color-accent','--theme-accent','--accent','--accent-color','--codex-accent','--interactive-bg-accent-default','--bg-accent','--text-accent','--accent-primary','--theme-user-selection-bg'],palette[nativeAccent]||(nativeAccent==='black'||nativeAccent==='white'?palette.neutral:palette.default))):palette[state.accent];
+    const accent=state.accent==='auto'?(preset?preset.accent:state.preset==='claude'?palette.claude:nativeColor(['--accent-brand','--accent-main-100','--accent-main-000','--color-accent','--theme-accent','--accent','--accent-color','--codex-accent','--interactive-bg-accent-default','--bg-accent','--text-accent','--accent-primary','--theme-user-selection-bg'],palette[nativeAccent]||(nativeAccent==='black'||nativeAccent==='white'?palette.neutral:palette.claude))):palette[state.accent];
     const colors={'--remaining':accent,'--ok':accent};
     if(state.preset==='auto'&&state.theme==='auto'){
       if(nav){
         colors['--fg']=getComputedStyle(nav).color;
         for(let el=nav;el;el=el.parentElement){const bg=getComputedStyle(el).backgroundColor;if(bg!=='transparent'&&bg!=='rgba(0, 0, 0, 0)'){colors['--surface']=bg;break;}}
       }
-      colors['--muted']=nativeColor(['--color-text-secondary','--muted-foreground','--text-secondary','--text-tertiary'],`color-mix(in srgb, ${colors['--fg']|| (dark?'#ececec':'#202123')} 70%, ${colors['--surface']|| (dark?'#000000':'#f9f9f9')})`);
+      colors['--muted']=nativeColor(['--text-300','--color-text-secondary','--muted-foreground','--text-secondary','--text-tertiary'],`color-mix(in srgb, ${colors['--fg']|| (dark?'#ececec':'#202123')} 70%, ${colors['--surface']|| (dark?'#000000':'#f9f9f9')})`);
       colors['--line']=nativeColor(['--color-border','--border','--border-default','--border-light'],`color-mix(in srgb, ${colors['--fg']|| (dark?'#ececec':'#202123')} 18%, ${colors['--surface']|| (dark?'#000000':'#f9f9f9')})`);
       colors['--hover']=nativeColor(['--color-surface-hover','--sidebar-surface-secondary','--bg-hover'],`color-mix(in srgb, ${colors['--fg']|| (dark?'#ececec':'#202123')} 8%, ${colors['--surface']|| (dark?'#000000':'#f9f9f9')})`);
     }
@@ -730,11 +731,11 @@
     const middleControls=`${state.gradientStops.map((stop,index)=>`<div class="gradient-stop" data-color-label="Middle color ${index+1}"><input type="color" value="${stop.color}" data-gradient-color="${index}" aria-label="Middle color ${index+1}"><label>From <input type="number" min="1" max="99" step="1" value="${stop.from}" data-gradient-from="${index}" aria-label="Middle color ${index+1} from">%</label><label>To <input type="number" min="1" max="99" step="1" value="${stop.to}" data-gradient-to="${index}" aria-label="Middle color ${index+1} to">%</label><button class="text-btn" data-remove-stop="${index}" aria-label="Remove middle color ${index+1}">Remove</button><div class="gradient-blends"><label>Blend before <input type="number" min="0" max="100" step="1" value="${stop.blendBefore??''}" placeholder="Auto" data-gradient-before="${index}" aria-label="Middle color ${index+1} blend before">%</label><label>Blend after <input type="number" min="0" max="100" step="1" value="${stop.blendAfter??''}" placeholder="Auto" data-gradient-after="${index}" aria-label="Middle color ${index+1} blend after">%</label></div></div>`).join('')}<button class="text-btn" data-add-stop ${state.gradientStops.length>=8?'disabled':''}>Add middle color</button><div class="note">From/To sets the solid color range. Blend before/after sets transition widths in percentage points: smaller is sharper, 0 is a hard edge, blank fills the gap. Neighboring middle colors share the transition between them. 0% is empty; 100% is full.</div>`;
     const barControls=group('barSource','Color source',select('Bar color','barMode',{auto:'Match theme',custom:'Custom'})+(state.barMode==='custom'?toggle('Color by percentage','data-bar-gradient',state.barGradient)+(state.barGradient?'':colorInput('Custom bar color','barColor')):'')+barPreview+`<div class="note">Applies to plan, credit and feature bars.</div>`)+
       (state.barMode==='custom'&&state.barGradient?group('barDisplay','Meter display',toggle('Show gradient across meters','data-visible-gradient',state.barGradientVisible)+`<div class="note">Off: one color for the current percentage. On: show the color scale across the fill.</div>`)+group('barEnds','End colors',colorInput('Color at 0%','barStart')+colorInput('Color at 100%','barEnd'))+group('barMiddle','Middle colors & transitions',middleControls):'');
-    const themeSelect=`<label class="setting"><span>Theme preset</span><select aria-label="Theme preset" data-setting="preset"><optgroup label="ChatGPT"><option value="auto" ${state.preset==='auto'?'selected':''}>Match ChatGPT</option><option value="chatgpt" ${state.preset==='chatgpt'?'selected':''}>ChatGPT</option></optgroup><optgroup label="Codex themes">${THEME_FAMILIES.map(name=>`<option value="${esc(name)}" ${state.preset===name?'selected':''}>${esc(name)}</option>`).join('')}</optgroup></select></label>`;
+    const themeSelect=`<label class="setting"><span>Theme preset</span><select aria-label="Theme preset" data-setting="preset"><optgroup label="Claude"><option value="auto" ${state.preset==='auto'?'selected':''}>Match Claude</option><option value="claude" ${state.preset==='claude'?'selected':''}>Claude (page colors, Claude accent)</option></optgroup><optgroup label="Palette presets">${THEME_FAMILIES.map(name=>`<option value="${esc(name)}" ${state.preset===name?'selected':''}>${esc(name)}</option>`).join('')}</optgroup></select></label>`;
     $('.settings').innerHTML=`<div class="settings-header"><div class="settings-title" title="Drag to move settings · Double-click to reset position"><button class="icon settings-grab" aria-label="Move settings" title="Drag or use arrow keys · Home resets position">${icon('grip')}</button><span>Usage settings</span><div class="history-buttons"><button class="icon undo-changes" aria-label="Undo changes" title="Undo changes" ${undoChanges.length?'':'disabled'}>${icon('undo')}</button><button class="icon redo-changes" aria-label="Redo changes" title="Redo changes" ${redoChanges.length?'':'disabled'}>${icon('redo')}</button></div><button class="icon close-settings" aria-label="Close settings">✕</button></div><div class="settings-tabs" role="tablist" aria-label="Settings categories">${Object.entries(SETTINGS_TABS).map(([key,label])=>`<button class="settings-tab" role="tab" id="gptu-tab-${key}" aria-controls="gptu-settings-${key}" aria-selected="${state.settingsTab===key}" tabindex="${state.settingsTab===key?0:-1}" data-settings-tab="${key}">${label}</button>`).join('')}</div></div><div class="settings-body">${
       tab('panel',group('placement','Docking & size',select('Placement','position',{top:'Sidebar top',bottom:'Sidebar bottom',floating:'Floating'})+toggle('Compact mode','data-compact',state.compact))+group('visibility','Visibility',toggle('Hide docked panel with sidebar','data-hide-with-sidebar',state.hideWithSidebar)+toggle('Hide frame completely','data-hide-frame',state.hideFrame))+group('hover','Hover behavior',`<div class="note">Turn a switch off to keep that element visible. Keyboard focus also reveals hover-only controls.</div>`+Object.entries(HOVER_OPTIONS).map(([key,item])=>toggle(item.label,`data-hover="${key}" ${key==='frame'&&state.hideFrame?'disabled':''}`,state.hover[key])).join('')+toggle('Hide collapsed Usage until hover','data-hide-collapsed',state.hideCollapsed))+group('status','Update time & Details',toggle('Show update time','data-show-update',state.showUpdateTime)+toggle('Show Details button','data-show-details',state.showDetails)+select('Status position','footerPosition',{header:'Next to Usage',top:'Above modules',bottom:'Below modules'})))+
-      tab('modules',group('plan','Plan limits',moduleToggle('plan')+toggle('Show banked reset count & button','data-usage-resets',state.showUsageResets)+toggle('Show paid reset button','data-paid-reset',state.showPaidReset)+toggle('Show remaining plan allowance','data-remaining-plan',state.showRemainingPlan)+`<div class="note">Also applies to the credits bar: remaining when enabled, used when disabled.</div>`+toggle('Plan limit tooltips','data-plan-tooltips',state.showPlanTooltips))+group('credits','Credits',moduleToggle('credits')+toggle('Show credit balance bar','data-credit-bar',state.showCreditBar)+`<div class="credit-reference-controls" ${state.showCreditBar?'':'hidden'}>${toggle('Show available balance','data-credit-balance',state.showCreditBalance)}${toggle('Balance beside Credits title',`data-credit-title ${state.showCreditBalance?'disabled':''}`,state.creditBalanceInTitle)}<div class="note">When the large balance is hidden, move its amount from the percentage row to the Credits title.</div><label class="setting"><span>Full balance</span><span class="margin-input"><input type="number" aria-label="Full credit balance" min="0.01" step="any" data-credit-reference value="${state.creditReference??''}" placeholder="e.g. 1000">credits</span></label><div class="note">This amount counts as 100%. Initially uses your balance when enabled; you can change it.</div></div>`+toggle('Add credits button','data-add-credits',state.showAddCredits))+group('features','Models & features',moduleToggle('features')+`<div class="feature-settings"><div class="feature-settings-title">Individual counters</div><div class="feature-options" role="group" aria-label="Models & features to show"></div><div class="note">Selections are kept when the module is hidden.</div></div>`))+
-      tab('appearance',group('appearance','Theme & mode',themeSelect+select('Appearance','theme',{auto:'Match ChatGPT',system:'System',light:'Light',dark:'Dark'})+`<div class="note">Match ChatGPT follows the page palette and custom colors. Codex presets use available light/dark variants; some have only one mode.</div>`)+group('colors','Accent & contrast',select('Accent color','accent',accentNames)+select('Contrast','contrast',{auto:'Match ChatGPT',system:'System',medium:'Medium',increased:'Increased'})))+
+      tab('modules',group('plan','Plan limits',moduleToggle('plan')+toggle('Show remaining plan allowance','data-remaining-plan',state.showRemainingPlan)+`<div class="note">Also applies to the extra usage bar: remaining when enabled, used when disabled.</div>`+toggle('Plan limit tooltips','data-plan-tooltips',state.showPlanTooltips))+group('credits','Extra usage',moduleToggle('credits')+toggle('Show extra usage bar','data-credit-bar',state.showCreditBar)+`<div class="credit-reference-controls" ${state.showCreditBar?'':'hidden'}>${toggle('Show amount left','data-credit-balance',state.showCreditBalance)}${toggle('Amount beside Extra usage title',`data-credit-title ${state.showCreditBalance?'disabled':''}`,state.creditBalanceInTitle)}<div class="note">When the large balance is hidden, move its amount from the percentage row to the Extra usage title.</div><label class="setting"><span>Fallback limit</span><span class="margin-input"><input type="number" aria-label="Full credit balance" min="0.01" step="any" data-credit-reference value="${state.creditReference??''}" placeholder="e.g. 50"></span></label><div class="note">Claude normally reports your monthly extra-usage limit, which counts as 100%. This value is used only when it does not.</div></div>`+toggle('Manage extra usage button','data-add-credits',state.showAddCredits))+group('features','Models & features',moduleToggle('features')+`<div class="feature-settings"><div class="feature-settings-title">Individual counters</div><div class="feature-options" role="group" aria-label="Models & features to show"></div><div class="note">Selections are kept when the module is hidden.</div></div>`))+
+      tab('appearance',group('appearance','Theme & mode',themeSelect+select('Appearance','theme',{auto:'Match Claude',system:'System',light:'Light',dark:'Dark'})+`<div class="note">Match Claude follows the page palette. Palette presets use available light/dark variants; some have only one mode.</div>`)+group('colors','Accent & contrast',select('Accent color','accent',accentNames)+select('Contrast','contrast',{auto:'Match Claude',system:'System',medium:'Medium',increased:'Increased'})))+
       tab('bars',barControls+`<button class="text-btn" data-reset-bar-colors>Reset bar colors</button>`)+
       tab('spacing',`${select('Editing spacing','spacingMode',{auto:'Current density',normal:'Normal',compact:'Compact'})}<div class="note">Editing ${profile==='normal'?'normal':'compact'} mode. All values are in pixels. Inside frame controls the space within the border; outside frame controls the surrounding gap.</div>`+group('spacePanel','Panel & header',['outer','frame','header'].map(box).join(''))+group('spaceStatus','Update time & summary',['status','headerStatus','statusButton','summary'].map(box).join(''))+group('spaceModules','Module spacing',['plan','credits','features','sectionHeader','sectionContent'].map(box).join(''))+group('spaceItems','Items & credits',['planRows','featureRows','creditBalance','creditMeter','addCredits'].map(box).join(''))+group('spaceBars','Bars & captions',['planBars','creditBars','featureBars','captions'].map(box).join(''))+group('spaceDetails','Expanded Details',['details','detailsContent'].map(box).join(''))+`<button class="text-btn reset-spacing" data-reset-spacing="${profile}">Reset ${profile} spacing</button>`)
     }</div><div class="settings-help"><details><summary>Moving & keyboard controls</summary><div class="note">Drag this window by its title. Double-click the title to return it beside the panel. Use arrow keys on a move or reorder handle.</div></details><button class="text-btn reset">Reset all settings</button></div><button class="icon settings-resize" aria-label="Resize settings" title="Drag to resize · Arrow keys resize · Double-click resets size"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m5 13 8-8m-3 8 3-3"/></svg></button>`;
@@ -779,22 +780,23 @@
       const caption=state.compact?(left==null?'Reset unknown':left>0?`Resets ${fmtDur(left)}`:'Refresh to update'):`${r.reached?'Limit reached · ':''}${left==null?'':reset}`;
       return `<div class="row plan-row" ${state.compact?`tabindex="0" role="group" aria-label="${esc(full)}"`:''}><div class="rl"><span>${esc(r.label)}</span><span class="v ${r.reached&&!state.showRemainingPlan?'at-limit':''}">${displayed==null?'—':Math.round(displayed)+(state.showRemainingPlan?'% left':'%')}</span></div>${displayed==null?'':bar(displayed,r.label,state.showRemainingPlan)}<div class="sub">${esc(caption)}</div>${state.compact&&state.showPlanTooltips?`<div class="plan-tip" aria-hidden="true">${esc(full)}</div>`:''}</div>`;
     }).join('')}</div>`:`<div class="empty">${state.error?'Usage unavailable. Try refreshing.':state.usageAt?'No plan limits reported.':'Waiting for usage…'}</div>`;
-    if(state.showPaidReset)blocks.plan+=`<button class="add-credits paid-reset" title="Open ChatGPT Usage to review paid reset offers">Paid reset…</button>`;
-    const balance=num(parsed.credits);
-    if(state.showCreditBar&&state.creditReferencePending&&balance>0){state.creditReference=Number(balance.toFixed(2))||balance;state.creditReferencePending=false;persist(false);syncCreditBarSettings();}
-    const creditText=balance!=null?format(balance):parsed.credits??'—';
-    const balanceInTitle=state.creditBalanceInTitle&&state.showCreditBar&&!state.showCreditBalance&&balance!=null&&state.creditReference>0;
+    if(state.showPaidReset)blocks.plan+=`<button class="add-credits paid-reset" title="Open Claude usage">Paid reset…</button>`;
+    const balance=num(parsed.credits),creditRef=parsed.creditLimit>0?parsed.creditLimit:state.creditReference;
+    const money=n=>{try{return parsed.currency?new Intl.NumberFormat(undefined,{style:'currency',currency:parsed.currency}).format(n):format(n);}catch(_){return format(n);}};
+    if(state.showCreditBar&&state.creditReferencePending&&!(parsed.creditLimit>0)&&balance>0){state.creditReference=Number(balance.toFixed(2))||balance;state.creditReferencePending=false;persist(false);syncCreditBarSettings();}
+    const creditText=balance!=null?money(balance):parsed.credits??'—';
+    const balanceInTitle=state.creditBalanceInTitle&&state.showCreditBar&&!state.showCreditBalance&&balance!=null&&creditRef>0;
     let creditMeter='';
     if(state.showCreditBar){
-      if(balance!=null&&state.creditReference>0){
-        const remaining=Math.max(0,balance/state.creditReference*100),percentage=state.showRemainingPlan?remaining:Math.max(0,100-remaining),text=new Intl.NumberFormat(undefined,{maximumFractionDigits:1}).format(percentage);
-        creditMeter=`<div class="credit-meter ${state.showCreditBalance||balanceInTitle?'':'has-inline-balance'}"><div class="rl"><span>${state.showRemainingPlan?'Remaining':'Used'}</span><span class="v"><span class="credit-percentage">${text}%</span>${state.showCreditBalance||balanceInTitle?'':`<span class="credit-meter-balance" role="group" aria-label="Available balance">${esc(creditText)}</span>`}</span></div>${bar(Math.min(100,percentage),'Credit balance',state.showRemainingPlan)}<div class="sub">of ${format(state.creditReference)} credits</div></div>`;
-      }else if(balance!=null)creditMeter='<div class="sub credit-meter">Set a full balance in settings to show a percentage.</div>';
-      else if(parsed.credits!=='Unlimited')creditMeter='<div class="sub credit-meter">Balance unavailable.</div>';
+      if(balance!=null&&creditRef>0){
+        const remaining=Math.max(0,balance/creditRef*100),percentage=state.showRemainingPlan?remaining:Math.max(0,100-remaining),text=new Intl.NumberFormat(undefined,{maximumFractionDigits:1}).format(percentage);
+        creditMeter=`<div class="credit-meter ${state.showCreditBalance||balanceInTitle?'':'has-inline-balance'}"><div class="rl"><span>${state.showRemainingPlan?'Remaining':'Used'}</span><span class="v"><span class="credit-percentage">${text}%</span>${state.showCreditBalance||balanceInTitle?'':`<span class="credit-meter-balance" role="group" aria-label="Amount left">${esc(creditText)}</span>`}</span></div>${bar(Math.min(100,percentage),'Extra usage',state.showRemainingPlan)}<div class="sub">${parsed.creditLimit>0?`${money(creditRef-balance)} used of ${money(creditRef)} monthly limit`:`of ${format(creditRef)}`}</div></div>`;
+      }else if(balance!=null)creditMeter='<div class="sub credit-meter">Set a fallback limit in settings to show a percentage.</div>';
+      else if(parsed.credits!=='Unlimited'&&parsed.credits!=='Off')creditMeter='<div class="sub credit-meter">Extra usage not reported.</div>';
     }
-    const hasCreditPercentage=state.showCreditBar&&balance!=null&&state.creditReference>0;
-    const creditBalance=!hasCreditPercentage||state.showCreditBalance?`<div class="credit-balance"><div class="credit">${esc(creditText)}</div><div class="sub">${parsed.credits==null?'No credit balance reported':'Available balance'}</div></div>`:'';
-    const addCredits=state.showAddCredits?'<a class="add-credits" href="'+esc(creditPurchaseUrl())+'" target="_blank" rel="noopener noreferrer"><svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M3 8h10"/></svg>Add credits</a>':'';
+    const hasCreditPercentage=state.showCreditBar&&balance!=null&&creditRef>0;
+    const creditBalance=!hasCreditPercentage||state.showCreditBalance?`<div class="credit-balance"><div class="credit">${esc(creditText)}</div><div class="sub">${parsed.credits==null?'Extra usage not reported':parsed.credits==='Off'?'Extra usage is turned off':parsed.credits==='Unlimited'?'No monthly limit':parsed.creditLimit>0?'Left this month':'Available'}</div></div>`:'';
+    const addCredits=state.showAddCredits?'<a class="add-credits" href="'+esc(creditPurchaseUrl())+'" target="_blank" rel="noopener noreferrer"><svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M3 8h10"/></svg>Manage</a>':'';
     blocks.credits=creditBalance+(state.showCreditBar?`<div class="credit-actions">${creditMeter}${addCredits}</div>`:addCredits);
     const models=Object.entries(state.models).filter(([name])=>state.hiddenFeatures[name]!==true).sort((a,b)=>(b[1].seenAt||0)-(a[1].seenAt||0)).slice(0,12);
     blocks.features=models.map(([name,m])=>{
@@ -803,7 +805,7 @@
       const label=featureLabel(name);
       const pct=!expired&&m.limit>0?(m.remaining!=null?100-m.remaining/m.limit*100:m.used!=null?m.used/m.limit*100:null):null;
       return `<div class="row" data-counter="${esc(name)}"><div class="rl"><span>${esc(label)}</span><span class="v">${esc(val)}</span></div>${pct==null?'':bar(Math.max(0,Math.min(100,pct)),label)}<div class="sub">${!expired&&m.resetsAt?`Resets in ${fmtDur(m.resetsAt-Date.now())} · `:''}Seen ${fmtAgo(m.seenAt)}</div></div>`;
-    }).join('')||`<div class="empty">${Object.keys(state.models).length?'All reported counters are hidden. Choose which to show in settings.':'Limits appear here when ChatGPT reports them.'}</div>`;
+    }).join('')||`<div class="empty">${Object.keys(state.models).length?'All reported counters are hidden. Choose which to show in settings.':'Limits appear here when Claude reports them.'}</div>`;
     const scroll=$('.body').scrollTop;
     const focused=root.activeElement?.dataset;
     const rawFocused=root.activeElement?.classList.contains('raw');
@@ -811,8 +813,8 @@
     const footer=state.showUpdateTime||(!inHeader&&state.showDetails)?`<div class="foot ${inHeader?'head-status':''}">${state.showUpdateTime?`<span class="updated-at" title="Updated ${esc(fmtAgo(state.usageAt))}">${inHeader?'':'Updated '}${fmtAgo(state.usageAt)}</span>`:''}${!inHeader&&state.showDetails?`<button class="text-btn raw" aria-expanded="${state.showRaw}">${state.showRaw?'Hide data':'Details'}</button>`:''}</div>`:'';
     $('.head-status-slot').innerHTML=state.footerPosition==='header'?footer:'';
     $('.head').classList.toggle('has-header-status',state.footerPosition==='header'&&!!footer);
-    $('.body').innerHTML=(state.footerPosition==='top'?footer:'')+state.sections.filter(k=>!state.hidden[k]).map(k=>`<section class="section" data-section="${k}"><div class="section-head"><button class="section-toggle" data-collapse="${k}" aria-expanded="${!state.closed[k]}" aria-controls="gptu-${k}">${icon(k)}<span>${labels[k]}</span>${k==='credits'&&(state.closed.credits||balanceInTitle)?`<span class="credit-inline" role="group" aria-label="Available balance">${esc(creditText)}</span>`:''}${icon('chevron')}</button>${k==='plan'&&state.showUsageResets&&resetCount()!=null?`<span class="reset-tools" title="Available usage limit resets"><span>${resetCount()} ${resetCount()===1?'reset':'resets'}</span>${resetCount()>0?`<button class="use-reset" aria-label="Use usage limit reset" ${resetPending?'disabled':''}>Use</button>`:''}</span>`:''}<button class="icon section-handle" draggable="true" data-handle="${k}" aria-label="Reorder ${labels[k]}" title="Drag to reorder · ↑ / ↓">${icon('grip')}</button></div><div class="section-content" id="gptu-${k}" ${state.closed[k]?'hidden':''}>${blocks[k]}</div></section>`).join('')+
-      `${state.error?`<div class="err" role="status">${esc(state.error)}</div>`:''}${state.footerPosition==='bottom'?footer:''}${state.showRaw?`<pre>${esc(JSON.stringify({usage:state.usage,models:state.models},null,2))}</pre>`:''}`;
+    $('.body').innerHTML=(state.footerPosition==='top'?footer:'')+state.sections.filter(k=>!state.hidden[k]).map(k=>`<section class="section" data-section="${k}"><div class="section-head"><button class="section-toggle" data-collapse="${k}" aria-expanded="${!state.closed[k]}" aria-controls="gptu-${k}">${icon(k)}<span>${labels[k]}</span>${k==='credits'&&(state.closed.credits||balanceInTitle)?`<span class="credit-inline" role="group" aria-label="Amount left">${esc(creditText)}</span>`:''}${icon('chevron')}</button>${k==='plan'&&state.showUsageResets&&resetCount()!=null?`<span class="reset-tools" title="Available usage limit resets"><span>${resetCount()} ${resetCount()===1?'reset':'resets'}</span>${resetCount()>0?`<button class="use-reset" aria-label="Use usage limit reset" ${resetPending?'disabled':''}>Use</button>`:''}</span>`:''}<button class="icon section-handle" draggable="true" data-handle="${k}" aria-label="Reorder ${labels[k]}" title="Drag to reorder · ↑ / ↓">${icon('grip')}</button></div><div class="section-content" id="gptu-${k}" ${state.closed[k]?'hidden':''}>${blocks[k]}</div></section>`).join('')+
+      `${state.error?`<div class="err" role="status">${esc(state.error)}</div>`:''}${state.footerPosition==='bottom'?footer:''}${state.showRaw?`<pre>${esc(JSON.stringify({claude:state.rawUsage??null,usage:state.usage,models:state.models},null,2))}</pre>`:''}`;
     $('.body').scrollTop=scroll;
     if(host.hasAttribute('data-bottom')) layoutBottom();
     if(rawFocused) $('.raw')?.focus();
@@ -1069,8 +1071,19 @@
     }
     return true;
   }
+  function claudeSidebar(){
+    // claude.ai keeps the account button at the foot of the left sidebar; climb to the column that holds it.
+    const account=[...document.querySelectorAll('[data-testid="user-menu-button"]')].find(el=>!host.contains(el)&&isVisibleElement(el));
+    for(let el=account?.parentElement;el&&el!==document.body;el=el.parentElement){
+      const r=el.getBoundingClientRect();
+      if(r.left>innerWidth/2||r.width>520)break;
+      if(r.width>120&&r.height>innerHeight*0.6&&(el.matches('nav,aside')||el.querySelector('a[href^="/chat/"],a[href^="/code/"],a[href="/new"],a[href^="/project"]')))return el;
+    }
+    return null;
+  }
   function findSidebarNav(){
-    for(const selector of ['nav[aria-label="Chat history"]','#stage-slideover-sidebar nav','[data-testid="sidebar"] nav','nav']){
+    const claude=claudeSidebar();if(claude)return claude;
+    for(const selector of ['nav[aria-label="Sidebar"]','[data-testid="menu-sidebar"]','nav[aria-label="Chat history"]','aside nav','nav']){
       for(const el of document.querySelectorAll(selector)){
         const r=el.getBoundingClientRect();
         if(el.getAttribute('aria-label')!=='Show sidebar'&&r.width>120&&(selector==='nav'?r.height>160:r.height>=0)&&r.left>=0&&r.left<innerWidth/2&&isVisibleElement(el,selector!=='nav'))return el;
@@ -1084,9 +1097,9 @@
       const parent=container.parentElement,r=parent.getBoundingClientRect();
       if(r.width>520||r.left>innerWidth/2)break;
       container=parent;
-      if(container.matches('#app-shell-sidebar,#stage-slideover-sidebar,[data-testid="sidebar"],aside'))break;
+      if(container.matches('#app-shell-sidebar,#stage-slideover-sidebar,[data-testid="sidebar"],[data-testid="menu-sidebar"],aside'))break;
     }
-    const selectors=['button[aria-label="Open profile menu"]','[data-testid="accounts-profile-button"], [data-testid="user-menu-button"], [data-testid="profile-button"]','footer'];
+    const selectors=['[data-testid="user-menu-button"]','button[aria-label="Open profile menu"]','[data-testid="accounts-profile-button"], [data-testid="profile-button"]','footer'];
     // The collapsed rail and expanded sidebar coexist. Search the active history
     // nav first, and reject hidden duplicate profile controls in every search.
     let account=null;
@@ -1167,8 +1180,10 @@
     const size=(measured>=13&&measured<=20?measured:14)+'px';
     if(host.style.getPropertyValue('--gptu-title-size')!==size)host.style.setProperty('--gptu-title-size',size);
   }
+  let sawSidebar=false;
   function place(force){
-    const nav=findSidebarNav(), hidden=state.position!=='floating'&&!nav&&state.hideWithSidebar;
+    const nav=findSidebarNav();if(nav)sawSidebar=true;
+    const hidden=state.position!=='floating'&&!nav&&sawSidebar&&state.hideWithSidebar;
     host.toggleAttribute('data-sidebar-hidden',hidden);
     if(hidden){
       if(settingsOpen)closeSettings();
