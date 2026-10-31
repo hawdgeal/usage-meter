@@ -1314,10 +1314,15 @@
     const selectors=[...(IS_CLAUDE?['[data-testid="user-menu-button"]']:[]),'button[aria-label="Open profile menu"]','[data-testid="accounts-profile-button"], [data-testid="user-menu-button"], [data-testid="profile-button"]','footer'];
     // The collapsed rail and expanded sidebar coexist. Search the active history
     // nav first, and reject hidden duplicate profile controls in every search.
+    // Second pass ignores aria-hidden/inert: an open menu marks the account row that way while it
+    // stays on screen, and losing it would drop the panel below the account row.
     let account=null;
-    for(const scope of [nav,container]){
-      for(const selector of selectors){
-        account=[...scope.querySelectorAll(selector)].find(el=>!host.contains(el)&&isVisibleElement(el));
+    for(const ignoreAria of [false,true]){
+      for(const scope of [nav,container]){
+        for(const selector of selectors){
+          account=[...scope.querySelectorAll(selector)].find(el=>!host.contains(el)&&isVisibleElement(el,false,ignoreAria));
+          if(account)break;
+        }
         if(account)break;
       }
       if(account)break;
