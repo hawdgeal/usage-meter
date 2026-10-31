@@ -131,7 +131,7 @@
     if(!Number.isFinite(state.creditReference)||state.creditReference<=0)state.creditReference=null;
     for(const key of ['marginTop','marginBottom'])state[key]=Number.isFinite(state[key])?Math.max(0,Math.min(120,state[key])):6;
     if(!['before','after'].includes(state.floatHandlePosition))state.floatHandlePosition='after';
-    if(!['top','bottom','header'].includes(state.footerPosition))state.footerPosition='top';
+    if(!['top','bottom','header','header-after'].includes(state.footerPosition))state.footerPosition='top';
     if(!Object.hasOwn(SETTINGS_TABS,state.settingsTab))state.settingsTab='panel';
     if(!state.settingsPosition||!Number.isFinite(state.settingsPosition.x)||!Number.isFinite(state.settingsPosition.y))state.settingsPosition=null;
     if(!state.settingsSize||!Number.isFinite(state.settingsSize.width)||!Number.isFinite(state.settingsSize.height))state.settingsSize=null;
@@ -296,7 +296,9 @@
     .head-title-row { display:flex; align-items:center; flex:1; min-width:0; gap:2px; }
     .head-title-row .usage-open { flex:0 1 auto; }
     .head-title-row>.collapse-panel { flex:none; }
-    .head-status-slot { display:contents; }
+    .head-status-slot,.head-status-after-slot { display:contents; }
+    .head.has-header-status.has-status-after .head-title-row { flex:1 1 auto; }
+    .head-status-after-slot>.head-status.foot { flex:0 1000 auto; max-width:64px; margin-left:0; }
     .head.has-header-status { flex-wrap:nowrap; }
     .head.has-header-status .head-title-row { flex:1 1 0; min-width:0; flex-wrap:nowrap; overflow:hidden; }
     .head.has-header-status .usage-open { flex:0 0 auto; gap:5px; }
@@ -443,6 +445,11 @@
     .settings-section .checks { margin:0; padding:0; border:0; }
     .settings-section .feature-settings { border:0; margin:0; padding:4px 0 0; }
     .settings-help { font-size:10.5px; color:var(--muted); padding:10px 14px; border-top:1px solid var(--line); }
+    .settings-file-actions { display:flex; flex-wrap:wrap; align-items:center; gap:6px 16px; padding-top:6px; }
+    .settings-file-actions .text-btn { font-size:11px; }
+    .settings-help .settings-file-actions .reset { margin:0; padding:3px 0; }
+    .export-status:empty { display:none; }
+    .export-status { display:block; padding-top:4px; }
     .settings-help .reset { font-size:11px; margin:6px 0 0; padding:5px 0; }
     .body { scrollbar-width:thin; scrollbar-color:transparent transparent; scrollbar-gutter:stable; }
     .settings { scrollbar-width:thin; scrollbar-color:var(--track) transparent; scrollbar-gutter:stable; }
@@ -516,7 +523,7 @@
   root.innerHTML=`<style>${CSS}</style><div class="panel-layout"><div class="card" part="card">
     <div class="head"><button class="icon grab" aria-label="Drag panel; use arrow keys to move, Escape to dock" title="Drag to float · Arrow keys to move · Escape to dock">${icon('grip')}</button>
     <div class="head-title-row"><button class="usage-open" aria-label="Open usage overview" title="Open usage overview"><span class="usage-icon">${USAGE_ICON}</span><span class="title">Usage</span><span class="badge" hidden></span></button><button class="icon toggle collapse-panel" aria-expanded="true" aria-label="Collapse usage panel" title="Collapse usage panel">${icon('chevron')}</button><div class="head-status-slot"></div></div>
-    <button class="icon refresh" title="Refresh usage" aria-label="Refresh usage">${icon('refresh')}</button>
+    <button class="icon refresh" title="Refresh usage" aria-label="Refresh usage">${icon('refresh')}</button><div class="head-status-after-slot"></div>
     <button class="icon customize" title="Customize panel" aria-label="Customize panel" aria-expanded="false">${icon('settings')}</button></div>
     <div class="summary" hidden></div><div class="body"></div><button class="resize" aria-label="Resize panel" title="Drag to resize · Arrow keys to resize · Double-click to reset size"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m5 13 8-8m-3 8 3-3"/></svg></button><div class="live" aria-live="polite"></div></div></div><div class="settings" popover="auto" role="dialog" aria-label="Usage settings"></div><dialog class="reset-dialog" aria-labelledby="gptu-reset-title"></dialog><dialog class="credits-modal" aria-labelledby="gptu-page-heading"><div class="credits-header"><h2 id="gptu-page-heading">Add credits</h2><a class="credit-external" target="_blank" rel="noopener noreferrer">Open in tab</a><button class="icon credits-close" aria-label="Close credits">✕</button></div><div class="credits-content"><p class="credits-status" role="status">Loading credits…</p><template class="credits-frame-template"><iframe class="credits-frame" title="ChatGPT credits purchase" allow="payment" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads"></iframe></template></div></dialog><div class="dock-targets" hidden aria-hidden="true"><div class="dock-zone" data-dock="top">Dock at top</div><div class="dock-zone" data-dock="bottom">Dock at bottom</div></div>`;
   const $=s=>root.querySelector(s), card=$('.card');
@@ -527,8 +534,20 @@
       historyGroup=`edit:${historyEpoch}:${signature}`;
     }else historyGroup=`action:${++historyEpoch}`;
   },true);
+  function exportSettings(){
+    const settings=Object.fromEntries(Object.keys(defaultPreferences()).filter(key=>key!=='creditReferencePending').map(key=>[key,structuredClone(state[key])]));
+    const data={format:'chatgpt-usage-meter-settings',version:1,extensionVersion:globalThis.chrome?.runtime?.getManifest?.().version||globalThis.browser?.runtime?.getManifest?.().version||'0.3.34',exportedAt:new Date().toISOString(),settings};
+    let url;
+    try{
+      url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)+'\n'],{type:'application/json'}));
+      const link=document.createElement('a');link.href=url;link.download='ChatGPT-Usage-Meter-settings-'+data.exportedAt.slice(0,10)+'.json';document.body.appendChild(link);link.click();link.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),60000);
+      $('.export-status').textContent='Settings exported.';
+    }catch(_){if(url)URL.revokeObjectURL(url);$('.export-status').textContent='Export failed. Please try again.';}
+  }
   root.addEventListener('click',event=>{
-    if(event.target.closest('.undo-changes'))travelHistory();
+    if(event.target.closest('[data-export-settings]'))exportSettings();
+    else if(event.target.closest('.undo-changes'))travelHistory();
     else if(event.target.closest('.redo-changes'))travelHistory(true);
     else if(event.target.closest('[data-reset-bar-colors]')){
       const defaults=defaultPreferences();for(const key of ['barMode','barColor','barStart','barEnd','barGradient','barGradientVisible','gradientStops'])state[key]=defaults[key];
@@ -733,12 +752,12 @@
       (state.barMode==='custom'&&state.barGradient?group('barDisplay','Meter display',toggle('Show gradient across meters','data-visible-gradient',state.barGradientVisible)+`<div class="note">Off: one color for the current percentage. On: show the color scale across the fill.</div>`)+group('barEnds','End colors',colorInput('Color at 0%','barStart')+colorInput('Color at 100%','barEnd'))+group('barMiddle','Middle colors & transitions',middleControls):'');
     const themeSelect=`<label class="setting"><span>Theme preset</span><select aria-label="Theme preset" data-setting="preset"><optgroup label="ChatGPT"><option value="auto" ${state.preset==='auto'?'selected':''}>Match ChatGPT</option><option value="chatgpt" ${state.preset==='chatgpt'?'selected':''}>ChatGPT</option></optgroup><optgroup label="Codex themes">${THEME_FAMILIES.map(name=>`<option value="${esc(name)}" ${state.preset===name?'selected':''}>${esc(name)}</option>`).join('')}</optgroup></select></label>`;
     $('.settings').innerHTML=`<div class="settings-header"><div class="settings-title" title="Drag to move settings · Double-click to reset position"><button class="icon settings-grab" aria-label="Move settings" title="Drag or use arrow keys · Home resets position">${icon('grip')}</button><span>Usage settings</span><div class="history-buttons"><button class="icon undo-changes" aria-label="Undo changes" title="Undo changes" ${undoChanges.length?'':'disabled'}>${icon('undo')}</button><button class="icon redo-changes" aria-label="Redo changes" title="Redo changes" ${redoChanges.length?'':'disabled'}>${icon('redo')}</button></div><button class="icon close-settings" aria-label="Close settings">✕</button></div><div class="settings-tabs" role="tablist" aria-label="Settings categories">${Object.entries(SETTINGS_TABS).map(([key,label])=>`<button class="settings-tab" role="tab" id="gptu-tab-${key}" aria-controls="gptu-settings-${key}" aria-selected="${state.settingsTab===key}" tabindex="${state.settingsTab===key?0:-1}" data-settings-tab="${key}">${label}</button>`).join('')}</div></div><div class="settings-body">${
-      tab('panel',group('placement','Docking & size',select('Placement','position',{top:'Sidebar top',bottom:'Sidebar bottom',floating:'Floating'})+toggle('Compact mode','data-compact',state.compact)+select('Drag handle position','floatHandlePosition',{before:'Before Usage',after:'After settings'}))+group('visibility','Visibility',toggle('Hide docked panel with sidebar','data-hide-with-sidebar',state.hideWithSidebar)+toggle('Hide frame completely','data-hide-frame',state.hideFrame))+group('hover','Hover behavior',`<div class="note">Turn a switch off to keep that element visible. Keyboard focus also reveals hover-only controls.</div>`+Object.entries(HOVER_OPTIONS).map(([key,item])=>toggle(item.label,`data-hover="${key}" ${key==='frame'&&state.hideFrame?'disabled':''}`,state.hover[key])).join('')+toggle('Hide collapsed Usage until hover','data-hide-collapsed',state.hideCollapsed))+group('status','Update time & Details',toggle('Show update time','data-show-update',state.showUpdateTime)+toggle('Show Details button','data-show-details',state.showDetails)+select('Status position','footerPosition',{header:'Next to Usage',top:'Above modules',bottom:'Below modules'})))+
+      tab('panel',group('placement','Docking & size',select('Placement','position',{top:'Sidebar top',bottom:'Sidebar bottom',floating:'Floating'})+toggle('Compact mode','data-compact',state.compact)+select('Drag handle position','floatHandlePosition',{before:'Before Usage',after:'After settings'}))+group('visibility','Visibility',toggle('Hide docked panel with sidebar','data-hide-with-sidebar',state.hideWithSidebar)+toggle('Hide frame completely','data-hide-frame',state.hideFrame))+group('hover','Hover behavior',`<div class="note">Turn a switch off to keep that element visible. Keyboard focus also reveals hover-only controls.</div>`+Object.entries(HOVER_OPTIONS).map(([key,item])=>toggle(item.label,`data-hover="${key}" ${key==='frame'&&state.hideFrame?'disabled':''}`,state.hover[key])).join('')+toggle('Hide collapsed Usage until hover','data-hide-collapsed',state.hideCollapsed))+group('status','Update time & Details',toggle('Show update time','data-show-update',state.showUpdateTime)+toggle('Show Details button','data-show-details',state.showDetails)+select('Status position','footerPosition',{header:'Header: before refresh','header-after':'Header: after refresh',top:'Above modules',bottom:'Below modules'})))+
       tab('modules',group('plan','Plan limits',moduleToggle('plan')+toggle('Show banked reset count & button','data-usage-resets',state.showUsageResets)+toggle('Show paid reset button','data-paid-reset',state.showPaidReset)+toggle('Show remaining plan allowance','data-remaining-plan',state.showRemainingPlan)+`<div class="note">Also applies to the credits bar: remaining when enabled, used when disabled.</div>`+toggle('Plan limit tooltips','data-plan-tooltips',state.showPlanTooltips))+group('credits','Credits',moduleToggle('credits')+toggle('Show credit balance bar','data-credit-bar',state.showCreditBar)+`<div class="credit-reference-controls" ${state.showCreditBar?'':'hidden'}>${toggle('Show available balance','data-credit-balance',state.showCreditBalance)}${toggle('Balance beside Credits title',`data-credit-title ${state.showCreditBalance?'disabled':''}`,state.creditBalanceInTitle)}<div class="note">When the large balance is hidden, move its amount from the percentage row to the Credits title.</div><label class="setting"><span>Full balance</span><span class="margin-input"><input type="number" aria-label="Full credit balance" min="0.01" step="any" data-credit-reference value="${state.creditReference??''}" placeholder="e.g. 1000">credits</span></label><div class="note">This amount counts as 100%. Initially uses your balance when enabled; you can change it.</div></div>`+toggle('Add credits button','data-add-credits',state.showAddCredits))+group('features','Models & features',moduleToggle('features')+`<div class="feature-settings"><div class="feature-settings-title">Individual counters</div><div class="feature-options" role="group" aria-label="Models & features to show"></div><div class="note">Selections are kept when the module is hidden.</div></div>`))+
       tab('appearance',group('appearance','Theme & mode',themeSelect+select('Appearance','theme',{auto:'Match ChatGPT',system:'System',light:'Light',dark:'Dark'})+`<div class="note">Match ChatGPT follows the page palette and custom colors. Codex presets use available light/dark variants; some have only one mode.</div>`)+group('colors','Accent & contrast',select('Accent color','accent',accentNames)+select('Contrast','contrast',{auto:'Match ChatGPT',system:'System',medium:'Medium',increased:'Increased'})))+
       tab('bars',barControls+`<button class="text-btn" data-reset-bar-colors>Reset bar colors</button>`)+
       tab('spacing',`${select('Editing spacing','spacingMode',{auto:'Current density',normal:'Normal',compact:'Compact'})}<div class="note">Editing ${profile==='normal'?'normal':'compact'} mode. All values are in pixels. Inside frame controls the space within the border; outside frame controls the surrounding gap.</div>`+group('spacePanel','Panel & header',['outer','frame','header'].map(box).join(''))+group('spaceStatus','Update time & summary',['status','headerStatus','statusButton','summary'].map(box).join(''))+group('spaceModules','Module spacing',['plan','credits','features','sectionHeader','sectionContent'].map(box).join(''))+group('spaceItems','Items & credits',['planRows','featureRows','creditBalance','creditMeter','addCredits'].map(box).join(''))+group('spaceBars','Bars & captions',['planBars','creditBars','featureBars','captions'].map(box).join(''))+group('spaceDetails','Expanded Details',['details','detailsContent'].map(box).join(''))+`<button class="text-btn reset-spacing" data-reset-spacing="${profile}">Reset ${profile} spacing</button>`)
-    }</div><div class="settings-help"><details><summary>Moving & keyboard controls</summary><div class="note">Drag this window by its title. Double-click the title to return it beside the panel. Use arrow keys on a move or reorder handle.</div></details><button class="text-btn reset">Reset all settings</button></div><button class="icon settings-resize" aria-label="Resize settings" title="Drag to resize · Arrow keys resize · Double-click resets size"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m5 13 8-8m-3 8 3-3"/></svg></button>`;
+    }</div><div class="settings-help"><details><summary>Moving & keyboard controls</summary><div class="note">Drag this window by its title. Double-click the title to return it beside the panel. Use arrow keys on a move or reorder handle.</div></details><div class="settings-file-actions"><button class="text-btn" data-export-settings>Export settings</button><button class="text-btn reset">Reset all settings</button></div><span class="export-status" role="status"></span></div><button class="icon settings-resize" aria-label="Resize settings" title="Drag to resize · Arrow keys resize · Double-click resets size"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m5 13 8-8m-3 8 3-3"/></svg></button>`;
     renderFeatureSettings();updateBarPreview();positionSettings();
   }
   function selectSettingsTab(key,focus=false){
@@ -811,10 +830,12 @@
     const scroll=$('.body').scrollTop;
     const focused=root.activeElement?.dataset;
     const rawFocused=root.activeElement?.classList.contains('raw');
-    const inHeader=state.footerPosition==='header';
+    const inHeader=['header','header-after'].includes(state.footerPosition);
     const footer=state.showUpdateTime||(!inHeader&&state.showDetails)?`<div class="foot ${inHeader?'head-status':''}">${state.showUpdateTime?`<span class="updated-at" title="Updated ${esc(fmtAgo(state.usageAt))}">${inHeader?'':'Updated '}${fmtAgo(state.usageAt)}</span>`:''}${!inHeader&&state.showDetails?`<button class="text-btn raw" aria-expanded="${state.showRaw}">${state.showRaw?'Hide data':'Details'}</button>`:''}</div>`:'';
     $('.head-status-slot').innerHTML=state.footerPosition==='header'?footer:'';
-    $('.head').classList.toggle('has-header-status',state.footerPosition==='header'&&!!footer);
+    $('.head-status-after-slot').innerHTML=state.footerPosition==='header-after'?footer:'';
+    $('.head').classList.toggle('has-header-status',inHeader&&!!footer);
+    $('.head').classList.toggle('has-status-after',state.footerPosition==='header-after'&&!!footer);
     $('.body').innerHTML=(state.footerPosition==='top'?footer:'')+state.sections.filter(k=>!state.hidden[k]).map(k=>`<section class="section" data-section="${k}"><div class="section-head"><button class="section-toggle" data-collapse="${k}" aria-expanded="${!state.closed[k]}" aria-controls="gptu-${k}">${icon(k)}<span>${labels[k]}</span>${k==='credits'&&(state.closed.credits||balanceInTitle)?`<span class="credit-inline" role="group" aria-label="Available balance">${esc(creditText)}</span>`:''}${icon('chevron')}</button>${k==='plan'&&state.showUsageResets&&resetCount()!=null?`<span class="reset-tools" title="Available usage limit resets"><span>${resetCount()} ${resetCount()===1?'reset':'resets'}</span>${resetCount()>0?`<button class="use-reset" aria-label="Use usage limit reset" ${resetPending?'disabled':''}>Use</button>`:''}</span>`:''}<button class="icon section-handle" draggable="true" data-handle="${k}" aria-label="Reorder ${labels[k]}" title="Drag to reorder · ↑ / ↓">${icon('grip')}</button></div><div class="section-content" id="gptu-${k}" ${state.closed[k]?'hidden':''}>${blocks[k]}</div></section>`).join('')+
       `${state.error?`<div class="err" role="status">${esc(state.error)}</div>`:''}${state.footerPosition==='bottom'?footer:''}${state.showRaw?`<pre>${esc(JSON.stringify({usage:state.usage,models:state.models},null,2))}</pre>`:''}`;
     $('.body').scrollTop=scroll;
@@ -1237,6 +1258,7 @@
       .card[data-hover-frame]:not(:hover):not(:has(:focus-visible)){border-color:transparent;box-shadow:none;}
       .card[data-hover-float]:not(:hover):not(:has(:focus-visible)) .head .grab{width:0;min-width:0;margin-right:-3px;overflow:hidden;}
       .card[data-hover-updated]:not(:hover):not(:has(:focus-visible)) .head-status.foot{flex:0 0 0;width:0;margin:0;padding:0;}
+      .card[data-hover-updated]:not(:hover):not(:has(:focus-visible)) .head-status-after-slot>.head-status.foot{margin-right:-3px;}
       .card[data-hover-collapse]:not(:hover):not(:has(:focus-visible)) .head .collapse-panel{width:0;min-width:0;margin-right:-2px;overflow:hidden;}
       .card[data-hover-refresh]:not(:hover):not(:has(:focus-visible)) .head>.refresh,
       :host(:not([data-settings-open])) .card[data-hover-customize]:not(:hover):not(:has(:focus-visible)) .head>.customize{width:0;min-width:0;margin-right:-3px;overflow:hidden;}

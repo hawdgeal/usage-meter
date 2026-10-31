@@ -6,7 +6,7 @@ A browser extension that adds a **Usage** card to ChatGPT's left sidebar, showin
 - **Credits** — your pay-as-you-go usage-credit balance, or "Unlimited".
 - **Model & feature limits** — remaining messages/uses per model or feature (Deep Research, image generation…), captured whenever ChatGPT reports them.
 
-## Panel controls (0.3.32)
+## Panel controls (0.3.34)
 
 - The settings window has a lower-right resize handle. Its size is saved separately from the Usage panel; resizing fixes its current position. Double-click the handle or press Home while it is focused to restore automatic sizing.
 
@@ -109,3 +109,7 @@ Modules → Plan limits → Show banked reset count & button independently toggl
 Modules → Credits → Balance beside Credits title moves the available amount from beside the percentage into the section heading when the bar is enabled and the large available-balance display is hidden. It defaults off, persists independently and is undoable. The percentage remains in the meter; no duplicate amount appears there. Collapsed Credits continues showing its balance as before.
 
 Layout → Docking & size → Drag handle position selects Before Usage or After settings (default). The actual control order follows this choice for both pointer and keyboard use. Hover-only visibility, drag/docking and resizing remain available. The setting persists and supports Undo/Redo.
+
+Layout → Update time & Details → Status position now offers Header: before refresh and Header: after refresh, in addition to above/below modules. Both header choices use the short relative timestamp, omit Details, and retain hover visibility. After refresh places the timestamp between Refresh and Customize. The setting persists and supports Undo/Redo.
+
+Export settings at the bottom of settings downloads a versioned JSON file containing preferences and layout, including custom bar colors and configured full-credit reference. Live usage payloads, current credit/reset balances, reported model data, account/session information and undo history are excluded. Export does not change preferences. The file is a settings backup; an import interface is not included in this release.
