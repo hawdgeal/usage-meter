@@ -6,7 +6,7 @@ A browser extension that adds a **Usage** card to ChatGPT's left sidebar, showin
 - **Credits** — your pay-as-you-go usage-credit balance, or "Unlimited".
 - **Model & feature limits** — remaining messages/uses per model or feature (Deep Research, image generation…), captured whenever ChatGPT reports them.
 
-## Panel controls (0.3.30)
+## Panel controls (0.3.31)
 
 - The settings window has a lower-right resize handle. Its size is saved separately from the Usage panel; resizing fixes its current position. Double-click the handle or press Home while it is focused to restore automatic sizing.
 
@@ -101,3 +101,9 @@ Banked usage limit resets appear beside Plan limits when reported by ChatGPT (in
 Reset request/response fields were checked against the [official Codex backend client](https://github.com/openai/codex/blob/main/codex-rs/backend-client/src/client/rate_limit_resets.rs) and its tests. See [How resets work in Codex](https://help.openai.com/en/articles/20001498-how-resets-work-in-codex) for account eligibility and behavior. Redemption checks use mocked responses during development; real account behavior remains subject to the server.
 
 Settings are organized into Layout (docking, visibility, hover and status), Modules (plan/credit/feature behavior), Theme (preset, mode, accent and contrast), Bars (color source, preview, meter display, endpoints and middle transitions), and Spacing. Each group collapses independently and remembers its state. Advanced meter display options are separated from color editing.
+
+Undo and Redo buttons in the settings title bar restore up to 100 extension preference/layout changes during the current page session. Consecutive edits to one field coalesce briefly. Settings navigation and group expansion, usage refreshes, account purchases and reset redemption are excluded. Undo/redo persists the resulting preferences; refreshing the page starts a new history. Ctrl/Cmd+Z, Shift+Ctrl/Cmd+Z and Ctrl/Cmd+Y work while focus is on extension controls, leaving editable fields to their native text undo. A new change after Undo clears Redo.
+
+Modules → Plan limits → Show banked reset count & button independently toggles banked-reset controls (on by default). Show paid reset button remains separate. Bars → Reset bar colors restores only the bar color source, custom colors, ranges/blend widths and gradient display defaults; it is undoable and preserves theme, module and spacing choices.
+
+Modules → Credits → Balance beside Credits title moves the available amount from beside the percentage into the section heading when the bar is enabled and the large available-balance display is hidden. It defaults off, persists independently and is undoable. The percentage remains in the meter; no duplicate amount appears there. Collapsed Credits continues showing its balance as before.
