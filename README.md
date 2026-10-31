@@ -2,6 +2,10 @@
 
 One browser extension that adds a **Usage** card to the left sidebar of **ChatGPT** (chatgpt.com) and **Claude** (claude.ai, including Claude Code on the web). Each site keeps its own settings, and the **Sync** tab copies settings between them in either direction.
 
+## What's new in 0.4.2
+
+- **Claude usage dialog:** clicking **Usage** or **Manage** shows your usage again, not Claude's settings menu. The dialog now finds the usage content by its position beside the settings menu, instead of by which links it contains.
+
 ## What's new in 0.4.1
 
 - **Claude Code menus:** opening a menu (for example right-click) no longer turns the panel black or moves it below the account row.
