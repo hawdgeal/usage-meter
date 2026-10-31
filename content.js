@@ -6,12 +6,14 @@
   const MIN_GAP_MS = 15 * 1000;
   const store = (globalThis.browser && browser.storage) || chrome.storage;
 
+  const THEME_PRESETS=[{"id":"ayu-dark","family":"Ayu","type":"dark","surface":"#0d1017","hover":"#47526640","border":"#1b1f29","fg":"#bfbdb6","muted":"#5a6673","accent":"#e6b450"},{"id":"catppuccin-mocha","family":"Catppuccin","type":"dark","surface":"#181825","hover":"#31324480","border":"#585b70","fg":"#cdd6f4","muted":"#9399b2","accent":"#cba6f7"},{"id":"catppuccin-latte","family":"Catppuccin","type":"light","surface":"#e6e9ef","hover":"#ccd0da80","border":"#acb0be","fg":"#4c4f69","muted":"#7c7f93","accent":"#8839ef"},{"id":"absolutely-dark","family":"Absolutely","type":"dark","surface":"#373735","hover":"#373735","border":"#ffffff22","fg":"#f9f9f7","muted":"#b2b2b0","accent":"#cc7d5e"},{"id":"absolutely-light","family":"Absolutely","type":"light","surface":"#f4f4f2","hover":"#f4f4f2","border":"#00000022","fg":"#2d2d2b","muted":"#8e8e8c","accent":"#c27759"},{"id":"dracula","family":"Dracula","type":"dark","surface":"#21222C","hover":"#44475A75","border":"#BD93F9","fg":"#F8F8F2","muted":"#6272A4","accent":"#737583"},{"id":"everforest-dark","family":"Everforest","type":"dark","surface":"#2d353b","hover":"#2d353b00","border":"#2d353b","fg":"#d3c6aa","muted":"#859289","accent":"#a7c080"},{"id":"everforest-light","family":"Everforest","type":"light","surface":"#fdf6e3","hover":"#fdf6e300","border":"#fdf6e3","fg":"#5c6a72","muted":"#859289","accent":"#7d974c"},{"id":"github-dark","family":"GitHub","type":"dark","surface":"#010409","hover":"#6e76811a","border":"#30363d","fg":"#e6edf3","muted":"#8b949e","accent":"#238636"},{"id":"github-light","family":"GitHub","type":"light","surface":"#f6f8fa","hover":"#eaeef280","border":"#d0d7de","fg":"#1f2328","muted":"#6e7781","accent":"#1f883d"},{"id":"gruvbox-dark","family":"Gruvbox","type":"dark","surface":"#282828","hover":"#3c383680","border":"#3c3836","fg":"#ebdbb2","muted":"#928374","accent":"#458588"},{"id":"gruvbox-light","family":"Gruvbox","type":"light","surface":"#fbf1c7","hover":"#ebdbb280","border":"#ebdbb2","fg":"#3c3836","muted":"#928374","accent":"#458588"},{"id":"linear-dark","family":"Linear","type":"dark","surface":"#080a0f","hover":"#080a0f","border":"#ffffff22","fg":"#e6e9ef","muted":"#636b7b","accent":"#606acc"},{"id":"linear-light","family":"Linear","type":"light","surface":"#f2f4f8","hover":"#f2f4f8","border":"#00000022","fg":"#2a3140","muted":"#858ea1","accent":"#5e6ad2"},{"id":"lobster-dark","family":"Lobster","type":"dark","surface":"#111827","hover":"#111827","border":"#ffffff22","fg":"#e4e4e7","muted":"#71717a","accent":"#ff5c5c"},{"id":"material-dark","family":"Material","type":"dark","surface":"#212121","hover":"#212121","border":"#21212160","fg":"#EEFFFF","muted":"#6b6e6e","accent":"#717171"},{"id":"matrix-dark","family":"Matrix","type":"dark","surface":"#020402","hover":"#020402","border":"#ffffff22","fg":"#b8ffca","muted":"#3f8f52","accent":"#1eff5a"},{"id":"monokai","family":"Monokai","type":"dark","surface":"#1e1f1c","hover":"#3e3d32","border":"#414339","fg":"#f8f8f2","muted":"#88846f","accent":"#75715E"},{"id":"night-owl","family":"Night Owl","type":"dark","surface":"#011627","hover":"#011627","border":"#5f7e97","fg":"#d6deeb","muted":"#637777","accent":"#7e57c2"},{"id":"nord","family":"Nord","type":"dark","surface":"#2e3440","hover":"#3b4252","border":"#3b4252","fg":"#d8dee9","muted":"#737f97","accent":"#88c0d0"},{"id":"notion-dark","family":"Notion","type":"dark","surface":"#151515","hover":"#151515","border":"#ffffff22","fg":"#d9d9d8","muted":"#6a9955","accent":"#3183d8"},{"id":"notion-light","family":"Notion","type":"light","surface":"#f7f6f3","hover":"#f7f6f3","border":"#00000022","fg":"#37352f","muted":"#008000","accent":"#3183d8"},{"id":"oscurange","family":"Oscurange","type":"dark","surface":"#0B0B0F","hover":"#0B0B0F","border":"#ffffff22","fg":"#E6E6E6","muted":"#5e5f66","accent":"#F9B98C"},{"id":"one-dark","family":"One","type":"dark","surface":"#21252b","hover":"#2c313a","border":"#3e4452","fg":"#abb2bf","muted":"#abb2bf","accent":"#70757f"},{"id":"one-light","family":"One","type":"light","surface":"#EAEAEB","hover":"#DBDBDC66","border":"#E5E5E6","fg":"#383A42","muted":"#8b8c93","accent":"#5871EF"},{"id":"proof-light","family":"Proof","type":"light","surface":"#efede6","hover":"#efede6","border":"#00000022","fg":"#2f312d","muted":"#8b877c","accent":"#3d755d"},{"id":"raycast-dark","family":"Raycast","type":"dark","surface":"#101010","hover":"#FFFFFF14","border":"#FFFFFF14","fg":"#FFFFFF","muted":"#666666","accent":"#ff6363"},{"id":"raycast-light","family":"Raycast","type":"light","surface":"#fcfcfc","hover":"#0000000f","border":"#00000014","fg":"#000000","muted":"#919191","accent":"#f25e5e"},{"id":"rose-pine-dark","family":"Rose Pine","type":"dark","surface":"#232136","hover":"#817c9c14","border":"#00000000","fg":"#e0def4","muted":"#6e6a86","accent":"#ea9a97"},{"id":"rose-pine-light","family":"Rose Pine","type":"light","surface":"#faf4ed","hover":"#6e6a860d","border":"#00000000","fg":"#575279","muted":"#8e899e","accent":"#c27571"},{"id":"sentry-dark","family":"Sentry","type":"dark","surface":"#26222d","hover":"#26222d","border":"#ffffff22","fg":"#e6dff9","muted":"#8d849f","accent":"#775ef6"},{"id":"solarized-dark","family":"Solarized","type":"dark","surface":"#00212B","hover":"#004454AA","border":"#2b2b4a","fg":"#839496","muted":"#5e747a","accent":"#2AA198"},{"id":"solarized-light","family":"Solarized","type":"light","surface":"#EEE8D5","hover":"#DFCA8844","border":"#DDD6C1","fg":"#5b6f76","muted":"#829294","accent":"#9b8d4e"},{"id":"tokyo-night","family":"Tokyo Night","type":"dark","surface":"#16161e","hover":"#13131a","border":"#101014","fg":"#a9b1d6","muted":"#5e668a","accent":"#506aaa"},{"id":"temple-dark","family":"Temple","type":"dark","surface":"#1d2d0f","hover":"#1d2d0f","border":"#ffffff22","fg":"#c7e6da","muted":"#4e645c","accent":"#e4f222"},{"id":"vercel-dark","family":"Vercel","type":"dark","surface":"#000000","hover":"#000000","border":"#ffffff22","fg":"#ededed","muted":"#666666","accent":"#006efe"},{"id":"vercel-light","family":"Vercel","type":"light","surface":"#ffffff","hover":"#ffffff","border":"#00000022","fg":"#171717","muted":"#666666","accent":"#006aff"},{"id":"vscode-dark","family":"VS Code Plus","type":"dark","surface":"#1E1E1E","hover":"#1E1E1E","border":"#ffffff22","fg":"#D4D4D4","muted":"#6A9955","accent":"#58a6ff"},{"id":"vscode-light","family":"VS Code Plus","type":"light","surface":"#FFFFFF","hover":"#E8E8E8","border":"#00000022","fg":"#000000","muted":"#008000","accent":"#0969da"},{"id":"xcode-dark","family":"Xcode","type":"dark","surface":"#1f1f24","hover":"#1f1f24","border":"#ffffff22","fg":"#ffffff","muted":"#6c7986","accent":"#5482ff"},{"id":"xcode-light","family":"Xcode","type":"light","surface":"#ffffff","hover":"#ffffff","border":"#00000022","fg":"#000000","muted":"#5d6c79","accent":"#0e0eff"}];
+  const THEME_FAMILIES=[...new Set(THEME_PRESETS.map(p=>p.family))].sort((a,b)=>a.localeCompare(b));
   function defaultPreferences(){return {
-    collapsed:false,compact:false,compactHeight:null,hideCollapsed:false,footerPosition:'top',showUpdateTime:true,showDetails:true,marginTop:6,marginBottom:6,
-    showAddCredits:true,showPlanTooltips:false,showRemainingPlan:true,showCreditBar:false,creditReference:null,creditReferencePending:false,
+    collapsed:false,compact:false,compactHeight:null,hideCollapsed:false,hideWithSidebar:true,footerPosition:'top',showUpdateTime:true,showDetails:true,marginTop:6,marginBottom:6,
+    showAddCredits:true,showPlanTooltips:false,showRemainingPlan:true,showCreditBar:false,showCreditBalance:true,creditReference:null,creditReferencePending:false,
     position:'bottom',sections:['plan','credits','features'],closed:{credits:true},
     hidden:{features:true},hiddenFeatures:{deep_research:true,file_upload:true,paste_text_to_file:true},
-    theme:'auto',floating:{x:24,y:100},size:{width:300,height:null},
+    theme:'auto',preset:'auto',accent:'auto',contrast:'auto',floating:{x:24,y:100},size:{width:300,height:null},
     settingsTab:'panel',settingsClosed:{appearance:false,status:true,placement:false,plan:false,credits:true,features:true}
   };}
   const state = {
@@ -21,7 +23,7 @@
   let lastRefresh = 0;
 
   // ---------- persistence ----------
-  const saveKeys = ["usage", "plan", "usageAt", "models", "collapsed", "position", "sections", "closed", "hidden", "theme", "floating", "size", "compact", "compactHeight", "hideCollapsed", "hiddenFeatures", "showAddCredits", "showPlanTooltips", "showRemainingPlan", "settingsClosed", "settingsTab", "footerPosition", "showUpdateTime", "showDetails", "marginTop", "marginBottom", "showCreditBar", "creditReference", "creditReferencePending"];
+  const saveKeys = ["usage", "plan", "usageAt", "models", "collapsed", "position", "sections", "closed", "hidden", "theme", "preset", "accent", "contrast", "floating", "size", "compact", "compactHeight", "hideCollapsed", "hideWithSidebar", "hiddenFeatures", "showAddCredits", "showPlanTooltips", "showRemainingPlan", "settingsClosed", "settingsTab", "footerPosition", "showUpdateTime", "showDetails", "marginTop", "marginBottom", "showCreditBar", "showCreditBalance", "creditReference", "creditReferencePending"];
   function persist() {
     const o = {};
     for (const k of saveKeys) o[k] = state[k];
@@ -42,7 +44,10 @@
     if (!state.floating || !Number.isFinite(state.floating.x) || !Number.isFinite(state.floating.y)) state.floating = {x:24,y:100};
     if (!state.size || !Number.isFinite(state.size.width)) state.size = {width:300,height:null};
     if (!Number.isFinite(state.size.height)) state.size.height = null;
-    if (!["auto", "light", "dark"].includes(state.theme)) state.theme = "auto";
+    if (!["auto", "system", "light", "dark"].includes(state.theme)) state.theme = "auto";
+    if(!['auto','chatgpt',...THEME_FAMILIES].includes(state.preset))state.preset='auto';
+    if(!['auto','default','blue','green','yellow','pink','orange','purple','neutral'].includes(state.accent))state.accent='auto';
+    if(!['auto','system','medium','increased'].includes(state.contrast))state.contrast='auto';
     if (!["top", "bottom", "floating"].includes(state.position)) state.position = "bottom";
   }
 
@@ -154,15 +159,16 @@
     :host { all:initial; display:block; box-sizing:border-box; padding:0; min-width:0; flex-shrink:0; color-scheme:light; }
     * { box-sizing:border-box; }
     [hidden] { display:none !important; }
-    .panel-layout { display:flow-root; min-width:0; padding-top:var(--gptu-margin-top,6px); padding-bottom:var(--gptu-margin-bottom,6px); }
+    .panel-layout { display:flow-root; min-width:0; padding:6px 0; }
     .card, .settings, .credits-modal, .dock-zone { --fg:#202123; --muted:#656565; --line:#e3e3e3; --surface:#f9f9f9; --hover:#ededed; --track:#e5e5e5; --ok:#087f65; --remaining:#2563eb; --warn:#966000; --bad:#c53240;
       color:var(--fg); background:var(--surface); font:13px/1.45 ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
       margin:0 8px; border:1px solid var(--line); border-radius:14px; overflow:hidden; text-align:left; display:flex; flex-direction:column; }
-    .card { position:relative; border-color:transparent; }
+    .card { position:relative; border-color:transparent; padding-top:var(--gptu-margin-top,6px); padding-bottom:var(--gptu-margin-bottom,6px); }
     .card:hover, .card:has(:focus-visible) { border-color:var(--line); }
     .resize { opacity:0; pointer-events:none; }
     .card:hover .resize, .card:has(:focus-visible) .resize { opacity:1; pointer-events:auto; }
     @media(hover:none) { .resize { opacity:1; pointer-events:auto; } }
+    :host([data-sidebar-hidden]) { display:none !important; }
     :host([data-bottom]) { position:relative; margin-top:0; width:auto; flex:0 0 auto; }
     :host([data-bottom]) .card { margin:0 8px; }
     .card.collapsed.hide-collapsed .usage-icon,.card.collapsed.hide-collapsed .title,.card.collapsed.hide-collapsed .badge,.card.collapsed.hide-collapsed .summary { opacity:0; pointer-events:none; }
@@ -197,8 +203,11 @@
     .credit-meter { margin-top:8px; }
     .credit-meter .rl { font-size:11px; }
     .credit-meter .v { font-size:11px; }
-    .credit-reference-controls input { width:94px; }
+    .credit-reference-controls [data-credit-reference] { width:94px; }
     .compact .credit-meter { margin-top:5px; }
+    .compact .credit-actions { display:flex; align-items:center; gap:10px; }
+    .compact .credit-actions .credit-meter { flex:1; min-width:0; }
+    .compact .credit-actions .add-credits { flex:none; align-self:center; margin-top:0; white-space:nowrap; }
     .credit-inline { color:var(--fg); font-size:12px; font-weight:600; font-variant-numeric:tabular-nums; }
     .section-toggle .chev { margin-left:auto; }
     .section-handle { width:22px; height:24px; cursor:grab; }
@@ -356,7 +365,7 @@
     <button class="usage-open" aria-label="Open usage overview" title="Open usage overview"><span class="usage-icon">${USAGE_ICON}</span><span class="title">Usage</span><span class="badge" hidden></span></button><button class="icon toggle collapse-panel" aria-expanded="true" aria-label="Collapse usage panel" title="Collapse usage panel">${icon('chevron')}</button>
     <button class="icon refresh" title="Refresh usage" aria-label="Refresh usage">${icon('refresh')}</button>
     <button class="icon customize" title="Customize panel" aria-label="Customize panel" aria-expanded="false">${icon('settings')}</button></div>
-    <div class="summary" hidden></div><div class="body"></div><button class="resize" aria-label="Resize panel" title="Drag to resize · Arrow keys to resize · Double-click to reset size"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m5 13 8-8m-3 8 3-3"/></svg></button><div class="live" aria-live="polite"></div></div></div><div class="settings" popover="auto" role="dialog" aria-label="Usage settings"></div><dialog class="credits-modal" aria-labelledby="gptu-page-heading"><div class="credits-header"><h2 id="gptu-page-heading">Add credits</h2><a class="credit-external" target="_blank" rel="noopener noreferrer">Open in tab</a><button class="icon credits-close" aria-label="Close credits">✕</button></div><p class="credits-status" role="status">Loading credits…</p><iframe class="credits-frame" title="ChatGPT credits purchase" allow="payment" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads"></iframe></dialog><div class="dock-targets" hidden aria-hidden="true"><div class="dock-zone" data-dock="top">Dock at top</div><div class="dock-zone" data-dock="bottom">Dock at bottom</div></div>`;
+    <div class="summary" hidden></div><div class="body"></div><button class="resize" aria-label="Resize panel" title="Drag to resize · Arrow keys to resize · Double-click to reset size"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m5 13 8-8m-3 8 3-3"/></svg></button><div class="live" aria-live="polite"></div></div></div><div class="settings" popover="auto" role="dialog" aria-label="Usage settings"></div><dialog class="credits-modal" aria-labelledby="gptu-page-heading"><div class="credits-header"><h2 id="gptu-page-heading">Add credits</h2><a class="credit-external" target="_blank" rel="noopener noreferrer">Open in tab</a><button class="icon credits-close" aria-label="Close credits">✕</button></div><p class="credits-status" role="status">Loading credits…</p><template class="credits-frame-template"><iframe class="credits-frame" title="ChatGPT credits purchase" allow="payment" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads"></iframe></template></dialog><div class="dock-targets" hidden aria-hidden="true"><div class="dock-zone" data-dock="top">Dock at top</div><div class="dock-zone" data-dock="bottom">Dock at bottom</div></div>`;
   const $=s=>root.querySelector(s), card=$('.card');
   let busyTimer, settingsOpen=false, drag=null, resizing=null, sectionDrag=null;
   const ui={ setBusy(b) { card.classList.toggle('busy',b); $('.refresh').disabled=b; $('.refresh').setAttribute('aria-busy',String(b)); clearTimeout(busyTimer); if(b) busyTimer=setTimeout(()=>{ui.setBusy(false); state.error='Refresh timed out. Try again.'; render();},20000); } };
@@ -388,13 +397,15 @@
   let creditReturnFocus=null,creditReturnPath='',creditWatch=null,creditLoadTimeout=null;
   function openCreditDialog(link){openPageDialog(creditPurchaseUrl(),'Add credits',link,true);}
   function openPageDialog(url,title,returnFocus,closeOnReturn=false){
-    const dialog=$('.credits-modal'),frame=$('.credits-frame');
+    const dialog=$('.credits-modal');
     if(dialog.open){$('.credits-close').focus();return;}
     if(settingsOpen)closeSettings();
+    const frame=$('.credits-frame-template').content.firstElementChild.cloneNode(true);
+    frame.addEventListener('load',()=>creditFrameLoaded(frame));
     creditReturnFocus=returnFocus;creditReturnPath=location.pathname+location.search+location.hash;
     $('#gptu-page-heading').textContent=title;frame.title=title==='Add credits'?'ChatGPT credits purchase':'ChatGPT usage overview';
     $('.credit-external').href=url;$('.credits-status').textContent='Loading…';$('.credits-status').hidden=false;
-    frame.src=url;dialog.showModal();$('.credits-close').focus();
+    frame.src=url;dialog.appendChild(frame);dialog.showModal();$('.credits-close').focus();
     creditLoadTimeout=setTimeout(()=>{if(dialog.open){$('.credits-status').textContent='If the page stays blank, choose Open in tab.';$('.credits-status').hidden=false;}},12000);
     if(closeOnReturn)creditWatch=setInterval(()=>{
       try{const destination=new URL(frame.contentWindow.location.href);if(destination.origin===location.origin&&destination.pathname+destination.search+destination.hash===creditReturnPath){dialog.close();requestRefresh(false);}}catch(_){}
@@ -404,22 +415,67 @@
   $('.credits-close').onclick=()=>$('.credits-modal').close();
   $('.credits-modal').addEventListener('close',()=>{
     clearInterval(creditWatch);clearTimeout(creditLoadTimeout);creditWatch=null;
-    $('.credits-frame').removeAttribute('src');
+    $('.credits-frame')?.remove();
     const target=creditReturnFocus?.isConnected?creditReturnFocus:$('.add-credits');target?.focus();creditReturnFocus=null;
   });
   $('.credits-modal').addEventListener('click',event=>{
     if(event.target!==$('.credits-modal'))return;
     const r=event.target.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)event.target.close();
   });
-  $('.credits-frame').addEventListener('load',()=>{
-    if(!$('.credits-modal').open)return;
+  function prepareEmbeddedPage(frame){
+    try{
+      const doc=frame.contentDocument;if(!doc?.head||doc.getElementById('gptu-embedded-page-style'))return;
+      const style=doc.createElement('style');style.id='gptu-embedded-page-style';
+      style.textContent=`
+        .app-shell-left-panel, #stage-slideover-sidebar, [data-testid="sidebar"],
+        aside:has(#app-shell-sidebar), #app-shell-sidebar,
+        [data-testid="open-sidebar-button"], [data-testid="close-sidebar-button"],
+        button[aria-label="Open sidebar"], button[aria-label="Close sidebar"], button[aria-label="Show sidebar"] { display:none !important; }
+      `;
+      doc.head.appendChild(style);
+    }catch(_){}
+  }
+  function creditFrameLoaded(frame){
+    if(!$('.credits-modal').open||frame!==$('.credits-frame'))return;
+    prepareEmbeddedPage(frame);
     clearTimeout(creditLoadTimeout);$('.credits-status').hidden=true;
-    try{$('.credits-frame').contentDocument?.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();$('.credits-modal').close();}});}catch(_){}
-  });
+    try{frame.contentDocument?.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();$('.credits-modal').close();}});}catch(_){}
+  }
+  const accentNames={auto:'Match theme',default:'Default',blue:'Blue',green:'Green',yellow:'Yellow',pink:'Pink',orange:'Orange',purple:'Purple',neutral:'Black / White'};
+  const themeProbe=document.createElement('span');themeProbe.hidden=true;root.appendChild(themeProbe);
   function applyTheme() {
-    const html=document.documentElement;
-    const dark=state.theme==='dark'||state.theme==='auto'&&(html.classList.contains('dark')||html.dataset.theme==='dark'||(!html.classList.contains('light')&&html.dataset.theme!=='light'&&(getComputedStyle(html).colorScheme==='dark'||getComputedStyle(html).colorScheme!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches)));
+    const html=document.documentElement,body=document.body,nav=findSidebarNav();
+    const htmlStyle=getComputedStyle(html),bodyStyle=getComputedStyle(body),appStyle=getComputedStyle(document.getElementById('root')||body),navStyle=nav?getComputedStyle(nav):appStyle;
+    const systemDark=matchMedia('(prefers-color-scheme: dark)').matches;
+    let dark=state.theme==='dark'||state.theme==='system'&&systemDark||state.theme==='auto'&&(html.classList.contains('dark')||html.dataset.theme==='dark'||(!html.classList.contains('light')&&html.dataset.theme!=='light'&&(htmlStyle.colorScheme==='dark'||htmlStyle.colorScheme!=='light'&&systemDark)));
+    const variants=THEME_PRESETS.filter(p=>p.family===state.preset),preset=variants.find(p=>p.type===(dark?'dark':'light'))||variants[0];
+    if(preset)dark=preset.type==='dark';
     host.toggleAttribute('data-dark',dark);
+    const resolve=value=>{if(!value)return null;if(!globalThis.CSS.supports('color',value)){value=value.includes('%')?`hsl(${value})`:`rgb(${value})`;if(!globalThis.CSS.supports('color',value))return null;}themeProbe.style.color=value;const color=getComputedStyle(themeProbe).color;return color==='transparent'||color==='rgba(0, 0, 0, 0)'?null:color;};
+    const nativeColor=(names,fallback)=>{for(const name of names){const value=navStyle.getPropertyValue(name).trim()||appStyle.getPropertyValue(name).trim()||bodyStyle.getPropertyValue(name).trim()||htmlStyle.getPropertyValue(name).trim();const color=resolve(value);if(color)return color;}return fallback;};
+    const palette={default:dark?'#60a5fa':'#2563eb',blue:dark?'#60a5fa':'#2563eb',green:dark?'#4ade80':'#15803d',yellow:dark?'#facc15':'#a16207',pink:dark?'#f472b6':'#be185d',orange:dark?'#fb923c':'#c2410c',purple:dark?'#c084fc':'#7e22ce',neutral:dark?'#ececec':'#202123'};
+    const nativeAccent=(html.dataset.accentColor||body.dataset.accentColor||html.dataset.accent||body.dataset.accent||'').toLowerCase();
+    const accent=state.accent==='auto'?(preset?preset.accent:state.preset==='chatgpt'?palette.default:nativeColor(['--color-accent','--theme-accent','--accent','--accent-color','--codex-accent','--interactive-bg-accent-default','--bg-accent','--text-accent','--accent-primary','--theme-user-selection-bg'],palette[nativeAccent]||(nativeAccent==='black'||nativeAccent==='white'?palette.neutral:palette.default))):palette[state.accent];
+    const colors={'--remaining':accent,'--ok':accent};
+    if(state.preset==='auto'&&state.theme==='auto'){
+      if(nav){
+        colors['--fg']=getComputedStyle(nav).color;
+        for(let el=nav;el;el=el.parentElement){const bg=getComputedStyle(el).backgroundColor;if(bg!=='transparent'&&bg!=='rgba(0, 0, 0, 0)'){colors['--surface']=bg;break;}}
+      }
+      colors['--muted']=nativeColor(['--color-text-secondary','--muted-foreground','--text-secondary','--text-tertiary'],`color-mix(in srgb, ${colors['--fg']|| (dark?'#ececec':'#202123')} 70%, ${colors['--surface']|| (dark?'#000000':'#f9f9f9')})`);
+      colors['--line']=nativeColor(['--color-border','--border','--border-default','--border-light'],`color-mix(in srgb, ${colors['--fg']|| (dark?'#ececec':'#202123')} 18%, ${colors['--surface']|| (dark?'#000000':'#f9f9f9')})`);
+      colors['--hover']=nativeColor(['--color-surface-hover','--sidebar-surface-secondary','--bg-hover'],`color-mix(in srgb, ${colors['--fg']|| (dark?'#ececec':'#202123')} 8%, ${colors['--surface']|| (dark?'#000000':'#f9f9f9')})`);
+    }
+    if(colors['--surface'])colors['--track']=`color-mix(in srgb, ${colors['--fg']|| (dark?'#ececec':'#202123')} 15%, ${colors['--surface']})`;
+    if(preset)Object.assign(colors,{'--surface':preset.surface,'--fg':preset.fg,'--muted':preset.muted,'--line':preset.border,'--hover':preset.hover,'--track':`color-mix(in srgb, ${preset.fg} 15%, ${preset.surface})`});
+    const nativeContrast=(html.dataset.contrast||body.dataset.contrast||html.dataset.colorContrast||body.dataset.colorContrast||'system').toLowerCase();
+    const increased=state.contrast==='increased'||(state.contrast==='system'||state.contrast==='auto'&&nativeContrast==='system')&&matchMedia('(prefers-contrast: more)').matches||state.contrast==='auto'&&['increased','high','more'].includes(nativeContrast);
+    if(increased)Object.assign(colors,{'--fg':dark?'#ffffff':'#000000','--muted':dark?'#d4d4d4':'#424242','--line':dark?'#858585':'#727272','--track':dark?'#454545':'#d4d4d4'});
+    host.toggleAttribute('data-increased-contrast',increased);
+    for(const el of root.querySelectorAll('.card,.settings,.credits-modal,.dock-zone'))for(const key of ['--remaining','--ok','--fg','--surface','--muted','--line','--hover','--track']){
+      const value=colors[key]||'';
+      if(value){if(el.style.getPropertyValue(key)!==value)el.style.setProperty(key,value);}else if(el.style.getPropertyValue(key))el.style.removeProperty(key);
+    }
   }
   function renderSettings() {
     $('.customize').setAttribute('aria-expanded',String(settingsOpen));
@@ -429,13 +485,13 @@
     const tabs=['panel','modules'].map(key=>`<button class="settings-tab" role="tab" id="gptu-tab-${key}" aria-controls="gptu-settings-${key}" aria-selected="${state.settingsTab===key}" tabindex="${state.settingsTab===key?0:-1}" data-settings-tab="${key}">${key==='panel'?'Panel':'Modules'}</button>`).join('');
     $('.settings').innerHTML=`<div class="settings-header"><div class="settings-title"><span>Usage settings</span><button class="icon close-settings" aria-label="Close settings">✕</button></div><div class="settings-tabs" role="tablist" aria-label="Settings categories">${tabs}</div></div><div class="settings-body">
       <div class="settings-panel" role="tabpanel" id="gptu-settings-panel" aria-labelledby="gptu-tab-panel" ${state.settingsTab==='panel'?'':'hidden'}>${
-        group('appearance','Appearance',`<div class="setting"><span>Theme</span><select aria-label="Appearance" data-setting="theme">${['auto','light','dark'].map(k=>`<option value="${k}" ${state.theme===k?'selected':''}>${k==='auto'?'Match ChatGPT':k==='light'?'Light':'Dark'}</option>`).join('')}</select></div>${toggle('Compact mode','data-compact',state.compact)}`)+
+        group('appearance','Appearance',`<div class="setting"><span>Theme preset</span><select aria-label="Theme preset" data-setting="preset"><option value="auto" ${state.preset==='auto'?'selected':''}>Match ChatGPT</option><option value="chatgpt" ${state.preset==='chatgpt'?'selected':''}>ChatGPT</option>${THEME_FAMILIES.map(name=>`<option value="${esc(name)}" ${state.preset===name?'selected':''}>${esc(name)}</option>`).join('')}</select></div><div class="setting"><span>Mode</span><select aria-label="Appearance" data-setting="theme">${['auto','system','light','dark'].map(k=>`<option value="${k}" ${state.theme===k?'selected':''}>${k==='auto'?'Match ChatGPT':k==='system'?'System':k==='light'?'Light':'Dark'}</option>`).join('')}</select></div><div class="setting"><span>Accent color</span><select aria-label="Accent color" data-setting="accent">${Object.entries(accentNames).map(([key,label])=>`<option value="${key}" ${state.accent===key?'selected':''}>${label}</option>`).join('')}</select></div><div class="setting"><span>Contrast</span><select aria-label="Contrast" data-setting="contrast">${['auto','system','medium','increased'].map(key=>`<option value="${key}" ${state.contrast===key?'selected':''}>${key==='auto'?'Match ChatGPT':key[0].toUpperCase()+key.slice(1)}</option>`).join('')}</select></div><div class="note">Match ChatGPT follows the active page palette, including custom colors. Presets use available light/dark variants; some have only one mode.</div>${toggle('Compact mode','data-compact',state.compact)}`)+
         group('status','Status & details',`${toggle('Show update time','data-show-update',state.showUpdateTime)}${toggle('Show Details button','data-show-details',state.showDetails)}${toggle('Update time and Details at top','data-footer-top',state.footerPosition==='top')}`)+
-        group('placement','Placement & visibility',`<div class="setting"><span>Placement</span><select aria-label="Placement" data-setting="position">${['top','bottom','floating'].map(k=>`<option value="${k}" ${state.position===k?'selected':''}>${k==='top'?'Sidebar top':k==='bottom'?'Sidebar bottom':'Floating'}</option>`).join('')}</select></div>${toggle('Hide collapsed Usage until hover','data-hide-collapsed',state.hideCollapsed)}<label class="setting"><span>Top margin</span><span class="margin-input"><input type="number" aria-label="Top margin" min="0" max="120" step="1" data-margin="marginTop" value="${state.marginTop}">px</span></label><label class="setting"><span>Bottom margin</span><span class="margin-input"><input type="number" aria-label="Bottom margin" min="0" max="120" step="1" data-margin="marginBottom" value="${state.marginBottom}">px</span></label>`)
+        group('placement','Placement & visibility',`<div class="setting"><span>Placement</span><select aria-label="Placement" data-setting="position">${['top','bottom','floating'].map(k=>`<option value="${k}" ${state.position===k?'selected':''}>${k==='top'?'Sidebar top':k==='bottom'?'Sidebar bottom':'Floating'}</option>`).join('')}</select></div>${toggle('Hide docked panel with sidebar','data-hide-with-sidebar',state.hideWithSidebar)}${toggle('Hide collapsed Usage until hover','data-hide-collapsed',state.hideCollapsed)}<label class="setting"><span>Top margin</span><span class="margin-input"><input type="number" aria-label="Top margin" min="0" max="120" step="1" data-margin="marginTop" value="${state.marginTop}">px</span></label><label class="setting"><span>Bottom margin</span><span class="margin-input"><input type="number" aria-label="Bottom margin" min="0" max="120" step="1" data-margin="marginBottom" value="${state.marginBottom}">px</span></label><div class="note">Space inside the frame, above the Usage header and below the last content.</div>`)
       }</div>
       <div class="settings-panel" role="tabpanel" id="gptu-settings-modules" aria-labelledby="gptu-tab-modules" ${state.settingsTab==='modules'?'':'hidden'}>${
         group('plan','Plan limits',`${moduleToggle('plan')}<div class="module-hint">Choose how the allowance is displayed.</div>${toggle('Show remaining plan allowance','data-remaining-plan',state.showRemainingPlan)}${toggle('Plan limit tooltips','data-plan-tooltips',state.showPlanTooltips)}`)+
-        group('credits','Credits',`${moduleToggle('credits')}${toggle('Show credit balance bar','data-credit-bar',state.showCreditBar)}<div class="credit-reference-controls" ${state.showCreditBar?'':'hidden'}><label class="setting"><span>Full balance</span><span class="margin-input"><input type="number" aria-label="Full credit balance" min="0.01" step="any" data-credit-reference value="${state.creditReference??''}" placeholder="e.g. 1000">credits</span></label><div class="note">This amount counts as 100%. Initially uses your balance when enabled; you can change it.</div></div>${toggle('Add credits button','data-add-credits',state.showAddCredits)}`)+
+        group('credits','Credits',`${moduleToggle('credits')}${toggle('Show credit balance bar','data-credit-bar',state.showCreditBar)}<div class="credit-reference-controls" ${state.showCreditBar?'':'hidden'}>${toggle('Show available balance','data-credit-balance',state.showCreditBalance)}<label class="setting"><span>Full balance</span><span class="margin-input"><input type="number" aria-label="Full credit balance" min="0.01" step="any" data-credit-reference value="${state.creditReference??''}" placeholder="e.g. 1000">credits</span></label><div class="note">This amount counts as 100%. Initially uses your balance when enabled; you can change it.</div></div>${toggle('Add credits button','data-add-credits',state.showAddCredits)}`)+
         group('features','Models & features',`${moduleToggle('features')}<div class="feature-settings"><div class="feature-settings-title">Individual counters</div><div class="feature-options" role="group" aria-label="Models & features to show"></div><div class="note">Selections are kept when the whole module is hidden. Counters appear when ChatGPT reports them.</div></div>`)
       }</div>
     </div><div class="settings-help"><details><summary>Keyboard & dragging</summary><div class="note">Drag the panel handle to float. Use section handles to reorder, or focus one and press ↑ / ↓.</div></details><button class="text-btn reset">Reset settings</button></div>`;
@@ -488,7 +544,9 @@
       }else if(balance!=null)creditMeter='<div class="sub credit-meter">Set a full balance in settings to show a percentage.</div>';
       else if(parsed.credits!=='Unlimited')creditMeter='<div class="sub credit-meter">Balance unavailable.</div>';
     }
-    blocks.credits=`<div class="credit">${esc(creditText)}</div><div class="sub">${parsed.credits==null?'No credit balance reported':'Available balance'}</div>${creditMeter}${state.showAddCredits?'<a class="add-credits" href="'+esc(creditPurchaseUrl())+'" target="_blank" rel="noopener noreferrer"><svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M3 8h10"/></svg>Add credits</a>':''}`;
+    const creditBalance=!state.showCreditBar||state.showCreditBalance?`<div class="credit-balance"><div class="credit">${esc(creditText)}</div><div class="sub">${parsed.credits==null?'No credit balance reported':'Available balance'}</div></div>`:'';
+    const addCredits=state.showAddCredits?'<a class="add-credits" href="'+esc(creditPurchaseUrl())+'" target="_blank" rel="noopener noreferrer"><svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M3 8h10"/></svg>Add credits</a>':'';
+    blocks.credits=creditBalance+(state.showCreditBar?`<div class="credit-actions">${creditMeter}${addCredits}</div>`:addCredits);
     const models=Object.entries(state.models).filter(([name])=>state.hiddenFeatures[name]!==true).sort((a,b)=>(b[1].seenAt||0)-(a[1].seenAt||0)).slice(0,12);
     blocks.features=models.map(([name,m])=>{
       const expired=m.resetsAt&&m.resetsAt<=Date.now();
@@ -543,7 +601,7 @@
   function syncCreditBarSettings(){
     const controls=$('.credit-reference-controls');if(!controls)return;
     controls.hidden=!state.showCreditBar;
-    const input=controls.querySelector('input');if(root.activeElement!==input)input.value=state.creditReference??'';
+    const input=controls.querySelector('[data-credit-reference]');if(root.activeElement!==input)input.value=state.creditReference??'';
   }
   function changeCreditReference(event){
     if(!event.target.hasAttribute?.('data-credit-reference'))return;
@@ -561,6 +619,7 @@
   root.addEventListener('change',changeMargin);
   root.addEventListener('change',e=>{
     if(e.target.hasAttribute('data-credit-reference'))changeCreditReference(e);
+    if(e.target.hasAttribute('data-credit-balance')){state.showCreditBalance=e.target.checked;persist();render();positionSettings();}
     if(e.target.hasAttribute('data-credit-bar')){
       state.showCreditBar=e.target.checked;
       if(state.showCreditBar&&!state.creditReference){const balance=num(parseUsage(state.usage).credits);if(balance>0){state.creditReference=Number(balance.toFixed(2))||balance;state.creditReferencePending=false;}else state.creditReferencePending=true;}
@@ -573,6 +632,7 @@
     if(e.target.hasAttribute('data-add-credits')){state.showAddCredits=e.target.checked;persist();render();positionSettings();}
     if(e.target.hasAttribute('data-plan-tooltips')){state.showPlanTooltips=e.target.checked;persist();render();positionSettings();}
     if(e.target.hasAttribute('data-feature')){state.hiddenFeatures={...state.hiddenFeatures,[e.target.dataset.feature]:!e.target.checked};persist();render();positionSettings();}
+    if(e.target.hasAttribute('data-hide-with-sidebar')){state.hideWithSidebar=e.target.checked;persist();render();place(true);positionSettings();}
     if(e.target.hasAttribute('data-hide-collapsed')){state.hideCollapsed=e.target.checked;persist();render();positionSettings();}
     if(e.target.hasAttribute('data-compact')){state.compact=e.target.checked;persist();render();place(true);positionSettings();}
     if(e.target.dataset.setting){const placement=e.target.dataset.setting==='position';state[e.target.dataset.setting]=e.target.value;if(placement)closeSettings(true);persist();render();place(true);positionSettings();}
@@ -586,7 +646,7 @@
   root.addEventListener('keydown',e=>{const k=e.target.dataset.handle;if(!k||!['ArrowUp','ArrowDown'].includes(e.key))return;e.preventDefault();const visible=state.sections.filter(x=>!state.hidden[x]), i=visible.indexOf(k)+(e.key==='ArrowUp'?-1:1);if(visible[i]){reorder(k,visible[i]);root.querySelector(`[data-handle="${k}"]`).focus();}});
   function setPanelHeight(height){if(state.compact)state.compactHeight=height;else state.size.height=height;}
   function applySize() {
-    for(const key of ['marginTop','marginBottom']){const property=key==='marginTop'?'--gptu-margin-top':'--gptu-margin-bottom',value=state[key]+'px';if(host.style.getPropertyValue(property)!==value)host.style.setProperty(property,value);}
+    for(const key of ['marginTop','marginBottom']){const property=key==='marginTop'?'--gptu-margin-top':'--gptu-margin-bottom',value=state[key]+'px';if(card.style.getPropertyValue(property)!==value)card.style.setProperty(property,value);}
     const floating=host.hasAttribute('data-floating');
     if(floating)host.style.width=Math.max(Math.min(240,innerWidth-16),Math.min(state.size.width,innerWidth-16))+'px';else host.style.width='';
     const requestedHeight=state.compact?state.compactHeight:state.size.height;
@@ -618,7 +678,7 @@
     if(['ArrowUp','ArrowDown'].includes(e.key))setPanelHeight(Math.max(140,Math.min(r.height+(e.key==='ArrowDown'?step:-step),host.hasAttribute('data-bottom')?r.bottom-8:innerHeight-r.top-8)));
     applySize();persist();
   });
-  function clampFloat(){const rect=host.getBoundingClientRect();state.floating.x=Math.max(8,Math.min(state.floating.x,innerWidth-rect.width-8));state.floating.y=Math.max(8,Math.min(state.floating.y,innerHeight-Math.min(rect.height,innerHeight-16)-8));host.style.left=state.floating.x+'px';host.style.top=state.floating.y+'px';card.style.maxHeight='calc(100dvh - 16px - var(--gptu-margin-top,6px) - var(--gptu-margin-bottom,6px))';}
+  function clampFloat(){const rect=host.getBoundingClientRect();state.floating.x=Math.max(8,Math.min(state.floating.x,innerWidth-rect.width-8));state.floating.y=Math.max(8,Math.min(state.floating.y,innerHeight-Math.min(rect.height,innerHeight-16)-8));host.style.left=state.floating.x+'px';host.style.top=state.floating.y+'px';card.style.maxHeight='calc(100dvh - 28px)';}
   $('.grab').addEventListener('pointerdown',e=>{if(e.button!==0)return;const r=host.getBoundingClientRect();drag={x:e.clientX,y:e.clientY,left:r.left,top:r.top,started:false};$('.grab').setPointerCapture(e.pointerId);e.preventDefault();});
   function updateDockTargets(event){
     const nav=findSidebarNav();
@@ -747,7 +807,7 @@
     const margin=reserve?reserve+'px':'';
     if(host.style.marginBottom!==margin)host.style.marginBottom=margin;
     if(observedFooter!==before){footerResizeObserver.disconnect();if(before)footerResizeObserver.observe(before);observedFooter=before;}
-    const available=Math.max(80,Math.min(innerHeight,r.height||innerHeight)-(reserve||(footer?.height||0))-100-state.marginTop-state.marginBottom);
+    const available=Math.max(80,Math.min(innerHeight,r.height||innerHeight)-(reserve||(footer?.height||0))-112);
     card.style.maxHeight=Math.min(available,innerHeight*.6)+'px';
   }
 
@@ -758,7 +818,14 @@
     if(host.style.getPropertyValue('--gptu-title-size')!==size)host.style.setProperty('--gptu-title-size',size);
   }
   function place(force){
-    const nav=findSidebarNav(), floating=state.position==='floating'||!nav, bottom=!floating&&state.position==='bottom';
+    const nav=findSidebarNav(), hidden=state.position!=='floating'&&!nav&&state.hideWithSidebar;
+    host.toggleAttribute('data-sidebar-hidden',hidden);
+    if(hidden){
+      if(settingsOpen)closeSettings();
+      if($('.credits-modal').open)$('.credits-modal').close();
+      host.removeAttribute('data-floating');applySize();return;
+    }
+    const floating=state.position==='floating'||!nav, bottom=!floating&&state.position==='bottom';
     if(nav)syncHeading(nav);
     if(nav&&observedSidebar!==nav){sidebarResizeObserver.disconnect();sidebarResizeObserver.observe(nav);const {container}=bottomTarget(nav);if(container!==nav)sidebarResizeObserver.observe(container);sidebarAttributes.disconnect();sidebarAttributes.observe(container,{attributes:true,subtree:true,attributeFilter:['class','style','hidden','aria-hidden','inert']});observedSidebar=nav;}
     host.toggleAttribute('data-floating',floating);host.toggleAttribute('data-bottom',bottom);
@@ -776,7 +843,7 @@
     positionSettings();
   }
   let bottomFrame=0;
-  function queueBottom(){if(state.position==='bottom'&&!bottomFrame)bottomFrame=requestAnimationFrame(()=>{bottomFrame=0;place(false);});}
+  function queueBottom(){if(state.position!=='floating'&&!bottomFrame)bottomFrame=requestAnimationFrame(()=>{bottomFrame=0;place(false);});}
   document.addEventListener('scroll',queueBottom,true);
   let observedSidebar=null,observedFooter=null;
   const footerResizeObserver=new ResizeObserver(queueBottom);
@@ -784,6 +851,7 @@
   const sidebarAttributes=new MutationObserver(records=>{if(records.some(r=>r.target!==host&&!host.contains(r.target)))queueBottom();});
   const panelResizeObserver=new ResizeObserver(queueBottom);panelResizeObserver.observe(card);
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyTheme);
+  matchMedia('(prefers-contrast: more)').addEventListener('change',applyTheme);
 
   let placeQueued = false;
   const mo = new MutationObserver(() => {
@@ -806,6 +874,10 @@
     setInterval(() => { if (document.visibilityState === "visible") requestRefresh(false); }, AUTO_REFRESH_MS);
     setInterval(render, 30 * 1000);
     document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") requestRefresh(false); });
-    new MutationObserver(render).observe(document.documentElement, { attributes: true, attributeFilter: ["class", "style", "data-theme"] });
+    const themeObserver=new MutationObserver(applyTheme);
+    themeObserver.observe(document.documentElement,{attributes:true});
+    themeObserver.observe(document.body,{attributes:true});
+    const appRoot=document.getElementById('root');if(appRoot)themeObserver.observe(appRoot,{attributes:true});
+    themeObserver.observe(document.head,{childList:true,subtree:true,characterData:true});
   });
 })();
