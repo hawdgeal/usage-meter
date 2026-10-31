@@ -1,4 +1,43 @@
-# ChatGPT Usage Meter
+# Usage Meter for ChatGPT & Claude
+
+One browser extension that adds a **Usage** card to the left sidebar of **ChatGPT** (chatgpt.com) and **Claude** (claude.ai, including Claude Code on the web). Each site keeps its own settings, and the **Sync** tab copies settings between them in either direction.
+
+## What's new in 0.4.0
+
+- **Claude support.** Shows plan limits (5-hour, weekly and per-model weekly), **Extra usage** (amount left of your monthly limit) and your plan (Free, Pro, Max 5x/20x, Team, Enterprise). Data comes from claude.ai's own usage endpoint, using your existing login.
+- **Settings → Sync.** Choose groups (Layout, Modules, Theme, Bars, Spacing), then **Apply these settings to (other site)** or **Apply (other site) settings here**. Open tabs of the other site update right away. Copying here can be undone with Undo in the title bar; copying to the other site shows its own **Undo** link. These are never copied: banked/paid reset buttons, the full credit balance / fallback limit (different units), individual feature counters, and the settings window itself. The site-colored theme preset ("ChatGPT" / "Claude") maps to the other site's equivalent.
+- **Import settings…** sits next to Export settings. It accepts files from this version and files exported by ChatGPT Usage Meter 0.3.34. A file from the same site restores everything, including site-specific choices. A file from the other site applies the shared groups only. Import can be undone.
+- **Exports** now record which site they came from (`"format": "usage-meter-settings"`, `"site": "chatgpt"` or `"claude"`) and are named `ChatGPT-Usage-Meter-settings-YYYY-MM-DD.json` or `Claude-Usage-Meter-settings-YYYY-MM-DD.json`.
+- **Toolbar icon** is green on ChatGPT tabs and orange on Claude tabs. Elsewhere it shows the split icon.
+- **Menus no longer hide the panel.** Right-click and other menus mark the rest of the page as hidden to screen readers, and the panel used to take that as "sidebar closed". It now keeps its sidebar while the sidebar stays on screen.
+
+## Claude specifics
+
+- Usage settings open inside the panel's dialog showing only the usage content. Claude's own Settings window and sidebars are hidden there. If that page changes and the content can't be isolated, the full page shows after a few seconds. **Open in tab** always works.
+- **Credits** is called **Extra usage**. Its bar uses Claude's reported monthly limit as 100%. **Fallback limit** is used only when Claude reports none.
+- **Match Claude** reads Claude's page colors, so bars default to Claude's orange.
+- On pages without a sidebar (for example full-width Claude Code pages), the panel floats instead of hiding.
+- Defaults differ slightly from ChatGPT: update time in the header after Refresh, and the extra usage bar on.
+- **Details** shows Claude's raw response (`claude`) next to the converted data (`usage`), which helps if Anthropic changes the endpoint.
+
+## Install or upgrade
+
+- **Chrome / Edge / Brave / Arc / Opera.** To keep your ChatGPT settings, replace the files in your existing `chatgpt-usage-meter` folder with these, then click **Reload** on `chrome://extensions`. Chrome ties stored settings to the folder you loaded. A new install: turn on Developer mode, then **Load unpacked** and pick the `usage-meter` folder. You can also import an earlier export.
+- **Firefox 128+.** `about:debugging#/runtime/this-firefox` → **Load Temporary Add-on…** → `manifest.json`. The same folder works in Chrome and Firefox. Chrome shows a harmless warning about `background.scripts`, a line only Firefox uses. The add-on ID is unchanged (`chatgpt-usage-meter@alencar.fr`). In `about:addons` → Permissions, allow chatgpt.com and claude.ai.
+- If you installed the separate Claude Usage Meter, remove it so two panels don't appear on claude.ai.
+
+## Files
+
+| File | Role |
+| --- | --- |
+| `page-hook-chatgpt.js` | ChatGPT data: session token, `/backend-api/wham/usage`, resets, passive limit scan. |
+| `page-hook-claude.js` | Claude data: organization, `/api/organizations/{org}/usage`, converted to the same shape; refreshes after each reply. |
+| `content.js` | The panel for both sites (picks the site from the hostname), settings, Sync, Export/Import. |
+| `background.js` | Sets the per-site toolbar icon. |
+
+Privacy: the extension only contacts chatgpt.com and claude.ai, using your existing login. Settings and the last usage snapshot stay in the extension's local storage.
+
+## ChatGPT feature notes (from 0.3.34)
 
 A browser extension that adds a **Usage** card to ChatGPT's left sidebar, showing:
 
@@ -6,7 +45,7 @@ A browser extension that adds a **Usage** card to ChatGPT's left sidebar, showin
 - **Credits** — your pay-as-you-go usage-credit balance, or "Unlimited".
 - **Model & feature limits** — remaining messages/uses per model or feature (Deep Research, image generation…), captured whenever ChatGPT reports them.
 
-## Panel controls (0.3.34)
+### Panel controls
 
 - The settings window has a lower-right resize handle. Its size is saved separately from the Usage panel; resizing fixes its current position. Double-click the handle or press Home while it is focused to restore automatic sizing.
 

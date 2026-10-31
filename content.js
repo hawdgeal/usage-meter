@@ -1,17 +1,25 @@
-// Isolated-world content script: draws the usage card inside ChatGPT's left sidebar.
+// Isolated-world content script: draws the usage card inside the left sidebar of ChatGPT or Claude.
 (() => {
   const TAG_IN = "gptu-hook";
   const TAG_OUT = "gptu-ui";
   const AUTO_REFRESH_MS = 2 * 60 * 1000;
   const MIN_GAP_MS = 15 * 1000;
   const store = (globalThis.browser && browser.storage) || chrome.storage;
+  // One extension, two sites. Each site keeps its own settings under its own storage key.
+  const SITES={
+    chatgpt:{id:'chatgpt',name:'ChatGPT',key:'gptu',preset:'chatgpt',usagePath:'/settings/usage?tab=overview'},
+    claude:{id:'claude',name:'Claude',key:'gptu-claude',preset:'claude',usagePath:'/settings/usage'}
+  };
+  const IS_CLAUDE=location.hostname==='claude.ai'||location.hostname.endsWith('.claude.ai');
+  const SITE=IS_CLAUDE?SITES.claude:SITES.chatgpt,OTHER=IS_CLAUDE?SITES.chatgpt:SITES.claude;
+  const T=(chatgpt,claude)=>IS_CLAUDE?claude:chatgpt;
 
   const THEME_PRESETS=[{"id":"ayu-dark","family":"Ayu","type":"dark","surface":"#0d1017","hover":"#47526640","border":"#1b1f29","fg":"#bfbdb6","muted":"#5a6673","accent":"#e6b450"},{"id":"catppuccin-mocha","family":"Catppuccin","type":"dark","surface":"#181825","hover":"#31324480","border":"#585b70","fg":"#cdd6f4","muted":"#9399b2","accent":"#cba6f7"},{"id":"catppuccin-latte","family":"Catppuccin","type":"light","surface":"#e6e9ef","hover":"#ccd0da80","border":"#acb0be","fg":"#4c4f69","muted":"#7c7f93","accent":"#8839ef"},{"id":"absolutely-dark","family":"Absolutely","type":"dark","surface":"#373735","hover":"#373735","border":"#ffffff22","fg":"#f9f9f7","muted":"#b2b2b0","accent":"#cc7d5e"},{"id":"absolutely-light","family":"Absolutely","type":"light","surface":"#f4f4f2","hover":"#f4f4f2","border":"#00000022","fg":"#2d2d2b","muted":"#8e8e8c","accent":"#c27759"},{"id":"dracula","family":"Dracula","type":"dark","surface":"#21222C","hover":"#44475A75","border":"#BD93F9","fg":"#F8F8F2","muted":"#6272A4","accent":"#737583"},{"id":"everforest-dark","family":"Everforest","type":"dark","surface":"#2d353b","hover":"#2d353b00","border":"#2d353b","fg":"#d3c6aa","muted":"#859289","accent":"#a7c080"},{"id":"everforest-light","family":"Everforest","type":"light","surface":"#fdf6e3","hover":"#fdf6e300","border":"#fdf6e3","fg":"#5c6a72","muted":"#859289","accent":"#7d974c"},{"id":"github-dark","family":"GitHub","type":"dark","surface":"#010409","hover":"#6e76811a","border":"#30363d","fg":"#e6edf3","muted":"#8b949e","accent":"#238636"},{"id":"github-light","family":"GitHub","type":"light","surface":"#f6f8fa","hover":"#eaeef280","border":"#d0d7de","fg":"#1f2328","muted":"#6e7781","accent":"#1f883d"},{"id":"gruvbox-dark","family":"Gruvbox","type":"dark","surface":"#282828","hover":"#3c383680","border":"#3c3836","fg":"#ebdbb2","muted":"#928374","accent":"#458588"},{"id":"gruvbox-light","family":"Gruvbox","type":"light","surface":"#fbf1c7","hover":"#ebdbb280","border":"#ebdbb2","fg":"#3c3836","muted":"#928374","accent":"#458588"},{"id":"linear-dark","family":"Linear","type":"dark","surface":"#080a0f","hover":"#080a0f","border":"#ffffff22","fg":"#e6e9ef","muted":"#636b7b","accent":"#606acc"},{"id":"linear-light","family":"Linear","type":"light","surface":"#f2f4f8","hover":"#f2f4f8","border":"#00000022","fg":"#2a3140","muted":"#858ea1","accent":"#5e6ad2"},{"id":"lobster-dark","family":"Lobster","type":"dark","surface":"#111827","hover":"#111827","border":"#ffffff22","fg":"#e4e4e7","muted":"#71717a","accent":"#ff5c5c"},{"id":"material-dark","family":"Material","type":"dark","surface":"#212121","hover":"#212121","border":"#21212160","fg":"#EEFFFF","muted":"#6b6e6e","accent":"#717171"},{"id":"matrix-dark","family":"Matrix","type":"dark","surface":"#020402","hover":"#020402","border":"#ffffff22","fg":"#b8ffca","muted":"#3f8f52","accent":"#1eff5a"},{"id":"monokai","family":"Monokai","type":"dark","surface":"#1e1f1c","hover":"#3e3d32","border":"#414339","fg":"#f8f8f2","muted":"#88846f","accent":"#75715E"},{"id":"night-owl","family":"Night Owl","type":"dark","surface":"#011627","hover":"#011627","border":"#5f7e97","fg":"#d6deeb","muted":"#637777","accent":"#7e57c2"},{"id":"nord","family":"Nord","type":"dark","surface":"#2e3440","hover":"#3b4252","border":"#3b4252","fg":"#d8dee9","muted":"#737f97","accent":"#88c0d0"},{"id":"notion-dark","family":"Notion","type":"dark","surface":"#151515","hover":"#151515","border":"#ffffff22","fg":"#d9d9d8","muted":"#6a9955","accent":"#3183d8"},{"id":"notion-light","family":"Notion","type":"light","surface":"#f7f6f3","hover":"#f7f6f3","border":"#00000022","fg":"#37352f","muted":"#008000","accent":"#3183d8"},{"id":"oscurange","family":"Oscurange","type":"dark","surface":"#0B0B0F","hover":"#0B0B0F","border":"#ffffff22","fg":"#E6E6E6","muted":"#5e5f66","accent":"#F9B98C"},{"id":"one-dark","family":"One","type":"dark","surface":"#21252b","hover":"#2c313a","border":"#3e4452","fg":"#abb2bf","muted":"#abb2bf","accent":"#70757f"},{"id":"one-light","family":"One","type":"light","surface":"#EAEAEB","hover":"#DBDBDC66","border":"#E5E5E6","fg":"#383A42","muted":"#8b8c93","accent":"#5871EF"},{"id":"proof-light","family":"Proof","type":"light","surface":"#efede6","hover":"#efede6","border":"#00000022","fg":"#2f312d","muted":"#8b877c","accent":"#3d755d"},{"id":"raycast-dark","family":"Raycast","type":"dark","surface":"#101010","hover":"#FFFFFF14","border":"#FFFFFF14","fg":"#FFFFFF","muted":"#666666","accent":"#ff6363"},{"id":"raycast-light","family":"Raycast","type":"light","surface":"#fcfcfc","hover":"#0000000f","border":"#00000014","fg":"#000000","muted":"#919191","accent":"#f25e5e"},{"id":"rose-pine-dark","family":"Rose Pine","type":"dark","surface":"#232136","hover":"#817c9c14","border":"#00000000","fg":"#e0def4","muted":"#6e6a86","accent":"#ea9a97"},{"id":"rose-pine-light","family":"Rose Pine","type":"light","surface":"#faf4ed","hover":"#6e6a860d","border":"#00000000","fg":"#575279","muted":"#8e899e","accent":"#c27571"},{"id":"sentry-dark","family":"Sentry","type":"dark","surface":"#26222d","hover":"#26222d","border":"#ffffff22","fg":"#e6dff9","muted":"#8d849f","accent":"#775ef6"},{"id":"solarized-dark","family":"Solarized","type":"dark","surface":"#00212B","hover":"#004454AA","border":"#2b2b4a","fg":"#839496","muted":"#5e747a","accent":"#2AA198"},{"id":"solarized-light","family":"Solarized","type":"light","surface":"#EEE8D5","hover":"#DFCA8844","border":"#DDD6C1","fg":"#5b6f76","muted":"#829294","accent":"#9b8d4e"},{"id":"tokyo-night","family":"Tokyo Night","type":"dark","surface":"#16161e","hover":"#13131a","border":"#101014","fg":"#a9b1d6","muted":"#5e668a","accent":"#506aaa"},{"id":"temple-dark","family":"Temple","type":"dark","surface":"#1d2d0f","hover":"#1d2d0f","border":"#ffffff22","fg":"#c7e6da","muted":"#4e645c","accent":"#e4f222"},{"id":"vercel-dark","family":"Vercel","type":"dark","surface":"#000000","hover":"#000000","border":"#ffffff22","fg":"#ededed","muted":"#666666","accent":"#006efe"},{"id":"vercel-light","family":"Vercel","type":"light","surface":"#ffffff","hover":"#ffffff","border":"#00000022","fg":"#171717","muted":"#666666","accent":"#006aff"},{"id":"vscode-dark","family":"VS Code Plus","type":"dark","surface":"#1E1E1E","hover":"#1E1E1E","border":"#ffffff22","fg":"#D4D4D4","muted":"#6A9955","accent":"#58a6ff"},{"id":"vscode-light","family":"VS Code Plus","type":"light","surface":"#FFFFFF","hover":"#E8E8E8","border":"#00000022","fg":"#000000","muted":"#008000","accent":"#0969da"},{"id":"xcode-dark","family":"Xcode","type":"dark","surface":"#1f1f24","hover":"#1f1f24","border":"#ffffff22","fg":"#ffffff","muted":"#6c7986","accent":"#5482ff"},{"id":"xcode-light","family":"Xcode","type":"light","surface":"#ffffff","hover":"#ffffff","border":"#00000022","fg":"#000000","muted":"#5d6c79","accent":"#0e0eff"}];
   const THEME_FAMILIES=[...new Set(THEME_PRESETS.map(p=>p.family))].sort((a,b)=>a.localeCompare(b));
   const LEGACY_BAR_PALETTE={blue:'#60a5fa',red:'#ff7983',white:'#ffffff',green:'#4ade80',yellow:'#facc15',pink:'#f472b6',orange:'#fb923c',purple:'#c084fc',neutral:'#ececec',gray:'#a3a3a3'};
   const isHex=value=>typeof value==='string'&&/^#[0-9a-f]{6}$/i.test(value);
   const legacyBarColor=(value,fallback)=>isHex(value)?value:LEGACY_BAR_PALETTE[value]||fallback;
-  const SETTINGS_TABS={panel:'Layout',modules:'Modules',appearance:'Theme',bars:'Bars',spacing:'Spacing'};
+  const SETTINGS_TABS={panel:'Layout',modules:'Modules',appearance:'Theme',bars:'Bars',spacing:'Spacing',sync:'Sync'};
   const SPACING_AREAS={
     outer:{label:'Frame margins (outside)',selector:'.panel-layout',kind:'padding',normal:[6,0,0,0]},
     frame:{label:'Inside frame',selector:'',kind:'padding',normal:[6,0,6,0]},
@@ -65,12 +73,12 @@
     scrollbar:{label:'Scrollbar on hover only'}
   };
   function defaultPreferences(){return {
-    floatHandlePosition:'after',hideFrame:false,hover:Object.fromEntries(Object.keys(HOVER_OPTIONS).map(key=>[key,true])),collapsed:false,compact:false,compactHeight:null,hideCollapsed:false,hideWithSidebar:true,footerPosition:'top',showUpdateTime:true,showDetails:true,marginTop:6,marginBottom:6,
-    showUsageResets:true,showPaidReset:false,showAddCredits:true,showPlanTooltips:false,showRemainingPlan:true,showCreditBar:false,showCreditBalance:true,creditBalanceInTitle:false,creditReference:null,creditReferencePending:false,
+    floatHandlePosition:'after',hideFrame:false,hover:Object.fromEntries(Object.keys(HOVER_OPTIONS).map(key=>[key,true])),collapsed:false,compact:false,compactHeight:null,hideCollapsed:false,hideWithSidebar:true,footerPosition:T('top','header-after'),showUpdateTime:true,showDetails:true,marginTop:6,marginBottom:6,
+    showUsageResets:!IS_CLAUDE,showPaidReset:false,showAddCredits:true,showPlanTooltips:false,showRemainingPlan:true,showCreditBar:IS_CLAUDE,showCreditBalance:true,creditBalanceInTitle:false,creditReference:null,creditReferencePending:false,
     position:'bottom',sections:['plan','credits','features'],closed:{credits:true},
-    hidden:{features:true},hiddenFeatures:{deep_research:true,file_upload:true,paste_text_to_file:true},
-    theme:'auto',preset:'auto',accent:'auto',contrast:'auto',barMode:'auto',barColor:'#60a5fa',barStart:'#60a5fa',barEnd:'#ff7983',barGradient:false,barGradientVisible:false,gradientStops:[],floating:{x:24,y:100},size:{width:300,height:null},
-    settingsTab:'panel',settingsPosition:null,settingsSize:null,spacingMode:'auto',spacing:{normal:{},compact:{}},settingsClosed:{barSource:false,barDisplay:true,barEnds:false,barMiddle:false,hover:true,appearance:false,colors:true,status:true,placement:false,visibility:true,plan:false,credits:true,features:true,spacePanel:false,spaceStatus:true,spaceModules:true,spaceItems:true,spaceBars:true,spaceDetails:true}
+    hidden:{features:true},hiddenFeatures:T({deep_research:true,file_upload:true,paste_text_to_file:true},{}),
+    theme:'auto',preset:'auto',accent:'auto',contrast:'auto',barMode:'auto',barColor:T('#60a5fa','#d97757'),barStart:T('#60a5fa','#d97757'),barEnd:'#ff7983',barGradient:false,barGradientVisible:false,gradientStops:[],floating:{x:24,y:100},size:{width:300,height:null},
+    syncGroups:{layout:true,modules:true,theme:true,bars:true,spacing:true},settingsTab:'panel',settingsPosition:null,settingsSize:null,spacingMode:'auto',spacing:{normal:{},compact:{}},settingsClosed:{barSource:false,barDisplay:true,barEnds:false,barMiddle:false,hover:true,appearance:false,colors:true,status:true,placement:false,visibility:true,plan:false,credits:true,features:true,spacePanel:false,spaceStatus:true,spaceModules:true,spaceItems:true,spaceBars:true,spaceDetails:true}
   };}
   const state = {
     usage:null,plan:null,usageAt:0,error:null,models:{},showRaw:false,resetInfo:null,
@@ -79,8 +87,8 @@
   let lastRefresh = 0;
 
   // ---------- persistence ----------
-  const saveKeys = ["floatHandlePosition", "creditBalanceInTitle", "showUsageResets", "barGradientVisible", "showPaidReset", "barMode", "barColor", "barStart", "barEnd", "gradientStops", "barGradient", "hideFrame", "hover", "usage", "plan", "usageAt", "models", "collapsed", "position", "sections", "closed", "hidden", "theme", "preset", "accent", "contrast", "floating", "size", "compact", "compactHeight", "hideCollapsed", "hideWithSidebar", "hiddenFeatures", "showAddCredits", "showPlanTooltips", "showRemainingPlan", "settingsClosed", "settingsTab", "settingsPosition", "settingsSize", "spacing", "spacingMode", "footerPosition", "showUpdateTime", "showDetails", "marginTop", "marginBottom", "showCreditBar", "showCreditBalance", "creditReference", "creditReferencePending"];
-  const historyKeys=Object.keys(defaultPreferences()).filter(key=>!['settingsTab','settingsClosed','spacingMode','creditReferencePending'].includes(key));
+  const saveKeys = ["syncGroups", "appliedAt", "floatHandlePosition", "creditBalanceInTitle", "showUsageResets", "barGradientVisible", "showPaidReset", "barMode", "barColor", "barStart", "barEnd", "gradientStops", "barGradient", "hideFrame", "hover", "usage", "plan", "usageAt", "models", "collapsed", "position", "sections", "closed", "hidden", "theme", "preset", "accent", "contrast", "floating", "size", "compact", "compactHeight", "hideCollapsed", "hideWithSidebar", "hiddenFeatures", "showAddCredits", "showPlanTooltips", "showRemainingPlan", "settingsClosed", "settingsTab", "settingsPosition", "settingsSize", "spacing", "spacingMode", "footerPosition", "showUpdateTime", "showDetails", "marginTop", "marginBottom", "showCreditBar", "showCreditBalance", "creditReference", "creditReferencePending"];
+  const historyKeys=Object.keys(defaultPreferences()).filter(key=>!['settingsTab','settingsClosed','spacingMode','creditReferencePending','syncGroups'].includes(key));
   const undoChanges=[],redoChanges=[];
   let historyReady=false,historyCurrent=null,historyGroup='',historyEpoch=0;
   const preferenceSnapshot=()=>Object.fromEntries(historyKeys.map(key=>[key,structuredClone(state[key])]));
@@ -113,21 +121,25 @@
     recordPreferenceHistory(record);
     const o = {};
     for (const k of saveKeys) o[k] = state[k];
-    try { store.local.set({ gptu: o })?.catch(() => {}); } catch (_) {}
+    try { store.local.set({ [SITE.key]: o })?.catch(() => {}); } catch (_) {}
   }
   async function load() {
     try {
-      const r = await store.local.get("gptu");
-      if (r && r.gptu) {
-        for (const k of saveKeys) if (r.gptu[k] !== undefined) state[k] = r.gptu[k];
-        if(r.gptu.barMode===undefined){
-          const old=r.gptu.barColors||{};state.barMode=r.gptu.barGradient||Object.values(old).some(value=>value!=='auto')?'custom':'auto';
+      const r = await store.local.get(SITE.key);
+      const saved = r && r[SITE.key];
+      if (saved) {
+        for (const k of saveKeys) if (saved[k] !== undefined) state[k] = saved[k];
+        if(saved.barMode===undefined){
+          const old=saved.barColors||{};state.barMode=saved.barGradient||Object.values(old).some(value=>value!=='auto')?'custom':'auto';
           state.barColor=legacyBarColor(old.remaining||old.normal,'#60a5fa');
           state.barStart=legacyBarColor(old.gradientStart,'#60a5fa');state.barEnd=legacyBarColor(old.gradientEnd,'#ff7983');
         }
-        if(!r.gptu.spacing)state.spacing={normal:{frame:[state.marginTop,0,state.marginBottom,0]},compact:{frame:[state.marginTop,0,state.marginBottom,0]}};
+        if(!saved.spacing)state.spacing={normal:{frame:[state.marginTop,0,state.marginBottom,0]},compact:{frame:[state.marginTop,0,state.marginBottom,0]}};
       }
     } catch (_) {}
+    normalizePreferences();
+  }
+  function normalizePreferences(){
     if(!Number.isFinite(state.creditReference)||state.creditReference<=0)state.creditReference=null;
     for(const key of ['marginTop','marginBottom'])state[key]=Number.isFinite(state[key])?Math.max(0,Math.min(120,state[key])):6;
     if(!['before','after'].includes(state.floatHandlePosition))state.floatHandlePosition='after';
@@ -147,7 +159,8 @@
     if (!state.size || !Number.isFinite(state.size.width)) state.size = {width:300,height:null};
     if (!Number.isFinite(state.size.height)) state.size.height = null;
     if (!["auto", "system", "light", "dark"].includes(state.theme)) state.theme = "auto";
-    if(!['auto','chatgpt',...THEME_FAMILIES].includes(state.preset))state.preset='auto';
+    if(state.preset===OTHER.preset)state.preset=SITE.preset;
+    if(!['auto',SITE.preset,...THEME_FAMILIES].includes(state.preset))state.preset='auto';
     if(!['auto','default','blue','green','yellow','pink','orange','purple','neutral'].includes(state.accent))state.accent='auto';
     if(!['auto','system','medium','increased'].includes(state.contrast))state.contrast='auto';
     state.gradientStops=(Array.isArray(state.gradientStops)?state.gradientStops:[]).filter(stop=>stop&&isHex(stop.color)&&Number.isFinite(stop.from??stop.at)&&Number.isFinite(stop.to??stop.at)).slice(0,8).map(stop=>({from:Math.max(1,Math.min(99,stop.from??stop.at)),to:Math.max(1,Math.min(99,stop.to??stop.at)),color:stop.color,blendBefore:Number.isFinite(stop.blendBefore)?Math.max(0,Math.min(100,stop.blendBefore)):null,blendAfter:Number.isFinite(stop.blendAfter)?Math.max(0,Math.min(100,stop.blendAfter)):null})).sort((a,b)=>a.from-b.from);
@@ -155,7 +168,8 @@
     state.barGradient=state.barGradient===true;state.barGradientVisible=state.barGradientVisible===true;
     if(!['auto','custom'].includes(state.barMode))state.barMode='auto';
     for(const key of ['barColor','barStart','barEnd'])if(!isHex(state[key]))state[key]=defaultPreferences()[key];
-    state.showPaidReset=state.showPaidReset===true;state.showUsageResets=state.showUsageResets!==false;state.creditBalanceInTitle=state.creditBalanceInTitle===true;
+    state.showPaidReset=!IS_CLAUDE&&state.showPaidReset===true;state.showUsageResets=!IS_CLAUDE&&state.showUsageResets!==false;
+    state.syncGroups={...defaultPreferences().syncGroups,...(state.syncGroups&&typeof state.syncGroups==='object'?state.syncGroups:{})};state.creditBalanceInTitle=state.creditBalanceInTitle===true;
     if (!["top", "bottom", "floating"].includes(state.position)) state.position = "bottom";
   }
 
@@ -222,14 +236,16 @@
     if (Array.isArray(extra)) {
       for (const x of extra) addWindows(x && (x.rate_limit || x), x && (x.limit_name || x.name || x.metered_feature || "Other"));
     }
-    let credits = null;
+    let credits = null, creditLimit = null, currency = null;
     const c = u.credits;
     if (c && typeof c === "object") {
-      if (c.unlimited) credits = "Unlimited";
+      creditLimit = num(c.limit); currency = typeof c.currency === "string" && /^[A-Z]{3}$/.test(c.currency) ? c.currency : null;
+      if (c.enabled === false) { credits = "Off"; creditLimit = null; }
+      else if (c.unlimited) credits = "Unlimited";
       else if (c.has_credits || num(c.balance)) credits = `${num(c.balance) ?? c.balance}`;
       else credits = "0";
     }
-    return { rows, credits, plan: u.plan_type || state.plan };
+    return { rows, credits, creditLimit, currency, plan: u.plan_type || state.plan };
   }
 
   // ---------- messaging with page-hook ----------
@@ -245,7 +261,7 @@
     const { type, payload } = ev.data;
     if (type === "ready") requestRefresh(true);
     else if (type === "usage") {
-      state.usage = payload.data;state.resetInfo=null;
+      state.usage = payload.data;state.rawUsage=payload.raw??null;state.resetInfo=null;
       state.plan = payload.plan || state.plan;
       state.usageAt = payload.at;
       state.error = null;
@@ -449,6 +465,10 @@
     .settings-file-actions .text-btn { font-size:11px; }
     .settings-help .settings-file-actions .reset { margin:0; padding:3px 0; }
     .export-status:empty { display:none; }
+    .sync-note { display:block; color:var(--muted); font-size:11px; line-height:1.35; margin-top:2px; }
+    .sync-actions { display:flex; flex-direction:column; gap:6px; padding:10px 0 4px; }
+    .sync-btn { border:1px solid var(--line); border-radius:8px; padding:7px 10px !important; text-align:left; font-weight:500; }
+    .sync-status .text-btn { margin-left:4px; }
     .export-status { display:block; padding-top:4px; }
     .settings-help .reset { font-size:11px; margin:6px 0 0; padding:5px 0; }
     .body { scrollbar-width:thin; scrollbar-color:transparent transparent; scrollbar-gutter:stable; }
@@ -525,7 +545,7 @@
     <div class="head-title-row"><button class="usage-open" aria-label="Open usage overview" title="Open usage overview"><span class="usage-icon">${USAGE_ICON}</span><span class="title">Usage</span><span class="badge" hidden></span></button><button class="icon toggle collapse-panel" aria-expanded="true" aria-label="Collapse usage panel" title="Collapse usage panel">${icon('chevron')}</button><div class="head-status-slot"></div></div>
     <button class="icon refresh" title="Refresh usage" aria-label="Refresh usage">${icon('refresh')}</button><div class="head-status-after-slot"></div>
     <button class="icon customize" title="Customize panel" aria-label="Customize panel" aria-expanded="false">${icon('settings')}</button></div>
-    <div class="summary" hidden></div><div class="body"></div><button class="resize" aria-label="Resize panel" title="Drag to resize · Arrow keys to resize · Double-click to reset size"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m5 13 8-8m-3 8 3-3"/></svg></button><div class="live" aria-live="polite"></div></div></div><div class="settings" popover="auto" role="dialog" aria-label="Usage settings"></div><dialog class="reset-dialog" aria-labelledby="gptu-reset-title"></dialog><dialog class="credits-modal" aria-labelledby="gptu-page-heading"><div class="credits-header"><h2 id="gptu-page-heading">Add credits</h2><a class="credit-external" target="_blank" rel="noopener noreferrer">Open in tab</a><button class="icon credits-close" aria-label="Close credits">✕</button></div><div class="credits-content"><p class="credits-status" role="status">Loading credits…</p><template class="credits-frame-template"><iframe class="credits-frame" title="ChatGPT credits purchase" allow="payment" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads"></iframe></template></div></dialog><div class="dock-targets" hidden aria-hidden="true"><div class="dock-zone" data-dock="top">Dock at top</div><div class="dock-zone" data-dock="bottom">Dock at bottom</div></div>`;
+    <div class="summary" hidden></div><div class="body"></div><button class="resize" aria-label="Resize panel" title="Drag to resize · Arrow keys to resize · Double-click to reset size"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m5 13 8-8m-3 8 3-3"/></svg></button><div class="live" aria-live="polite"></div></div></div><div class="settings" popover="auto" role="dialog" aria-label="Usage settings"></div><dialog class="reset-dialog" aria-labelledby="gptu-reset-title"></dialog><dialog class="credits-modal" aria-labelledby="gptu-page-heading"><div class="credits-header"><h2 id="gptu-page-heading">Add credits</h2><a class="credit-external" target="_blank" rel="noopener noreferrer">Open in tab</a><button class="icon credits-close" aria-label="Close credits">✕</button></div><div class="credits-content"><p class="credits-status" role="status">Loading credits…</p><template class="credits-frame-template"><iframe class="credits-frame" title="Usage" allow="payment" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads"></iframe></template></div></dialog><div class="dock-targets" hidden aria-hidden="true"><div class="dock-zone" data-dock="top">Dock at top</div><div class="dock-zone" data-dock="bottom">Dock at bottom</div></div>`;
   const $=s=>root.querySelector(s), card=$('.card');
   for(const type of ['click','dblclick','change','input','keydown','pointerdown','dragstart'])root.addEventListener(type,event=>{
     const el=event.target;if(!el?.getAttribute)return;
@@ -534,19 +554,123 @@
       historyGroup=`edit:${historyEpoch}:${signature}`;
     }else historyGroup=`action:${++historyEpoch}`;
   },true);
+  // ---------- applying settings across ChatGPT and Claude ----------
+  // Site-specific keys are never copied: resets, the credit reference (different units), feature
+  // counters, and the settings window's own state.
+  const SYNC_GROUPS={
+    layout:{label:'Layout',note:'Placement, floating position, size, compact mode, visibility, hover, drag handle, update time, module order and collapsed state',
+      keys:['position','floating','size','compact','compactHeight','hideCollapsed','hideWithSidebar','hideFrame','hover','floatHandlePosition','footerPosition','showUpdateTime','showDetails','collapsed','sections','closed']},
+    modules:{label:'Modules',note:'Visible modules, remaining vs used, tooltips, balance bar and button options',
+      keys:['hidden','showRemainingPlan','showPlanTooltips','showCreditBar','showCreditBalance','creditBalanceInTitle','showAddCredits']},
+    theme:{label:'Theme',note:'Preset, mode, accent and contrast. "Match site" stays matched to each site',keys:['theme','preset','accent','contrast']},
+    bars:{label:'Bars',note:'Color source, custom colors, ranges and gradient display',keys:['barMode','barColor','barStart','barEnd','gradientStops','barGradient','barGradientVisible']},
+    spacing:{label:'Spacing',note:'Normal and compact spacing profiles',keys:['spacing','spacingMode','marginTop','marginBottom']}
+  };
+  const SYNCABLE_KEYS=Object.values(SYNC_GROUPS).flatMap(group=>group.keys);
+  let syncBackup=null,syncMessage='',otherSaved=undefined;
+  function pickSettings(source,fromSite,toSite,groups){
+    const out={};
+    for(const [key,group] of Object.entries(SYNC_GROUPS))if(groups[key])for(const k of group.keys)if(source[k]!==undefined)out[k]=structuredClone(source[k]);
+    if(out.preset===fromSite.preset)out.preset=toSite.preset;
+    return out;
+  }
+  async function readOtherSite(){
+    try{const r=await store.local.get(OTHER.key);otherSaved=r?.[OTHER.key]||null;}catch(_){otherSaved=null;}
+    return otherSaved;
+  }
+  function selectedSyncGroups(){return Object.fromEntries(Object.keys(SYNC_GROUPS).map(key=>[key,state.syncGroups[key]!==false]));}
+  function applyIncoming(settings){
+    Object.assign(state,settings);normalizePreferences();state.appliedAt=Date.now();
+    persist();render();place(true);
+    if(settingsOpen){const scroll=$('.settings-body').scrollTop;renderSettings();$('.settings-body').scrollTop=scroll;}
+  }
+  async function copyAcrossSites(direction){
+    const groups=selectedSyncGroups();
+    if(!Object.values(groups).some(Boolean)){syncMessage='Choose at least one group to copy.';renderSyncPanel();return;}
+    if(direction==='from'){
+      const other=await readOtherSite();
+      if(!other){syncMessage=`No ${OTHER.name} settings saved yet. Open ${OTHER.name} once, or copy from this side instead.`;renderSyncPanel();return;}
+      historyGroup='sync';applyIncoming(pickSettings(other,OTHER,SITE,groups));historyGroup='';
+      syncBackup=null;syncMessage=`Applied ${OTHER.name} settings here. Use Undo in the title bar to revert.`;
+    }else{
+      const previous=await readOtherSite();
+      const snapshot=Object.fromEntries(SYNCABLE_KEYS.map(key=>[key,state[key]]));
+      const next={...(previous||{}),...pickSettings(snapshot,SITE,OTHER,groups),appliedAt:Date.now()};
+      try{await store.local.set({[OTHER.key]:next});otherSaved=next;syncBackup={value:previous};
+        syncMessage=`Applied to ${OTHER.name}. Open ${OTHER.name} tabs update right away.`;}
+      catch(_){syncMessage=`Could not save ${OTHER.name} settings. Try again.`;}
+    }
+    if(settingsOpen){const scroll=$('.settings-body').scrollTop;renderSettings();$('.settings-body').scrollTop=scroll;}
+  }
+  async function undoSyncCopy(){
+    if(!syncBackup)return;
+    try{
+      if(syncBackup.value)await store.local.set({[OTHER.key]:{...syncBackup.value,appliedAt:Date.now()}});
+      else await store.local.remove(OTHER.key);
+      otherSaved=syncBackup.value;syncBackup=null;syncMessage=`Restored the previous ${OTHER.name} settings.`;
+    }catch(_){syncMessage='Could not undo. Try again.';}
+    renderSyncPanel();
+  }
+  function syncPanelContent(){
+    const groups=selectedSyncGroups();
+    const status=otherSaved===undefined?'Checking…':otherSaved?`${OTHER.name} has saved settings.`:`${OTHER.name} has no saved settings yet; it uses defaults.`;
+    return `<div class="note">ChatGPT and Claude keep separate settings. Choose groups, then copy them in either direction. The panel position and size are copied as-is; each site still matches its own page colors.</div>`+
+      `<details class="settings-section" open><summary>${icon('settings')}<span>Groups to copy</span>${icon('chevron')}</summary><div class="settings-section-content">`+
+      Object.entries(SYNC_GROUPS).map(([key,group])=>`<label class="setting"><span>${group.label}<small class="sync-note">${esc(group.note)}</small></span><input type="checkbox" role="switch" aria-label="${group.label}" data-sync-group="${key}" ${groups[key]?'checked':''}></label>`).join('')+
+      `<div class="note">Never copied: ${T('banked and paid reset buttons, ','')}the ${T('full credit balance','fallback limit')}, individual feature counters and this settings window.</div></div></details>`+
+      `<div class="sync-actions"><button class="text-btn sync-btn" data-sync-copy="to">Apply these settings to ${OTHER.name} →</button><button class="text-btn sync-btn" data-sync-copy="from">← Apply ${OTHER.name} settings here</button></div>`+
+      `<div class="note sync-status" role="status">${esc(syncMessage||status)}${syncBackup?` <button class="text-btn" data-sync-undo>Undo</button>`:''}</div>`;
+  }
+  function renderSyncPanel(){const panel=root.querySelector('#gptu-settings-sync');if(panel)panel.innerHTML=syncPanelContent();}
+  root.addEventListener('change',event=>{
+    const key=event.target.dataset?.syncGroup;if(!key)return;
+    state.syncGroups={...state.syncGroups,[key]:event.target.checked};persist(false);syncMessage='';renderSyncPanel();
+  });
+  // Another tab (either site) changed this site's settings through Sync or Import: load them live.
+  store.onChanged?.addListener((changes,area)=>{
+    if(area!=='local')return;
+    if(changes[OTHER.key]){otherSaved=changes[OTHER.key].newValue||null;if(settingsOpen&&state.settingsTab==='sync'&&!syncMessage)renderSyncPanel();}
+    const change=changes[SITE.key];const value=change?.newValue;
+    if(!value||!value.appliedAt||value.appliedAt===state.appliedAt)return;
+    for(const k of SYNCABLE_KEYS)if(value[k]!==undefined)state[k]=structuredClone(value[k]);
+    state.appliedAt=value.appliedAt;normalizePreferences();render();place(true);
+    if(historyReady){historyCurrent=preferenceSnapshot();}
+    if(settingsOpen){const scroll=$('.settings-body').scrollTop;renderSettings();$('.settings-body').scrollTop=scroll;}
+  });
+  function importSettings(){
+    const input=document.createElement('input');input.type='file';input.accept='application/json,.json';
+    input.addEventListener('change',async()=>{
+      const file=input.files?.[0];if(!file)return;
+      try{
+        const data=JSON.parse(await file.text());
+        if(!['usage-meter-settings','chatgpt-usage-meter-settings'].includes(data?.format)||!data.settings||typeof data.settings!=='object')throw Error('format');
+        const from=SITES[data.site]||SITES.chatgpt;
+        const allGroups=Object.fromEntries(Object.keys(SYNC_GROUPS).map(key=>[key,true]));
+        const incoming=pickSettings(data.settings,from,SITE,allGroups);
+        // Same-site files also restore site-specific choices.
+        if(from===SITE)for(const key of ['showUsageResets','showPaidReset','creditReference','hiddenFeatures','syncGroups'])if(data.settings[key]!==undefined)incoming[key]=structuredClone(data.settings[key]);
+        historyGroup='import';applyIncoming(incoming);historyGroup='';
+        $('.export-status').textContent=`Imported ${from.name} settings from ${file.name}. Use Undo to revert.`;
+      }catch(_){$('.export-status').textContent='Import failed: choose a settings file exported by Usage Meter.';}
+    });
+    input.click();
+  }
   function exportSettings(){
     const settings=Object.fromEntries(Object.keys(defaultPreferences()).filter(key=>key!=='creditReferencePending').map(key=>[key,structuredClone(state[key])]));
-    const data={format:'chatgpt-usage-meter-settings',version:1,extensionVersion:globalThis.chrome?.runtime?.getManifest?.().version||globalThis.browser?.runtime?.getManifest?.().version||'0.3.34',exportedAt:new Date().toISOString(),settings};
+    const data={format:'usage-meter-settings',site:SITE.id,version:1,extensionVersion:globalThis.chrome?.runtime?.getManifest?.().version||globalThis.browser?.runtime?.getManifest?.().version||'0.3.34',exportedAt:new Date().toISOString(),settings};
     let url;
     try{
       url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)+'\n'],{type:'application/json'}));
-      const link=document.createElement('a');link.href=url;link.download='ChatGPT-Usage-Meter-settings-'+data.exportedAt.slice(0,10)+'.json';document.body.appendChild(link);link.click();link.remove();
+      const link=document.createElement('a');link.href=url;link.download=SITE.name+'-Usage-Meter-settings-'+data.exportedAt.slice(0,10)+'.json';document.body.appendChild(link);link.click();link.remove();
       setTimeout(()=>URL.revokeObjectURL(url),60000);
       $('.export-status').textContent='Settings exported.';
     }catch(_){if(url)URL.revokeObjectURL(url);$('.export-status').textContent='Export failed. Please try again.';}
   }
   root.addEventListener('click',event=>{
     if(event.target.closest('[data-export-settings]'))exportSettings();
+    else if(event.target.closest('[data-import-settings]'))importSettings();
+    else if(event.target.closest('[data-sync-copy]'))copyAcrossSites(event.target.closest('[data-sync-copy]').dataset.syncCopy);
+    else if(event.target.closest('[data-sync-undo]'))undoSyncCopy();
     else if(event.target.closest('.undo-changes'))travelHistory();
     else if(event.target.closest('.redo-changes'))travelHistory(true);
     else if(event.target.closest('[data-reset-bar-colors]')){
@@ -562,8 +686,8 @@
   const ui={ setBusy(b) { card.classList.toggle('busy',b); $('.refresh').disabled=b; $('.refresh').setAttribute('aria-busy',String(b)); clearTimeout(busyTimer); if(b) busyTimer=setTimeout(()=>{ui.setBusy(false); state.error='Refresh timed out. Try again.'; render();},20000); } };
   const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const level=p=>p>=90?'bad':p>=75?'warn':'';
-  const labels={plan:'Plan limits',credits:'Credits',features:'Models & features'};
-  const featureNames={deep_research:'Deep Research',file_upload:'File uploads',paste_text_to_file:'Paste text to file',image_gen:'Image generation'};
+  const labels={plan:'Plan limits',credits:T('Credits','Extra usage'),features:'Models & features'};
+  const featureNames=IS_CLAUDE?{}:{deep_research:'Deep Research',file_upload:'File uploads',paste_text_to_file:'Paste text to file',image_gen:'Image generation'};
   const featureLabel=name=>featureNames[name]||name.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
   const format=n=>new Intl.NumberFormat(undefined,{maximumFractionDigits:2}).format(n);
   function colorScalePoints(){
@@ -596,6 +720,7 @@
   const bar=(p,label,remaining=false)=>`<div class="bar" role="progressbar" aria-label="${esc(label)} ${remaining?'remaining':'used'}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${p}"><i class="${remaining?'remaining':level(p)}" style="width:${p}%;--meter-scale:${p>0?10000/p:100}%;${state.barMode==='custom'&&state.barGradient&&!state.barGradientVisible?'background-color:'+percentageColor(p):''}"></i></div>`;
 
   function creditPurchaseUrl(){
+    if(IS_CLAUDE)return new URL(SITE.usagePath,location.origin).href;
     const url=new URL('/pricing/credits',location.origin);
     url.searchParams.set('source','chatgpt_web_merged');
     url.searchParams.set('return_to',location.pathname+location.search+location.hash);
@@ -624,12 +749,12 @@
   }
   root.addEventListener('click',event=>{
     const target=event.target;
-    if(target.closest('.paid-reset'))openPageDialog(new URL('/settings/usage?tab=overview',location.origin).href,'Usage',target);
+    if(target.closest('.paid-reset'))openPageDialog(new URL(SITE.usagePath,location.origin).href,'Usage',target);
     else if(target.closest('.use-reset')&&!resetPending){
       if(settingsOpen)closeSettings();resetFocus=target;resetFlow={id:crypto.randomUUID(),loading:true};renderResetDialog();$('.reset-dialog').showModal();
       window.postMessage({source:TAG_OUT,type:'reset-details',payload:{flowId:resetFlow.id}},location.origin);
     }else if(target.closest('.cancel-reset'))$('.reset-dialog').close();
-    else if(target.closest('.reset-native')){$('.reset-dialog').close();openPageDialog(new URL('/settings/usage?tab=overview',location.origin).href,'Usage',$('.usage-open'));}
+    else if(target.closest('.reset-native')){$('.reset-dialog').close();openPageDialog(new URL(SITE.usagePath,location.origin).href,'Usage',$('.usage-open'));}
     else if(target.closest('.confirm-reset')&&resetFlow&&!resetFlow.busy&&!resetFlow.finished){
       const selected=availableResets().find(c=>c.id===resetFlow.creditId);if(!selected)return;
       resetFlow.busy=true;resetPending=true;resetFlow.requestId=crypto.randomUUID();renderResetDialog();render();
@@ -639,7 +764,7 @@
   root.addEventListener('change',event=>{if(event.target.matches('.reset-dialog select')&&resetFlow&&!resetFlow.busy){resetFlow.creditId=event.target.value;renderResetDialog();}});
   $('.reset-dialog').addEventListener('close',()=>{resetFlow=null;const target=resetFocus?.isConnected?resetFocus:$('.usage-open');target?.focus();resetFocus=null;});
   let creditReturnFocus=null,creditReturnPath='',creditWatch=null,creditLoadTimeout=null;
-  function openCreditDialog(link){openPageDialog(creditPurchaseUrl(),'Add credits',link,true);}
+  function openCreditDialog(link){openPageDialog(creditPurchaseUrl(),T('Add credits','Usage'),link,!IS_CLAUDE);}
   function openPageDialog(url,title,returnFocus,closeOnReturn=false){
     const dialog=$('.credits-modal');
     if(dialog.open){$('.credits-close').focus();return;}
@@ -649,7 +774,7 @@
     dialog.setAttribute('aria-busy','true');
     frame.addEventListener('load',()=>creditFrameLoaded(frame));
     creditReturnFocus=returnFocus;creditReturnPath=location.pathname+location.search+location.hash;
-    $('#gptu-page-heading').textContent=title;frame.title=title==='Add credits'?'ChatGPT credits purchase':'ChatGPT usage overview';
+    $('#gptu-page-heading').textContent=title;frame.title=title==='Add credits'?'ChatGPT credits purchase':`${SITE.name} usage overview`;
     $('.credit-external').href=url;$('.credits-status').textContent='Loading…';$('.credits-status').hidden=false;
     frame.src=url;$('.credits-content').appendChild(frame);dialog.showModal();$('.credits-close').focus();
     creditLoadTimeout=setTimeout(()=>{if(dialog.open){$('.credits-status').textContent='If the page stays blank, choose Open in tab.';$('.credits-status').hidden=false;}},12000);
@@ -657,7 +782,7 @@
       try{const destination=new URL(frame.contentWindow.location.href);if(destination.origin===location.origin&&destination.pathname+destination.search+destination.hash===creditReturnPath){dialog.close();requestRefresh(false);}}catch(_){}
     },1000);
   }
-  $('.usage-open').onclick=()=>openPageDialog(new URL('/settings/usage?tab=overview',location.origin).href,'Usage',$('.usage-open'));
+  $('.usage-open').onclick=()=>openPageDialog(new URL(SITE.usagePath,location.origin).href,'Usage',$('.usage-open'));
   $('.credits-close').onclick=()=>$('.credits-modal').close();
   $('.credits-modal').addEventListener('close',()=>{
     clearInterval(creditWatch);clearTimeout(creditLoadTimeout);creditWatch=null;
@@ -677,21 +802,72 @@
         aside:has(#app-shell-sidebar), #app-shell-sidebar,
         [data-testid="open-sidebar-button"], [data-testid="close-sidebar-button"],
         button[aria-label="Open sidebar"], button[aria-label="Close sidebar"], button[aria-label="Show sidebar"] { display:none !important; }
+        [data-gptu-hidden] { display:none !important; }
+        html[data-gptu-isolated], html[data-gptu-isolated] body { height:100% !important; overflow:hidden !important; margin:0 !important; }
+        [data-gptu-path] { position:static !important; inset:auto !important; transform:none !important; translate:none !important; width:100% !important; height:100% !important;
+          max-width:none !important; max-height:none !important; min-width:0 !important; min-height:0 !important; margin:0 !important; padding:0 !important;
+          border:0 !important; border-radius:0 !important; box-shadow:none !important; outline:0 !important; display:flex !important; flex-direction:column !important; opacity:1 !important; }
+        [data-gptu-content] { flex:1 1 auto !important; width:100% !important; max-width:none !important; height:100% !important; max-height:none !important;
+          min-height:0 !important; overflow:auto !important; margin:0 !important; border:0 !important; border-radius:0 !important; }
       `;
       doc.head.appendChild(style);return true;
     }catch(_){return false;}
+  }
+  // Claude opens settings as its own modal with a settings sidebar. Inside our dialog, keep only
+  // the settings content pane: hide everything that is not on the path from it to <html>.
+  function isolateEmbeddedContent(doc){
+    try{
+      const links=[...doc.querySelectorAll('a[href*="/settings/"]')];
+      if(!links.length||!doc.body)return false;
+      const scope=links[0].closest('[role="dialog"],dialog')||doc.body;
+      const hasNav=el=>links.some(a=>el.contains(a));
+      const sr=scope.getBoundingClientRect(),minArea=sr.width*sr.height*0.2;
+      let best=null,bestArea=0;
+      for(const el of scope.querySelectorAll('div,main,section,article')){
+        if(hasNav(el))continue;
+        const r=el.getBoundingClientRect(),area=r.width*r.height;
+        if(area>bestArea&&area>=minArea&&(el.textContent||'').trim().length>20){best=el;bestArea=area;}
+      }
+      if(!best)return false;
+      for(const el of doc.querySelectorAll('[data-gptu-hidden],[data-gptu-path],[data-gptu-content]'))for(const a of ['data-gptu-hidden','data-gptu-path','data-gptu-content'])el.removeAttribute(a);
+      for(let el=best;el&&el!==doc.documentElement;el=el.parentElement){
+        for(const sib of el.parentElement?.children||[])if(sib!==el&&!['SCRIPT','STYLE','LINK','META','TEMPLATE'].includes(sib.tagName))sib.setAttribute('data-gptu-hidden','');
+        if(el!==best&&el!==doc.body)el.setAttribute('data-gptu-path','');
+      }
+      best.setAttribute('data-gptu-content','');doc.documentElement.setAttribute('data-gptu-isolated','');
+      return true;
+    }catch(_){return false;}
+  }
+  function keepEmbeddedIsolated(frame){
+    try{
+      const doc=frame.contentDocument;let timer=null;
+      const observer=new MutationObserver(()=>{clearTimeout(timer);timer=setTimeout(()=>isolateEmbeddedContent(doc),80);});
+      observer.observe(doc.body,{childList:true,subtree:true});
+      $('.credits-modal').addEventListener('close',()=>observer.disconnect(),{once:true});
+    }catch(_){}
   }
   function creditFrameLoaded(frame){
     if(!$('.credits-modal').open||frame!==$('.credits-frame'))return;
     const prepared=prepareEmbeddedPage(frame);
     // Cross-origin checkout pages cannot be styled, but must remain usable.
     if(!prepared&&frame.contentDocument){$('.credits-status').textContent='Unable to prepare the page. Choose Open in tab.';return;}
-    requestAnimationFrame(()=>{
+    // Claude: wait for the settings content to render and be isolated before revealing the frame.
+    const started=Date.now();
+    const attempt=()=>{
+      if(!$('.credits-modal').open||frame!==$('.credits-frame'))return;
+      let doc=null;try{doc=frame.contentDocument;}catch(_){}
+      if(!IS_CLAUDE||!doc)reveal();
+      else if(isolateEmbeddedContent(doc)){keepEmbeddedIsolated(frame);reveal();}
+      else if(Date.now()-started>6000)reveal();
+      else setTimeout(attempt,100);
+    };
+    attempt();
+    function reveal(){requestAnimationFrame(()=>{
       if(!$('.credits-modal').open||frame!==$('.credits-frame'))return;
       frame.removeAttribute('data-loading');frame.removeAttribute('aria-hidden');frame.removeAttribute('tabindex');
       $('.credits-modal').removeAttribute('aria-busy');
       clearTimeout(creditLoadTimeout);$('.credits-status').hidden=true;
-    });
+    });}
     try{frame.contentDocument?.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();$('.credits-modal').close();}});}catch(_){}
   }
   const accentNames={auto:'Match theme',default:'Default',blue:'Blue',green:'Green',yellow:'Yellow',pink:'Pink',orange:'Orange',purple:'Purple',neutral:'Black / White'};
@@ -700,22 +876,22 @@
     const html=document.documentElement,body=document.body,nav=findSidebarNav();
     const htmlStyle=getComputedStyle(html),bodyStyle=getComputedStyle(body),appStyle=getComputedStyle(document.getElementById('root')||body),navStyle=nav?getComputedStyle(nav):appStyle;
     const systemDark=matchMedia('(prefers-color-scheme: dark)').matches;
-    let dark=state.theme==='dark'||state.theme==='system'&&systemDark||state.theme==='auto'&&(html.classList.contains('dark')||html.dataset.theme==='dark'||(!html.classList.contains('light')&&html.dataset.theme!=='light'&&(htmlStyle.colorScheme==='dark'||htmlStyle.colorScheme!=='light'&&systemDark)));
+    let dark=state.theme==='dark'||state.theme==='system'&&systemDark||state.theme==='auto'&&(html.classList.contains('dark')||html.dataset.theme==='dark'||html.dataset.mode==='dark'||(!html.classList.contains('light')&&html.dataset.theme!=='light'&&html.dataset.mode!=='light'&&(htmlStyle.colorScheme==='dark'||htmlStyle.colorScheme!=='light'&&systemDark)));
     const variants=THEME_PRESETS.filter(p=>p.family===state.preset),preset=variants.find(p=>p.type===(dark?'dark':'light'))||variants[0];
     if(preset)dark=preset.type==='dark';
     host.toggleAttribute('data-dark',dark);
     const resolve=value=>{if(!value)return null;if(!globalThis.CSS.supports('color',value)){value=value.includes('%')?`hsl(${value})`:`rgb(${value})`;if(!globalThis.CSS.supports('color',value))return null;}themeProbe.style.color=value;const color=getComputedStyle(themeProbe).color;return color==='transparent'||color==='rgba(0, 0, 0, 0)'?null:color;};
     const nativeColor=(names,fallback)=>{for(const name of names){const value=navStyle.getPropertyValue(name).trim()||appStyle.getPropertyValue(name).trim()||bodyStyle.getPropertyValue(name).trim()||htmlStyle.getPropertyValue(name).trim();const color=resolve(value);if(color)return color;}return fallback;};
-    const palette={default:dark?'#60a5fa':'#2563eb',blue:dark?'#60a5fa':'#2563eb',green:dark?'#4ade80':'#15803d',yellow:dark?'#facc15':'#a16207',pink:dark?'#f472b6':'#be185d',orange:dark?'#fb923c':'#c2410c',purple:dark?'#c084fc':'#7e22ce',neutral:dark?'#ececec':'#202123'};
+    const palette={claude:dark?'#d97757':'#c6613f',default:dark?'#60a5fa':'#2563eb',blue:dark?'#60a5fa':'#2563eb',green:dark?'#4ade80':'#15803d',yellow:dark?'#facc15':'#a16207',pink:dark?'#f472b6':'#be185d',orange:dark?'#fb923c':'#c2410c',purple:dark?'#c084fc':'#7e22ce',neutral:dark?'#ececec':'#202123'};
     const nativeAccent=(html.dataset.accentColor||body.dataset.accentColor||html.dataset.accent||body.dataset.accent||'').toLowerCase();
-    const accent=state.accent==='auto'?(preset?preset.accent:state.preset==='chatgpt'?palette.default:nativeColor(['--color-accent','--theme-accent','--accent','--accent-color','--codex-accent','--interactive-bg-accent-default','--bg-accent','--text-accent','--accent-primary','--theme-user-selection-bg'],palette[nativeAccent]||(nativeAccent==='black'||nativeAccent==='white'?palette.neutral:palette.default))):palette[state.accent];
+    const accent=state.accent==='auto'?(preset?preset.accent:state.preset==='chatgpt'?palette.default:state.preset==='claude'?palette.claude:nativeColor([...(IS_CLAUDE?['--accent-brand','--accent-main-100','--accent-main-000']:[]),'--color-accent','--theme-accent','--accent','--accent-color','--codex-accent','--interactive-bg-accent-default','--bg-accent','--text-accent','--accent-primary','--theme-user-selection-bg'],palette[nativeAccent]||(nativeAccent==='black'||nativeAccent==='white'?palette.neutral:IS_CLAUDE?palette.claude:palette.default))):palette[state.accent];
     const colors={'--remaining':accent,'--ok':accent};
     if(state.preset==='auto'&&state.theme==='auto'){
       if(nav){
         colors['--fg']=getComputedStyle(nav).color;
         for(let el=nav;el;el=el.parentElement){const bg=getComputedStyle(el).backgroundColor;if(bg!=='transparent'&&bg!=='rgba(0, 0, 0, 0)'){colors['--surface']=bg;break;}}
       }
-      colors['--muted']=nativeColor(['--color-text-secondary','--muted-foreground','--text-secondary','--text-tertiary'],`color-mix(in srgb, ${colors['--fg']|| (dark?'#ececec':'#202123')} 70%, ${colors['--surface']|| (dark?'#000000':'#f9f9f9')})`);
+      colors['--muted']=nativeColor([...(IS_CLAUDE?['--text-300']:[]),'--color-text-secondary','--muted-foreground','--text-secondary','--text-tertiary'],`color-mix(in srgb, ${colors['--fg']|| (dark?'#ececec':'#202123')} 70%, ${colors['--surface']|| (dark?'#000000':'#f9f9f9')})`);
       colors['--line']=nativeColor(['--color-border','--border','--border-default','--border-light'],`color-mix(in srgb, ${colors['--fg']|| (dark?'#ececec':'#202123')} 18%, ${colors['--surface']|| (dark?'#000000':'#f9f9f9')})`);
       colors['--hover']=nativeColor(['--color-surface-hover','--sidebar-surface-secondary','--bg-hover'],`color-mix(in srgb, ${colors['--fg']|| (dark?'#ececec':'#202123')} 8%, ${colors['--surface']|| (dark?'#000000':'#f9f9f9')})`);
     }
@@ -750,18 +926,19 @@
     const middleControls=`${state.gradientStops.map((stop,index)=>`<div class="gradient-stop" data-color-label="Middle color ${index+1}"><input type="color" value="${stop.color}" data-gradient-color="${index}" aria-label="Middle color ${index+1}"><label>From <input type="number" min="1" max="99" step="1" value="${stop.from}" data-gradient-from="${index}" aria-label="Middle color ${index+1} from">%</label><label>To <input type="number" min="1" max="99" step="1" value="${stop.to}" data-gradient-to="${index}" aria-label="Middle color ${index+1} to">%</label><button class="text-btn" data-remove-stop="${index}" aria-label="Remove middle color ${index+1}">Remove</button><div class="gradient-blends"><label>Blend before <input type="number" min="0" max="100" step="1" value="${stop.blendBefore??''}" placeholder="Auto" data-gradient-before="${index}" aria-label="Middle color ${index+1} blend before">%</label><label>Blend after <input type="number" min="0" max="100" step="1" value="${stop.blendAfter??''}" placeholder="Auto" data-gradient-after="${index}" aria-label="Middle color ${index+1} blend after">%</label></div></div>`).join('')}<button class="text-btn" data-add-stop ${state.gradientStops.length>=8?'disabled':''}>Add middle color</button><div class="note">From/To sets the solid color range. Blend before/after sets transition widths in percentage points: smaller is sharper, 0 is a hard edge, blank fills the gap. Neighboring middle colors share the transition between them. 0% is empty; 100% is full.</div>`;
     const barControls=group('barSource','Color source',select('Bar color','barMode',{auto:'Match theme',custom:'Custom'})+(state.barMode==='custom'?toggle('Color by percentage','data-bar-gradient',state.barGradient)+(state.barGradient?'':colorInput('Custom bar color','barColor')):'')+barPreview+`<div class="note">Applies to plan, credit and feature bars.</div>`)+
       (state.barMode==='custom'&&state.barGradient?group('barDisplay','Meter display',toggle('Show gradient across meters','data-visible-gradient',state.barGradientVisible)+`<div class="note">Off: one color for the current percentage. On: show the color scale across the fill.</div>`)+group('barEnds','End colors',colorInput('Color at 0%','barStart')+colorInput('Color at 100%','barEnd'))+group('barMiddle','Middle colors & transitions',middleControls):'');
-    const themeSelect=`<label class="setting"><span>Theme preset</span><select aria-label="Theme preset" data-setting="preset"><optgroup label="ChatGPT"><option value="auto" ${state.preset==='auto'?'selected':''}>Match ChatGPT</option><option value="chatgpt" ${state.preset==='chatgpt'?'selected':''}>ChatGPT</option></optgroup><optgroup label="Codex themes">${THEME_FAMILIES.map(name=>`<option value="${esc(name)}" ${state.preset===name?'selected':''}>${esc(name)}</option>`).join('')}</optgroup></select></label>`;
+    const themeSelect=`<label class="setting"><span>Theme preset</span><select aria-label="Theme preset" data-setting="preset"><optgroup label="${SITE.name}"><option value="auto" ${state.preset==='auto'?'selected':''}>Match ${SITE.name}</option><option value="${SITE.preset}" ${state.preset===SITE.preset?'selected':''}>${T('ChatGPT','Claude (page colors, Claude accent)')}</option></optgroup><optgroup label="Codex themes">${THEME_FAMILIES.map(name=>`<option value="${esc(name)}" ${state.preset===name?'selected':''}>${esc(name)}</option>`).join('')}</optgroup></select></label>`;
     $('.settings').innerHTML=`<div class="settings-header"><div class="settings-title" title="Drag to move settings · Double-click to reset position"><button class="icon settings-grab" aria-label="Move settings" title="Drag or use arrow keys · Home resets position">${icon('grip')}</button><span>Usage settings</span><div class="history-buttons"><button class="icon undo-changes" aria-label="Undo changes" title="Undo changes" ${undoChanges.length?'':'disabled'}>${icon('undo')}</button><button class="icon redo-changes" aria-label="Redo changes" title="Redo changes" ${redoChanges.length?'':'disabled'}>${icon('redo')}</button></div><button class="icon close-settings" aria-label="Close settings">✕</button></div><div class="settings-tabs" role="tablist" aria-label="Settings categories">${Object.entries(SETTINGS_TABS).map(([key,label])=>`<button class="settings-tab" role="tab" id="gptu-tab-${key}" aria-controls="gptu-settings-${key}" aria-selected="${state.settingsTab===key}" tabindex="${state.settingsTab===key?0:-1}" data-settings-tab="${key}">${label}</button>`).join('')}</div></div><div class="settings-body">${
       tab('panel',group('placement','Docking & size',select('Placement','position',{top:'Sidebar top',bottom:'Sidebar bottom',floating:'Floating'})+toggle('Compact mode','data-compact',state.compact)+select('Drag handle position','floatHandlePosition',{before:'Before Usage',after:'After settings'}))+group('visibility','Visibility',toggle('Hide docked panel with sidebar','data-hide-with-sidebar',state.hideWithSidebar)+toggle('Hide frame completely','data-hide-frame',state.hideFrame))+group('hover','Hover behavior',`<div class="note">Turn a switch off to keep that element visible. Keyboard focus also reveals hover-only controls.</div>`+Object.entries(HOVER_OPTIONS).map(([key,item])=>toggle(item.label,`data-hover="${key}" ${key==='frame'&&state.hideFrame?'disabled':''}`,state.hover[key])).join('')+toggle('Hide collapsed Usage until hover','data-hide-collapsed',state.hideCollapsed))+group('status','Update time & Details',toggle('Show update time','data-show-update',state.showUpdateTime)+toggle('Show Details button','data-show-details',state.showDetails)+select('Status position','footerPosition',{header:'Header: before refresh','header-after':'Header: after refresh',top:'Above modules',bottom:'Below modules'})))+
-      tab('modules',group('plan','Plan limits',moduleToggle('plan')+toggle('Show banked reset count & button','data-usage-resets',state.showUsageResets)+toggle('Show paid reset button','data-paid-reset',state.showPaidReset)+toggle('Show remaining plan allowance','data-remaining-plan',state.showRemainingPlan)+`<div class="note">Also applies to the credits bar: remaining when enabled, used when disabled.</div>`+toggle('Plan limit tooltips','data-plan-tooltips',state.showPlanTooltips))+group('credits','Credits',moduleToggle('credits')+toggle('Show credit balance bar','data-credit-bar',state.showCreditBar)+`<div class="credit-reference-controls" ${state.showCreditBar?'':'hidden'}>${toggle('Show available balance','data-credit-balance',state.showCreditBalance)}${toggle('Balance beside Credits title',`data-credit-title ${state.showCreditBalance?'disabled':''}`,state.creditBalanceInTitle)}<div class="note">When the large balance is hidden, move its amount from the percentage row to the Credits title.</div><label class="setting"><span>Full balance</span><span class="margin-input"><input type="number" aria-label="Full credit balance" min="0.01" step="any" data-credit-reference value="${state.creditReference??''}" placeholder="e.g. 1000">credits</span></label><div class="note">This amount counts as 100%. Initially uses your balance when enabled; you can change it.</div></div>`+toggle('Add credits button','data-add-credits',state.showAddCredits))+group('features','Models & features',moduleToggle('features')+`<div class="feature-settings"><div class="feature-settings-title">Individual counters</div><div class="feature-options" role="group" aria-label="Models & features to show"></div><div class="note">Selections are kept when the module is hidden.</div></div>`))+
-      tab('appearance',group('appearance','Theme & mode',themeSelect+select('Appearance','theme',{auto:'Match ChatGPT',system:'System',light:'Light',dark:'Dark'})+`<div class="note">Match ChatGPT follows the page palette and custom colors. Codex presets use available light/dark variants; some have only one mode.</div>`)+group('colors','Accent & contrast',select('Accent color','accent',accentNames)+select('Contrast','contrast',{auto:'Match ChatGPT',system:'System',medium:'Medium',increased:'Increased'})))+
+      tab('modules',group('plan','Plan limits',moduleToggle('plan')+(IS_CLAUDE?'':toggle('Show banked reset count & button','data-usage-resets',state.showUsageResets)+toggle('Show paid reset button','data-paid-reset',state.showPaidReset))+toggle('Show remaining plan allowance','data-remaining-plan',state.showRemainingPlan)+`<div class="note">Also applies to the ${T('credits','extra usage')} bar: remaining when enabled, used when disabled.</div>`+toggle('Plan limit tooltips','data-plan-tooltips',state.showPlanTooltips))+group('credits',labels.credits,moduleToggle('credits')+toggle(T('Show credit balance bar','Show extra usage bar'),'data-credit-bar',state.showCreditBar)+`<div class="credit-reference-controls" ${state.showCreditBar?'':'hidden'}>${toggle(T('Show available balance','Show amount left'),'data-credit-balance',state.showCreditBalance)}${toggle(T('Balance beside Credits title','Amount beside Extra usage title'),`data-credit-title ${state.showCreditBalance?'disabled':''}`,state.creditBalanceInTitle)}<div class="note">When the large balance is hidden, move its amount from the percentage row to the ${labels.credits} title.</div><label class="setting"><span>${T('Full balance','Fallback limit')}</span><span class="margin-input"><input type="number" aria-label="Full credit balance" min="0.01" step="any" data-credit-reference value="${state.creditReference??''}" placeholder="${T('e.g. 1000','e.g. 50')}">${T('credits','')}</span></label><div class="note">${T('This amount counts as 100%. Initially uses your balance when enabled; you can change it.','Claude normally reports your monthly extra-usage limit, which counts as 100%. This value is used only when it does not.')}</div></div>`+toggle(T('Add credits button','Manage extra usage button'),'data-add-credits',state.showAddCredits))+group('features','Models & features',moduleToggle('features')+`<div class="feature-settings"><div class="feature-settings-title">Individual counters</div><div class="feature-options" role="group" aria-label="Models & features to show"></div><div class="note">Selections are kept when the module is hidden.</div></div>`))+
+      tab('appearance',group('appearance','Theme & mode',themeSelect+select('Appearance','theme',{auto:'Match '+SITE.name,system:'System',light:'Light',dark:'Dark'})+`<div class="note">Match ${SITE.name} follows the page palette and custom colors. Codex presets use available light/dark variants; some have only one mode.</div>`)+group('colors','Accent & contrast',select('Accent color','accent',accentNames)+select('Contrast','contrast',{auto:'Match '+SITE.name,system:'System',medium:'Medium',increased:'Increased'})))+
       tab('bars',barControls+`<button class="text-btn" data-reset-bar-colors>Reset bar colors</button>`)+
       tab('spacing',`${select('Editing spacing','spacingMode',{auto:'Current density',normal:'Normal',compact:'Compact'})}<div class="note">Editing ${profile==='normal'?'normal':'compact'} mode. All values are in pixels. Inside frame controls the space within the border; outside frame controls the surrounding gap.</div>`+group('spacePanel','Panel & header',['outer','frame','header'].map(box).join(''))+group('spaceStatus','Update time & summary',['status','headerStatus','statusButton','summary'].map(box).join(''))+group('spaceModules','Module spacing',['plan','credits','features','sectionHeader','sectionContent'].map(box).join(''))+group('spaceItems','Items & credits',['planRows','featureRows','creditBalance','creditMeter','addCredits'].map(box).join(''))+group('spaceBars','Bars & captions',['planBars','creditBars','featureBars','captions'].map(box).join(''))+group('spaceDetails','Expanded Details',['details','detailsContent'].map(box).join(''))+`<button class="text-btn reset-spacing" data-reset-spacing="${profile}">Reset ${profile} spacing</button>`)
-    }</div><div class="settings-help"><details><summary>Moving & keyboard controls</summary><div class="note">Drag this window by its title. Double-click the title to return it beside the panel. Use arrow keys on a move or reorder handle.</div></details><div class="settings-file-actions"><button class="text-btn" data-export-settings>Export settings</button><button class="text-btn reset">Reset all settings</button></div><span class="export-status" role="status"></span></div><button class="icon settings-resize" aria-label="Resize settings" title="Drag to resize · Arrow keys resize · Double-click resets size"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m5 13 8-8m-3 8 3-3"/></svg></button>`;
+    }${tab('sync',syncPanelContent())}</div><div class="settings-help"><details><summary>Moving & keyboard controls</summary><div class="note">Drag this window by its title. Double-click the title to return it beside the panel. Use arrow keys on a move or reorder handle.</div></details><div class="settings-file-actions"><button class="text-btn" data-export-settings>Export settings</button><button class="text-btn" data-import-settings>Import settings…</button><button class="text-btn reset">Reset all settings</button></div><span class="export-status" role="status"></span></div><button class="icon settings-resize" aria-label="Resize settings" title="Drag to resize · Arrow keys resize · Double-click resets size"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m5 13 8-8m-3 8 3-3"/></svg></button>`;
     renderFeatureSettings();updateBarPreview();positionSettings();
   }
   function selectSettingsTab(key,focus=false){
     if(!Object.hasOwn(SETTINGS_TABS,key))return;
+    if(key==='sync')readOtherSite().then(()=>{if(!syncMessage)renderSyncPanel();});
     state.settingsTab=key;persist(false);
     if(key==='spacing')renderSettings();
     for(const el of root.querySelectorAll('[data-settings-tab]')){const selected=el.dataset.settingsTab===key;el.setAttribute('aria-selected',String(selected));el.tabIndex=selected?0:-1;if(selected&&focus)el.focus();}
@@ -803,21 +980,22 @@
       return `<div class="row plan-row" ${state.compact?`tabindex="0" role="group" aria-label="${esc(full)}"`:''}><div class="rl"><span>${esc(r.label)}</span><span class="v ${r.reached&&!state.showRemainingPlan?'at-limit':''}">${displayed==null?'—':Math.round(displayed)+(state.showRemainingPlan?'% left':'%')}</span></div>${displayed==null?'':bar(displayed,r.label,state.showRemainingPlan)}<div class="sub">${esc(caption)}</div>${state.compact&&state.showPlanTooltips?`<div class="plan-tip" aria-hidden="true">${esc(full)}</div>`:''}</div>`;
     }).join('')}</div>`:`<div class="empty">${state.error?'Usage unavailable. Try refreshing.':state.usageAt?'No plan limits reported.':'Waiting for usage…'}</div>`;
     if(state.showPaidReset)blocks.plan+=`<button class="add-credits paid-reset" title="Open ChatGPT Usage to review paid reset offers">Paid reset…</button>`;
-    const balance=num(parsed.credits);
-    if(state.showCreditBar&&state.creditReferencePending&&balance>0){state.creditReference=Number(balance.toFixed(2))||balance;state.creditReferencePending=false;persist(false);syncCreditBarSettings();}
-    const creditText=balance!=null?format(balance):parsed.credits??'—';
-    const balanceInTitle=state.creditBalanceInTitle&&state.showCreditBar&&!state.showCreditBalance&&balance!=null&&state.creditReference>0;
+    const balance=num(parsed.credits),creditRef=parsed.creditLimit>0?parsed.creditLimit:state.creditReference;
+    const money=n=>{try{return parsed.currency?new Intl.NumberFormat(undefined,{style:'currency',currency:parsed.currency}).format(n):format(n);}catch(_){return format(n);}};
+    if(state.showCreditBar&&state.creditReferencePending&&!(parsed.creditLimit>0)&&balance>0){state.creditReference=Number(balance.toFixed(2))||balance;state.creditReferencePending=false;persist(false);syncCreditBarSettings();}
+    const creditText=balance!=null?money(balance):parsed.credits??'—';
+    const balanceInTitle=state.creditBalanceInTitle&&state.showCreditBar&&!state.showCreditBalance&&balance!=null&&creditRef>0;
     let creditMeter='';
     if(state.showCreditBar){
-      if(balance!=null&&state.creditReference>0){
-        const remaining=Math.max(0,balance/state.creditReference*100),percentage=state.showRemainingPlan?remaining:Math.max(0,100-remaining),text=new Intl.NumberFormat(undefined,{maximumFractionDigits:1}).format(percentage);
-        creditMeter=`<div class="credit-meter ${state.showCreditBalance||balanceInTitle?'':'has-inline-balance'}"><div class="rl"><span>${state.showRemainingPlan?'Remaining':'Used'}</span><span class="v"><span class="credit-percentage">${text}%</span>${state.showCreditBalance||balanceInTitle?'':`<span class="credit-meter-balance" role="group" aria-label="Available balance">${esc(creditText)}</span>`}</span></div>${bar(Math.min(100,percentage),'Credit balance',state.showRemainingPlan)}<div class="sub">of ${format(state.creditReference)} credits</div></div>`;
-      }else if(balance!=null)creditMeter='<div class="sub credit-meter">Set a full balance in settings to show a percentage.</div>';
-      else if(parsed.credits!=='Unlimited')creditMeter='<div class="sub credit-meter">Balance unavailable.</div>';
+      if(balance!=null&&creditRef>0){
+        const remaining=Math.max(0,balance/creditRef*100),percentage=state.showRemainingPlan?remaining:Math.max(0,100-remaining),text=new Intl.NumberFormat(undefined,{maximumFractionDigits:1}).format(percentage);
+        creditMeter=`<div class="credit-meter ${state.showCreditBalance||balanceInTitle?'':'has-inline-balance'}"><div class="rl"><span>${state.showRemainingPlan?'Remaining':'Used'}</span><span class="v"><span class="credit-percentage">${text}%</span>${state.showCreditBalance||balanceInTitle?'':`<span class="credit-meter-balance" role="group" aria-label="Available balance">${esc(creditText)}</span>`}</span></div>${bar(Math.min(100,percentage),labels.credits,state.showRemainingPlan)}<div class="sub">${parsed.creditLimit>0?`${money(creditRef-balance)} used of ${money(creditRef)} monthly limit`:`of ${format(creditRef)} credits`}</div></div>`;
+      }else if(balance!=null)creditMeter=`<div class="sub credit-meter">Set a ${T('full balance','fallback limit')} in settings to show a percentage.</div>`;
+      else if(parsed.credits!=='Unlimited'&&parsed.credits!=='Off')creditMeter=`<div class="sub credit-meter">${T('Balance unavailable.','Extra usage not reported.')}</div>`;
     }
-    const hasCreditPercentage=state.showCreditBar&&balance!=null&&state.creditReference>0;
-    const creditBalance=!hasCreditPercentage||state.showCreditBalance?`<div class="credit-balance"><div class="credit">${esc(creditText)}</div><div class="sub">${parsed.credits==null?'No credit balance reported':'Available balance'}</div></div>`:'';
-    const addCredits=state.showAddCredits?'<a class="add-credits" href="'+esc(creditPurchaseUrl())+'" target="_blank" rel="noopener noreferrer"><svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M3 8h10"/></svg>Add credits</a>':'';
+    const hasCreditPercentage=state.showCreditBar&&balance!=null&&creditRef>0;
+    const creditBalance=!hasCreditPercentage||state.showCreditBalance?`<div class="credit-balance"><div class="credit">${esc(creditText)}</div><div class="sub">${parsed.credits==null?T('No credit balance reported','Extra usage not reported'):parsed.credits==='Off'?'Extra usage is turned off':parsed.credits==='Unlimited'&&IS_CLAUDE?'No monthly limit':parsed.creditLimit>0?'Left this month':'Available balance'}</div></div>`:'';
+    const addCredits=state.showAddCredits?'<a class="add-credits" href="'+esc(creditPurchaseUrl())+'" target="_blank" rel="noopener noreferrer"><svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M3 8h10"/></svg>'+T('Add credits','Manage')+'</a>':'';
     blocks.credits=creditBalance+(state.showCreditBar?`<div class="credit-actions">${creditMeter}${addCredits}</div>`:addCredits);
     const models=Object.entries(state.models).filter(([name])=>state.hiddenFeatures[name]!==true).sort((a,b)=>(b[1].seenAt||0)-(a[1].seenAt||0)).slice(0,12);
     blocks.features=models.map(([name,m])=>{
@@ -826,7 +1004,7 @@
       const label=featureLabel(name);
       const pct=!expired&&m.limit>0?(m.remaining!=null?100-m.remaining/m.limit*100:m.used!=null?m.used/m.limit*100:null):null;
       return `<div class="row" data-counter="${esc(name)}"><div class="rl"><span>${esc(label)}</span><span class="v">${esc(val)}</span></div>${pct==null?'':bar(Math.max(0,Math.min(100,pct)),label)}<div class="sub">${!expired&&m.resetsAt?`Resets in ${fmtDur(m.resetsAt-Date.now())} · `:''}Seen ${fmtAgo(m.seenAt)}</div></div>`;
-    }).join('')||`<div class="empty">${Object.keys(state.models).length?'All reported counters are hidden. Choose which to show in settings.':'Limits appear here when ChatGPT reports them.'}</div>`;
+    }).join('')||`<div class="empty">${Object.keys(state.models).length?'All reported counters are hidden. Choose which to show in settings.':`Limits appear here when ${SITE.name} reports them.`}</div>`;
     const scroll=$('.body').scrollTop;
     const focused=root.activeElement?.dataset;
     const rawFocused=root.activeElement?.classList.contains('raw');
@@ -837,7 +1015,7 @@
     $('.head').classList.toggle('has-header-status',inHeader&&!!footer);
     $('.head').classList.toggle('has-status-after',state.footerPosition==='header-after'&&!!footer);
     $('.body').innerHTML=(state.footerPosition==='top'?footer:'')+state.sections.filter(k=>!state.hidden[k]).map(k=>`<section class="section" data-section="${k}"><div class="section-head"><button class="section-toggle" data-collapse="${k}" aria-expanded="${!state.closed[k]}" aria-controls="gptu-${k}">${icon(k)}<span>${labels[k]}</span>${k==='credits'&&(state.closed.credits||balanceInTitle)?`<span class="credit-inline" role="group" aria-label="Available balance">${esc(creditText)}</span>`:''}${icon('chevron')}</button>${k==='plan'&&state.showUsageResets&&resetCount()!=null?`<span class="reset-tools" title="Available usage limit resets"><span>${resetCount()} ${resetCount()===1?'reset':'resets'}</span>${resetCount()>0?`<button class="use-reset" aria-label="Use usage limit reset" ${resetPending?'disabled':''}>Use</button>`:''}</span>`:''}<button class="icon section-handle" draggable="true" data-handle="${k}" aria-label="Reorder ${labels[k]}" title="Drag to reorder · ↑ / ↓">${icon('grip')}</button></div><div class="section-content" id="gptu-${k}" ${state.closed[k]?'hidden':''}>${blocks[k]}</div></section>`).join('')+
-      `${state.error?`<div class="err" role="status">${esc(state.error)}</div>`:''}${state.footerPosition==='bottom'?footer:''}${state.showRaw?`<pre>${esc(JSON.stringify({usage:state.usage,models:state.models},null,2))}</pre>`:''}`;
+      `${state.error?`<div class="err" role="status">${esc(state.error)}</div>`:''}${state.footerPosition==='bottom'?footer:''}${state.showRaw?`<pre>${esc(JSON.stringify(IS_CLAUDE?{claude:state.rawUsage??null,usage:state.usage,models:state.models}:{usage:state.usage,models:state.models},null,2))}</pre>`:''}`;
     $('.body').scrollTop=scroll;
     if(host.hasAttribute('data-bottom')) layoutBottom();
     if(rawFocused) $('.raw')?.focus();
@@ -1085,17 +1263,33 @@
   };
   window.addEventListener('pointerup',endDrag);window.addEventListener('pointercancel',endDrag);window.addEventListener('blur',endDrag);
   $('.grab').addEventListener('keydown',e=>{if(e.key==='Escape'){state.position='top';persist();place(true);if(settingsOpen)renderSettings();return;}if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key))return;e.preventDefault();if(state.position!=='floating'){const r=host.getBoundingClientRect();state.floating={x:r.left,y:r.top};state.position='floating';}const step=e.shiftKey?30:10;state.floating.x+=e.key==='ArrowRight'?step:e.key==='ArrowLeft'?-step:0;state.floating.y+=e.key==='ArrowDown'?step:e.key==='ArrowUp'?-step:0;place(false);persist();if(settingsOpen)renderSettings();});
-  function isVisibleElement(el,allowZeroHeight=false) {
+  // aria-hidden/inert only mean "not on screen" when the page set them itself. Menus and dialogs
+  // (right-click menus, popovers) mark everything else that way while it all stays visible:
+  // those come from hide-others helpers that also add data-aria-hidden / data-inert markers.
+  const temporarilyHidden=node=>node.hasAttribute('data-aria-hidden')||node.hasAttribute('data-inert')||node.hasAttribute('data-suppressed');
+  function isVisibleElement(el,allowZeroHeight=false,ignoreAria=false) {
     const r=el.getBoundingClientRect();
     if(r.width<=0||(r.height<=0&&!allowZeroHeight)||r.right<=0||r.bottom<=0||r.left>=innerWidth||r.top>=innerHeight)return false;
     for(let node=el;node&&node!==document.body;node=node.parentElement){
       const style=getComputedStyle(node);
-      if(style.display==='none'||style.visibility==='hidden'||Number(style.opacity)===0||node.hidden||node.getAttribute('aria-hidden')==='true'||node.hasAttribute('inert'))return false;
+      if(style.display==='none'||style.visibility==='hidden'||Number(style.opacity)===0||node.hidden)return false;
+      if(!ignoreAria&&!temporarilyHidden(node)&&(node.getAttribute('aria-hidden')==='true'||node.hasAttribute('inert')))return false;
     }
     return true;
   }
+  function claudeSidebar(){
+    // claude.ai keeps the account button at the foot of the left sidebar; climb to the column that holds it.
+    const account=[...document.querySelectorAll('[data-testid="user-menu-button"]')].find(el=>!host.contains(el)&&isVisibleElement(el));
+    for(let el=account?.parentElement;el&&el!==document.body;el=el.parentElement){
+      const r=el.getBoundingClientRect();
+      if(r.left>innerWidth/2||r.width>520)break;
+      if(r.width>120&&r.height>innerHeight*0.6&&(el.matches('nav,aside')||el.querySelector('a[href^="/chat/"],a[href^="/code/"],a[href="/new"],a[href^="/project"]')))return el;
+    }
+    return null;
+  }
   function findSidebarNav(){
-    for(const selector of ['nav[aria-label="Chat history"]','#stage-slideover-sidebar nav','[data-testid="sidebar"] nav','nav']){
+    if(IS_CLAUDE){const claude=claudeSidebar();if(claude)return claude;}
+    for(const selector of IS_CLAUDE?['nav[aria-label="Sidebar"]','[data-testid="menu-sidebar"]','aside nav','nav']:['nav[aria-label="Chat history"]','#stage-slideover-sidebar nav','[data-testid="sidebar"] nav','nav']){
       for(const el of document.querySelectorAll(selector)){
         const r=el.getBoundingClientRect();
         if(el.getAttribute('aria-label')!=='Show sidebar'&&r.width>120&&(selector==='nav'?r.height>160:r.height>=0)&&r.left>=0&&r.left<innerWidth/2&&isVisibleElement(el,selector!=='nav'))return el;
@@ -1109,9 +1303,9 @@
       const parent=container.parentElement,r=parent.getBoundingClientRect();
       if(r.width>520||r.left>innerWidth/2)break;
       container=parent;
-      if(container.matches('#app-shell-sidebar,#stage-slideover-sidebar,[data-testid="sidebar"],aside'))break;
+      if(container.matches('#app-shell-sidebar,#stage-slideover-sidebar,[data-testid="sidebar"],[data-testid="menu-sidebar"],aside'))break;
     }
-    const selectors=['button[aria-label="Open profile menu"]','[data-testid="accounts-profile-button"], [data-testid="user-menu-button"], [data-testid="profile-button"]','footer'];
+    const selectors=[...(IS_CLAUDE?['[data-testid="user-menu-button"]']:[]),'button[aria-label="Open profile menu"]','[data-testid="accounts-profile-button"], [data-testid="user-menu-button"], [data-testid="profile-button"]','footer'];
     // The collapsed rail and expanded sidebar coexist. Search the active history
     // nav first, and reject hidden duplicate profile controls in every search.
     let account=null;
@@ -1192,8 +1386,13 @@
     const size=(measured>=13&&measured<=20?measured:14)+'px';
     if(host.style.getPropertyValue('--gptu-title-size')!==size)host.style.setProperty('--gptu-title-size',size);
   }
+  let sawSidebar=false;
   function place(force){
-    const nav=findSidebarNav(), hidden=state.position!=='floating'&&!nav&&state.hideWithSidebar;
+    let nav=findSidebarNav();
+    // Keep the sidebar we already use while it is still on screen, even if a menu marked it hidden.
+    if(!nav&&observedSidebar?.isConnected&&isVisibleElement(observedSidebar,false,true))nav=observedSidebar;
+    if(nav)sawSidebar=true;
+    const hidden=state.position!=='floating'&&!nav&&(sawSidebar||!IS_CLAUDE)&&state.hideWithSidebar;
     host.toggleAttribute('data-sidebar-hidden',hidden);
     if(hidden){
       if(settingsOpen)closeSettings();
@@ -1272,6 +1471,8 @@
   root.appendChild(hoverStyle);
 
   // ---------- boot ----------
+  // Toolbar icon follows the site (background.js sets it for this tab).
+  try{const runtime=(globalThis.browser??chrome).runtime;runtime.sendMessage({type:'usage-meter-site',site:SITE.id})?.catch?.(()=>{});}catch(_){}
   load().then(() => {
     // drop model entries older than 7 days
     const cutoff = Date.now() - 7 * 864e5;
