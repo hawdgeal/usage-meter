@@ -6,33 +6,22 @@
   const MIN_GAP_MS = 15 * 1000;
   const store = (globalThis.browser && browser.storage) || chrome.storage;
 
+  function defaultPreferences(){return {
+    collapsed:false,compact:false,compactHeight:null,hideCollapsed:false,
+    showAddCredits:true,showPlanTooltips:false,showRemainingPlan:false,
+    position:'bottom',sections:['plan','credits','features'],closed:{credits:true},
+    hidden:{features:true},hiddenFeatures:{deep_research:true,file_upload:true,paste_text_to_file:true},
+    theme:'auto',floating:{x:24,y:100},size:{width:300,height:null},
+    settingsTab:'panel',settingsClosed:{appearance:false,placement:false,plan:false,credits:true,features:true}
+  };}
   const state = {
-    usage: null,        // raw /wham/usage JSON
-    plan: null,
-    usageAt: 0,
-    error: null,
-    models: {},         // name -> {remaining, limit, used, resetsAt, seenAt}
-    collapsed: false,
-    compact: false,
-    compactHeight: null,
-    hideCollapsed: true,
-    showAddCredits: true,
-    showPlanTooltips: true,
-    showRemainingPlan: false,
-    position: "top", // "top" | "bottom" inside the sidebar
-    showRaw: false,
-    sections: ["plan", "credits", "features"],
-    closed: {},
-    hidden: {},
-    hiddenFeatures: {},
-    theme: "auto",
-    floating: { x: 24, y: 100 },
-    size: { width: 300, height: null },
+    usage:null,plan:null,usageAt:0,error:null,models:{},showRaw:false,
+    ...defaultPreferences()
   };
   let lastRefresh = 0;
 
   // ---------- persistence ----------
-  const saveKeys = ["usage", "plan", "usageAt", "models", "collapsed", "position", "sections", "closed", "hidden", "theme", "floating", "size", "compact", "compactHeight", "hideCollapsed", "hiddenFeatures", "showAddCredits", "showPlanTooltips", "showRemainingPlan"];
+  const saveKeys = ["usage", "plan", "usageAt", "models", "collapsed", "position", "sections", "closed", "hidden", "theme", "floating", "size", "compact", "compactHeight", "hideCollapsed", "hiddenFeatures", "showAddCredits", "showPlanTooltips", "showRemainingPlan", "settingsClosed", "settingsTab"];
   function persist() {
     const o = {};
     for (const k of saveKeys) o[k] = state[k];
@@ -43,13 +32,14 @@
       const r = await store.local.get("gptu");
       if (r && r.gptu) for (const k of saveKeys) if (r.gptu[k] !== undefined) state[k] = r.gptu[k];
     } catch (_) {}
+    if(!['panel','modules'].includes(state.settingsTab))state.settingsTab='panel';
     if (!Array.isArray(state.sections)) state.sections = ["plan", "credits", "features"];
-    for (const key of ["closed", "hidden", "models", "hiddenFeatures"]) if (!state[key] || typeof state[key] !== "object") state[key] = {};
+    for (const key of ["closed", "hidden", "models", "hiddenFeatures", "settingsClosed"]) if (!state[key] || typeof state[key] !== "object") state[key] = {};
     if (!state.floating || !Number.isFinite(state.floating.x) || !Number.isFinite(state.floating.y)) state.floating = {x:24,y:100};
     if (!state.size || !Number.isFinite(state.size.width)) state.size = {width:300,height:null};
     if (!Number.isFinite(state.size.height)) state.size.height = null;
     if (!["auto", "light", "dark"].includes(state.theme)) state.theme = "auto";
-    if (!["top", "bottom", "floating"].includes(state.position)) state.position = "top";
+    if (!["top", "bottom", "floating"].includes(state.position)) state.position = "bottom";
   }
 
   // ---------- helpers ----------
@@ -170,10 +160,10 @@
     @media(hover:none) { .resize { opacity:1; pointer-events:auto; } }
     :host([data-bottom]) { position:relative; margin-top:0; width:auto; flex:0 0 auto; }
     :host([data-bottom]) .card { margin:6px 8px; }
-    .card.collapsed.hide-collapsed .title,.card.collapsed.hide-collapsed .badge,.card.collapsed.hide-collapsed .summary { opacity:0; pointer-events:none; }
-    .card.collapsed.hide-collapsed:hover .title,.card.collapsed.hide-collapsed:hover .badge,.card.collapsed.hide-collapsed:hover .summary,
-    .card.collapsed.hide-collapsed:has(:focus-visible) .title,.card.collapsed.hide-collapsed:has(:focus-visible) .badge,.card.collapsed.hide-collapsed:has(:focus-visible) .summary { opacity:1; pointer-events:auto; }
-    @media(hover:none) { .card.collapsed.hide-collapsed .title,.card.collapsed.hide-collapsed .badge,.card.collapsed.hide-collapsed .summary { opacity:1; pointer-events:auto; } }
+    .card.collapsed.hide-collapsed .usage-icon,.card.collapsed.hide-collapsed .title,.card.collapsed.hide-collapsed .badge,.card.collapsed.hide-collapsed .summary { opacity:0; pointer-events:none; }
+    .card.collapsed.hide-collapsed:hover .usage-icon,.card.collapsed.hide-collapsed:hover .title,.card.collapsed.hide-collapsed:hover .badge,.card.collapsed.hide-collapsed:hover .summary,
+    .card.collapsed.hide-collapsed:has(:focus-visible) .usage-icon,.card.collapsed.hide-collapsed:has(:focus-visible) .title,.card.collapsed.hide-collapsed:has(:focus-visible) .badge,.card.collapsed.hide-collapsed:has(:focus-visible) .summary { opacity:1; pointer-events:auto; }
+    @media(hover:none) { .card.collapsed.hide-collapsed .usage-icon,.card.collapsed.hide-collapsed .title,.card.collapsed.hide-collapsed .badge,.card.collapsed.hide-collapsed .summary { opacity:1; pointer-events:auto; } }
     :host([data-dark]) { color-scheme:dark; }
     :host([data-dark]) .card, :host([data-dark]) .settings { --fg:#ececec; --muted:#ababab; --line:#292929; --surface:#000000; --hover:#171717; --track:#292929; --ok:#57c7a6; --warn:#e9b55f; --bad:#ff7983; }
     button,select { font:inherit; color:inherit; }
@@ -181,16 +171,16 @@
     button:hover { background:var(--hover); }
     button:focus-visible,select:focus-visible { outline:2px solid var(--ok); outline-offset:2px; }
     svg { width:16px; height:16px; flex-shrink:0; vertical-align:middle; pointer-events:none; }
-    .head { flex-shrink:0; display:flex; align-items:center; gap:3px; padding:7px 6px; }
+    .head { flex-shrink:0; display:flex; align-items:center; gap:3px; padding:5px 6px; min-height:38px; }
     .icon { width:28px; height:28px; display:inline-flex; align-items:center; justify-content:center; border-radius:7px; flex-shrink:0; color:var(--muted); }
     .grab { cursor:grab; touch-action:none; }
     .grab:active { cursor:grabbing; }
-    .toggle { display:flex; align-items:center; gap:6px; min-width:0; flex:1; border-radius:7px; padding:5px 2px; text-align:left; }
-    .title { font-size:13px; font-weight:600; white-space:nowrap; }
+    .toggle { display:flex; align-items:center; gap:8px; min-width:0; flex:1; border-radius:7px; padding:5px 2px; text-align:left; }
+    .title { font-size:var(--gptu-title-size,14px); font-weight:500; white-space:nowrap; }
     .badge { color:var(--muted); border:1px solid var(--line); font-size:9px; padding:1px 4px; border-radius:5px; text-transform:uppercase; max-width:58px; overflow:hidden; text-overflow:ellipsis; }
     .chev { width:13px; transition:transform .15s; }
     [aria-expanded="false"] .chev { transform:rotate(-90deg); }
-    .body { min-height:0; max-height:min(56vh,540px); overflow:auto; scrollbar-width:thin; scrollbar-color:var(--track) transparent; }
+    .body { min-height:0; max-height:min(56vh,540px); overflow:auto; scrollbar-width:thin; scrollbar-color:transparent transparent; }
     .section { margin:0 10px; border-top:1px solid var(--line); }
     .section-head { display:flex; align-items:center; gap:2px; padding:5px 0; }
     .section-toggle { display:flex; flex:1; align-items:center; gap:7px; min-width:0; text-align:left; padding:6px 2px; border-radius:6px; font-size:11px; font-weight:600; color:var(--muted); }
@@ -242,7 +232,7 @@
     .drag-over { border-top:2px solid var(--ok); }
     .summary { padding:0 12px 8px; color:var(--muted); font-size:11px; }
     .card.compact { font-size:12px; line-height:1.4; border-radius:10px; }
-    .compact .head { padding:4px 5px; }
+    .compact .head { padding:5px 6px; min-height:38px; }
     .compact .icon { width:24px; height:24px; }
     .compact svg { width:14px; height:14px; }
     .compact .chev { width:11px; }
@@ -283,6 +273,42 @@
     .feature-settings-title { font-size:11px; font-weight:600; color:var(--muted); margin-bottom:6px; }
     .feature-options label { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:5px 0; font-size:11px; overflow-wrap:anywhere; }
     .feature-options input { flex-shrink:0; }
+    .usage-icon { display:inline-flex; flex:0 0 20px; width:20px; color:var(--fg); }
+    .usage-icon svg,.compact .usage-icon svg { width:20px; height:20px; }
+    .head .toggle .chev { margin-left:auto; }
+    .settings { padding:0; width:min(324px,calc(100vw - 16px)); }
+    .settings-title { position:sticky; top:0; z-index:3; background:var(--surface); margin:0; padding:12px 14px; border-bottom:1px solid var(--line); }
+    .settings-header { position:sticky; top:0; z-index:3; background:var(--surface); }
+    .settings-header .settings-title { position:static; border:0; padding-bottom:8px; }
+    .settings-tabs { display:flex; gap:4px; padding:0 12px 10px; border-bottom:1px solid var(--line); }
+    .settings-tab { flex:1; border-radius:7px; padding:6px 10px; font-size:12px; color:var(--muted); }
+    .settings-tab[aria-selected="true"] { background:var(--hover); color:var(--fg); font-weight:600; }
+    .settings-body { padding:0 12px; }
+    .settings-panel[hidden] { display:none !important; }
+    .module-hint { color:var(--muted); font-size:10.5px; padding:0 0 5px; }
+
+    .settings-section { border-bottom:1px solid var(--line); }
+    .settings-section:last-child { border-bottom:0; }
+    .settings-section>summary { display:flex; align-items:center; gap:8px; cursor:pointer; list-style:none; padding:11px 2px; font-size:12px; font-weight:600; }
+    .settings-section>summary::-webkit-details-marker { display:none; }
+    .settings-section>summary .chev { margin-left:auto; }
+    .settings-section:not([open])>summary .chev { transform:rotate(-90deg); }
+    .settings-section>summary:focus-visible { outline:2px solid var(--ok); outline-offset:-2px; border-radius:6px; }
+    .settings-section-content { padding:2px 2px 10px; }
+    .settings-section .setting { margin:0; padding:7px 0; border:0; font-size:11.5px; }
+    .settings-section .checks { margin:0; padding:0; border:0; }
+    .settings-section .feature-settings { border:0; margin:0; padding:4px 0 0; }
+    .settings-help { font-size:10.5px; color:var(--muted); padding:10px 14px; border-top:1px solid var(--line); }
+    .settings-help .reset { font-size:11px; margin:6px 0 0; padding:5px 0; }
+    .body { scrollbar-width:thin; scrollbar-color:transparent transparent; scrollbar-gutter:stable; }
+    .settings { scrollbar-width:thin; scrollbar-color:var(--track) transparent; scrollbar-gutter:stable; }
+    .card:hover .body,.card:has(:focus-visible) .body { scrollbar-color:var(--track) transparent; }
+    .body::-webkit-scrollbar,.settings::-webkit-scrollbar { width:6px; }
+    .body::-webkit-scrollbar-track,.settings::-webkit-scrollbar-track { background:transparent; }
+    .body::-webkit-scrollbar-thumb { background:transparent; border-radius:6px; }
+    .settings::-webkit-scrollbar-thumb { background:var(--track); border-radius:6px; }
+    .card:hover .body::-webkit-scrollbar-thumb,.card:has(:focus-visible) .body::-webkit-scrollbar-thumb { background:var(--track); }
+    @media(hover:none) { .body { scrollbar-color:var(--track) transparent; } }
     .live { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
     @media(prefers-reduced-motion:reduce) { * { animation:none !important; transition:none !important; } }
   `;
@@ -300,7 +326,7 @@
   const root=host.attachShadow({mode:'open'});
   root.innerHTML=`<style>${CSS}</style><div class="card" part="card">
     <div class="head"><button class="icon grab" aria-label="Drag panel; use arrow keys to move, Escape to dock" title="Drag to float · Arrow keys to move · Escape to dock">${icon('grip')}</button>
-    <button class="toggle" aria-expanded="true">${icon('chevron')}<span class="title">Usage</span><span class="badge" hidden></span></button>
+    <button class="toggle" aria-expanded="true"><span class="usage-icon">${icon('plan')}</span><span class="title">Usage</span><span class="badge" hidden></span>${icon('chevron')}</button>
     <button class="icon refresh" title="Refresh usage" aria-label="Refresh usage">${icon('refresh')}</button>
     <button class="icon customize" title="Customize panel" aria-label="Customize panel" aria-expanded="false">${icon('settings')}</button></div>
     <div class="summary" hidden></div><div class="body"></div><button class="resize" aria-label="Resize panel" title="Drag to resize · Arrow keys to resize · Double-click to reset size"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m5 13 8-8m-3 8 3-3"/></svg></button><div class="live" aria-live="polite"></div></div><div class="settings" popover="auto" role="dialog" aria-label="Usage settings"></div>`;
@@ -320,19 +346,30 @@
     host.toggleAttribute('data-dark',dark);
   }
   function renderSettings() {
-
     $('.customize').setAttribute('aria-expanded',String(settingsOpen));
-    $('.settings').innerHTML=`<div class="settings-title"><span>Usage settings</span><button class="icon close-settings" aria-label="Close settings">✕</button></div><div class="setting"><span>Appearance</span><select aria-label="Appearance" data-setting="theme">${['auto','light','dark'].map(k=>`<option value="${k}" ${state.theme===k?'selected':''}>${k==='auto'?'Match ChatGPT':k==='light'?'Light':'Dark'}</option>`).join('')}</select></div>
-    <div class="setting"><span>Placement</span><select aria-label="Placement" data-setting="position">${['top','bottom','floating'].map(k=>`<option value="${k}" ${state.position===k?'selected':''}>${k==='top'?'Sidebar top':k==='bottom'?'Sidebar bottom':'Floating'}</option>`).join('')}</select></div>
-    <label class="setting compact-toggle"><span>Compact mode</span><input type="checkbox" role="switch" aria-label="Compact mode" data-compact ${state.compact?'checked':''}></label>
-    <label class="setting"><span>Hide collapsed Usage until hover</span><input type="checkbox" role="switch" aria-label="Hide collapsed Usage until hover" data-hide-collapsed ${state.hideCollapsed?'checked':''}></label>
-    <label class="setting"><span>Add credits button</span><input type="checkbox" role="switch" aria-label="Add credits button" data-add-credits ${state.showAddCredits?'checked':''}></label>
-    <label class="setting"><span>Plan limit tooltips</span><input type="checkbox" role="switch" aria-label="Plan limit tooltips" data-plan-tooltips ${state.showPlanTooltips?'checked':''}></label>
-    <label class="setting"><span>Show remaining plan allowance</span><input type="checkbox" role="switch" aria-label="Show remaining plan allowance" data-remaining-plan ${state.showRemainingPlan?'checked':''}></label>
-    <div class="modules-title" id="gptu-modules-label">Visible modules</div><div class="checks" role="group" aria-labelledby="gptu-modules-label">${Object.keys(labels).map(k=>`<label><span>${labels[k]}</span><input type="checkbox" role="switch" aria-label="Show ${labels[k]}" data-visible="${k}" ${!state.hidden[k]?'checked':''}></label>`).join('')}</div>
-    <div class="feature-settings"><div class="feature-settings-title" id="gptu-feature-options-label">Models &amp; features to show</div><div class="feature-options" role="group" aria-labelledby="gptu-feature-options-label"></div><div class="note">Counters appear when ChatGPT reports them. New models are added here automatically.</div></div>
-    <div class="note">Drag section handles to reorder. Use ↑ / ↓ on a section handle for keyboard reordering.</div><button class="text-btn reset">Reset layout</button>`;
+    const toggle=(label,attr,checked)=>`<label class="setting"><span>${label}</span><input type="checkbox" role="switch" aria-label="${label}" ${attr} ${checked?'checked':''}></label>`;
+    const moduleToggle=key=>toggle('Show '+labels[key],`data-visible="${key}"`,!state.hidden[key]);
+    const group=(key,label,content)=>`<details class="settings-section" data-settings-section="${key}" ${!state.settingsClosed[key]?'open':''}><summary>${icon(['appearance','placement'].includes(key)?'settings':key==='features'?'features':key)}<span>${label}</span>${icon('chevron')}</summary><div class="settings-section-content">${content}</div></details>`;
+    const tabs=['panel','modules'].map(key=>`<button class="settings-tab" role="tab" id="gptu-tab-${key}" aria-controls="gptu-settings-${key}" aria-selected="${state.settingsTab===key}" tabindex="${state.settingsTab===key?0:-1}" data-settings-tab="${key}">${key==='panel'?'Panel':'Modules'}</button>`).join('');
+    $('.settings').innerHTML=`<div class="settings-header"><div class="settings-title"><span>Usage settings</span><button class="icon close-settings" aria-label="Close settings">✕</button></div><div class="settings-tabs" role="tablist" aria-label="Settings categories">${tabs}</div></div><div class="settings-body">
+      <div class="settings-panel" role="tabpanel" id="gptu-settings-panel" aria-labelledby="gptu-tab-panel" ${state.settingsTab==='panel'?'':'hidden'}>${
+        group('appearance','Appearance',`<div class="setting"><span>Theme</span><select aria-label="Appearance" data-setting="theme">${['auto','light','dark'].map(k=>`<option value="${k}" ${state.theme===k?'selected':''}>${k==='auto'?'Match ChatGPT':k==='light'?'Light':'Dark'}</option>`).join('')}</select></div>${toggle('Compact mode','data-compact',state.compact)}`)+
+        group('placement','Placement & visibility',`<div class="setting"><span>Placement</span><select aria-label="Placement" data-setting="position">${['top','bottom','floating'].map(k=>`<option value="${k}" ${state.position===k?'selected':''}>${k==='top'?'Sidebar top':k==='bottom'?'Sidebar bottom':'Floating'}</option>`).join('')}</select></div>${toggle('Hide collapsed Usage until hover','data-hide-collapsed',state.hideCollapsed)}`)
+      }</div>
+      <div class="settings-panel" role="tabpanel" id="gptu-settings-modules" aria-labelledby="gptu-tab-modules" ${state.settingsTab==='modules'?'':'hidden'}>${
+        group('plan','Plan limits',`${moduleToggle('plan')}<div class="module-hint">Choose how the allowance is displayed.</div>${toggle('Show remaining plan allowance','data-remaining-plan',state.showRemainingPlan)}${toggle('Plan limit tooltips','data-plan-tooltips',state.showPlanTooltips)}`)+
+        group('credits','Credits',`${moduleToggle('credits')}${toggle('Add credits button','data-add-credits',state.showAddCredits)}`)+
+        group('features','Models & features',`${moduleToggle('features')}<div class="feature-settings"><div class="feature-settings-title">Individual counters</div><div class="feature-options" role="group" aria-label="Models & features to show"></div><div class="note">Selections are kept when the whole module is hidden. Counters appear when ChatGPT reports them.</div></div>`)
+      }</div>
+    </div><div class="settings-help"><details><summary>Keyboard & dragging</summary><div class="note">Drag the panel handle to float. Use section handles to reorder, or focus one and press ↑ / ↓.</div></details><button class="text-btn reset">Reset settings</button></div>`;
     renderFeatureSettings();
+  }
+  function selectSettingsTab(key,focus=false){
+    if(!['panel','modules'].includes(key))return;
+    state.settingsTab=key;persist();
+    for(const el of root.querySelectorAll('[data-settings-tab]')){const selected=el.dataset.settingsTab===key;el.setAttribute('aria-selected',String(selected));el.tabIndex=selected?0:-1;if(selected&&focus)el.focus();}
+    for(const el of root.querySelectorAll('.settings-panel'))el.hidden=el.id!=='gptu-settings-'+key;
+    $('.settings').scrollTop=0;positionSettings();
   }
   function renderFeatureSettings(){
     const active=root.activeElement?.dataset.feature;
@@ -394,16 +431,26 @@
     menu.style.top=Math.max(8,Math.min(below>=r.height?anchor.bottom+6:anchor.top-r.height-6,innerHeight-r.height-8))+'px';
   }
   function closeSettings(focus=false) { host.removeAttribute('data-settings-open');$('.settings').hidePopover(); settingsOpen=false;$('.customize').setAttribute('aria-expanded','false');if(focus)$('.customize').focus(); }
-  $('.customize').onclick=()=>{if(settingsOpen){closeSettings();return;}settingsOpen=true;host.setAttribute('data-settings-open','');renderSettings();$('.settings').showPopover();positionSettings();$('.settings').querySelector('select').focus();};
+  $('.customize').onclick=()=>{if(settingsOpen){closeSettings();return;}settingsOpen=true;host.setAttribute('data-settings-open','');renderSettings();$('.settings').showPopover();positionSettings();$('.settings').querySelector('[aria-selected="true"]').focus();};
   $('.settings').addEventListener('toggle',e=>{settingsOpen=e.newState==='open';host.toggleAttribute('data-settings-open',settingsOpen);$('.customize').setAttribute('aria-expanded',String(settingsOpen));});
-  root.addEventListener('click',e=>{if(e.target.closest('.close-settings'))closeSettings(true);});
+  root.addEventListener('click',e=>{if(e.target.closest('.close-settings'))closeSettings(true);const tab=e.target.closest('[data-settings-tab]');if(tab)selectSettingsTab(tab.dataset.settingsTab);});
+  root.addEventListener('keydown',e=>{
+    const tab=e.target.closest('[data-settings-tab]');if(!tab||!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;
+    e.preventDefault();selectSettingsTab(e.key==='Home'?'panel':e.key==='End'?'modules':tab.dataset.settingsTab==='panel'?'modules':'panel',true);
+  });
+  root.addEventListener('toggle',e=>{
+    const key=e.target.dataset?.settingsSection;if(!key)return;
+    const closed=!e.target.open;
+    if(state.settingsClosed[key]!==closed){state.settingsClosed[key]=closed;persist();}
+    positionSettings();
+  },true);
   window.addEventListener('resize',positionSettings);
   document.addEventListener('scroll',positionSettings,true);
   root.addEventListener('click',e=>{
     const k=e.target.closest('[data-collapse]')?.dataset.collapse;
     if(k){state.closed[k]=!state.closed[k];persist();render();}
     if(e.target.closest('.raw')){state.showRaw=!state.showRaw;render();$('.raw').focus();}
-    if(e.target.closest('.reset')){Object.assign(state,{sections:['plan','credits','features'],closed:{},hidden:{},hiddenFeatures:{},theme:'auto',position:'top',floating:{x:24,y:100},size:{width:300,height:null},compact:false,compactHeight:null,hideCollapsed:true,showAddCredits:true,showPlanTooltips:true,showRemainingPlan:false});persist();closeSettings(true);render();place(true);}
+    if(e.target.closest('.reset')){Object.assign(state,defaultPreferences());persist();closeSettings(true);render();place(true);}
   });
   root.addEventListener('change',e=>{
     if(e.target.hasAttribute('data-remaining-plan')){state.showRemainingPlan=e.target.checked;persist();render();positionSettings();}
@@ -561,8 +608,15 @@
     card.style.maxHeight=Math.min(available,innerHeight*.6)+'px';
   }
 
+  function syncHeading(nav){
+    const reference=[...nav.querySelectorAll('[data-testid="create-new-chat-button"],a[href="/"],a[href]')].find(el=>!host.contains(el)&&isVisibleElement(el));
+    const measured=reference?parseFloat(getComputedStyle(reference).fontSize):14;
+    const size=(measured>=13&&measured<=20?measured:14)+'px';
+    if(host.style.getPropertyValue('--gptu-title-size')!==size)host.style.setProperty('--gptu-title-size',size);
+  }
   function place(force){
     const nav=findSidebarNav(), floating=state.position==='floating'||!nav, bottom=!floating&&state.position==='bottom';
+    if(nav)syncHeading(nav);
     if(nav&&observedSidebar!==nav){sidebarResizeObserver.disconnect();sidebarResizeObserver.observe(nav);const {container}=bottomTarget(nav);if(container!==nav)sidebarResizeObserver.observe(container);sidebarAttributes.disconnect();sidebarAttributes.observe(container,{attributes:true,subtree:true,attributeFilter:['class','style','hidden','aria-hidden','inert']});observedSidebar=nav;}
     host.toggleAttribute('data-floating',floating);host.toggleAttribute('data-bottom',bottom);
     applySize();
