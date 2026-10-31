@@ -385,13 +385,19 @@
     }
     // Prefer the exact profile control; the absolute button itself is an overlay
     // inside the account row, so insert beside its containing footer branch.
-    const account=container.querySelector('button[aria-label="Open profile menu"]')||container.querySelector('[data-testid="accounts-profile-button"], [data-testid="user-menu-button"], [data-testid="profile-button"]')||container.querySelector('footer');
+    // ChatGPT also renders a profile button in the hidden collapsed rail; only use visible ones,
+    // preferring one inside the history nav's own panel.
+    const shown=el=>{const r=el.getBoundingClientRect();return r.width>0&&r.height>0&&getComputedStyle(el).visibility!=='hidden';};
+    const pick=sel=>{const all=[...container.querySelectorAll(sel)].filter(shown);return all.find(el=>nav.contains(el))||all.find(el=>nav.parentElement?.contains(el))||all[0]||null;};
+    const account=pick('button[aria-label="Open profile menu"]')||pick('[data-testid="accounts-profile-button"], [data-testid="user-menu-button"], [data-testid="profile-button"]')||pick('footer');
     if(account){
       let parent=nav;
       while(parent&&!parent.contains(account))parent=parent.parentElement;
       if(parent&&parent!==document.body){
-        let before=account;
-        while(before.parentElement!==parent)before=before.parentElement;
+        const branchOf=par=>{let b=account;while(b.parentElement!==par)b=b.parentElement;return b;};
+        let before=branchOf(parent);
+        // Step into tall wrappers (e.g. the scrolling history list) until the branch is the footer itself.
+        while(before!==account&&before.getBoundingClientRect().height>200&&before.contains(account)&&before!==account.parentElement){parent=before;before=branchOf(parent);}
         return {container,parent,before,account};
       }
     }
