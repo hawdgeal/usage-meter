@@ -6,7 +6,7 @@ A browser extension that adds a **Usage** card to ChatGPT's left sidebar, showin
 - **Credits** — your pay-as-you-go usage-credit balance, or "Unlimited".
 - **Model & feature limits** — remaining messages/uses per model or feature (Deep Research, image generation…), captured whenever ChatGPT reports them.
 
-## Panel controls (0.3.24)
+## Panel controls (0.3.25)
 
 - The settings window has a lower-right resize handle. Its size is saved separately from the Usage panel; resizing fixes its current position. Double-click the handle or press Home while it is focused to restore automatic sizing.
 
@@ -16,6 +16,9 @@ A browser extension that adds a **Usage** card to ChatGPT's left sidebar, showin
 - **General → Visibility → Hide frame completely** suppresses the Usage panel’s outer border and floating shadow even while hovered or focused. Content, its background, and keyboard focus indicators remain available. This overrides Frame on hover only.
 
 - Drag the settings title bar or its move handle to reposition the window. The position is saved and clamped to the viewport. Double-click the title to reattach it beside Customize; arrow keys move the focused handle and Home resets its position.
+
+- **Appearance → Bar colors** provides independent colors for remaining allowance, normal usage, high usage, limit reached, and the bar background across plan, credit, and feature meters. Choose Match theme, a named color, or Custom for a color picker. Choices persist across reloads and theme changes; Optional Gradient bars use configurable 0% and 100% endpoint colors plus up to eight middle colors at editable percentage positions, anchored to the full meter scale rather than stretched across the filled portion. This replaces solid status colors while enabled. Reset bar colors restores theme defaults and disables gradients without resetting the theme.
+- Embedded-page loading messages are centered horizontally and vertically within the content area, without a divider.
 
 - **Theme preset, Mode, Accent color, and Contrast** default to following ChatGPT and update with native theme changes. The theme picker contains ChatGPT and 27 Codex theme families, with their available light/dark variants. Manual controls also include System/Light/Dark mode, Default/Blue/Green/Yellow/Pink/Orange/Purple/Black–White accents, and System/Medium/Increased contrast. Preset palettes are adapted from Codex Palette; native application-shell colors can differ. Choices are saved independently. Native matching uses the page’s rendered sidebar and available color tokens, with a blue fallback when no accent is exposed. See THIRD-PARTY-NOTICES.txt for palette licensing.
 - **Spacing → Panel & header → Frame margins (outside)** controls the gap around the visible frame, including the gap above your profile. Bottom defaults to zero; Inside frame controls content padding separately. Explicit saved margins are preserved.
