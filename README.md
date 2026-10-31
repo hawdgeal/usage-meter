@@ -2,6 +2,16 @@
 
 One browser extension that adds a **Usage** card to the left sidebar of **ChatGPT** (chatgpt.com) and **Claude** (claude.ai, including Claude Code on the web). Each site keeps its own settings, and the **Sync** tab copies settings between them in either direction.
 
+## What's new in 0.4.3
+
+- **Claude usage dialog:** shows only the usage content again, without Claude's Settings window, its menu or its header. The settings window's parts sit inside layout-only wrappers (`display: contents`), which the previous version could not see. The dialog now finds the settings menu by Claude's `…-settings` items (or, if those change, a narrow column of menu items) and keeps the content column beside it. **Layout → Visibility → Open usage pages** can open them in a new tab instead; the dialog stays the default.
+- **Panel stays in the app sidebar** while Claude's Settings window is open. It used to move into the settings menu.
+- **Credits in the collapsed summary:** when the panel is collapsed, the summary shows your credit balance (ChatGPT) or extra usage left this month (Claude) after the plan limit, for example "78% left · €37.50 extra · just now". It's on by default and only appears when you have credits. Switch it off in **Modules → Credits / Extra usage → Show in collapsed summary**. This is separate from **Balance beside Credits title**, which still moves the amount next to the heading in bars-only mode.
+- **Header timestamp** is capitalized ("Just now") in both header positions, before or after Refresh.
+- **Sync:** collapsed sections, the collapsed panel and the floating position are now a separate **Panel state** group, off by default, so they only transfer when you choose to. Undoing "Apply to the other site" now restores that site's defaults when it had no saved settings, and its open tabs follow.
+- **Exports** are named with your local date instead of the UTC date.
+- **Fewer errors blamed on the extension:** on Claude, the extension no longer wraps the page's `fetch`; it notices finished replies through the browser's performance timeline. Claude's own failed requests (for example analytics blocked by an ad blocker) are no longer reported as extension errors. On ChatGPT, the wrapper now returns the page's own request unchanged, skips bodies over 2 MB and scans when the page is idle.
+
 ## What's new in 0.4.2
 
 - **Claude usage dialog:** clicking **Usage** or **Manage** shows your usage again, not Claude's settings menu. The dialog now finds the usage content by its position beside the settings menu, instead of by which links it contains.
@@ -23,7 +33,7 @@ One browser extension that adds a **Usage** card to the left sidebar of **ChatGP
 
 ## Claude specifics
 
-- Usage settings open inside the panel's dialog showing only the usage content. Claude's own Settings window and sidebars are hidden there. If that page changes and the content can't be isolated, the full page shows after a few seconds. **Open in tab** always works.
+- Usage settings open inside the panel's dialog showing only the usage content. Claude's own Settings window, its menu and header are hidden there. If that page changes and the content can't be isolated, the full page shows after a few seconds. **Open in tab** always works, and **Open usage pages → In a new tab** skips the dialog.
 - **Credits** is called **Extra usage**. Its bar uses Claude's reported monthly limit as 100%. **Fallback limit** is used only when Claude reports none.
 - **Match Claude** reads Claude's page colors, so bars default to Claude's orange.
 - On pages without a sidebar (for example full-width Claude Code pages), the panel floats instead of hiding.
@@ -40,10 +50,11 @@ One browser extension that adds a **Usage** card to the left sidebar of **ChatGP
 
 | File | Role |
 | --- | --- |
-| `page-hook-chatgpt.js` | ChatGPT data: session token, `/backend-api/wham/usage`, resets, passive limit scan. |
-| `page-hook-claude.js` | Claude data: organization, `/api/organizations/{org}/usage`, converted to the same shape; refreshes after each reply. |
+| `page-hook-chatgpt.js` | ChatGPT data: session token, `/backend-api/wham/usage`, resets, and a passive scan of ChatGPT's JSON responses for model and feature limits (bodies up to 2 MB, when idle). |
+| `page-hook-claude.js` | Claude data: organization, `/api/organizations/{org}/usage`, converted to the same shape. Refreshes after each reply, detected through the browser's performance timeline. |
 | `content.js` | The panel for both sites (picks the site from the hostname), settings, Sync, Export/Import. |
 | `background.js` | Sets the per-site toolbar icon. |
+| `tools/settings-outline.js` | Diagnostic, not part of the extension. Paste it into the browser console on claude.ai to print the layout of Claude's Settings window (no page text) when the usage dialog needs adjusting. |
 
 Privacy: the extension only contacts chatgpt.com and claude.ai, using your existing login. Settings and the last usage snapshot stay in the extension's local storage.
 

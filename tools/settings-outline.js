@@ -1,12 +1,14 @@
 // Prints the layout of Claude's settings page so the usage dialog can be fixed against the real
 // structure. Read-only. It records element types, sizes, roles, test ids and link paths (with
 // chat IDs blanked out). It never records the text on the page.
-// Use: open https://claude.ai/settings/usage in a normal tab, open DevTools (F12) → Console,
-// paste this whole file, press Enter. The outline is copied to the clipboard.
+// Use: open DevTools (F12) → Console on claude.ai, paste this whole file, press Enter, then open
+// Settings → Usage within 60 seconds (or have it open already). The outline is copied to the
+// clipboard once the Settings window is visible.
 (() => {
-  const dialogs = [...document.querySelectorAll('[role="dialog"],dialog')]
+  const findDialogs = () => [...document.querySelectorAll('[role="dialog"],dialog')]
     .filter((d) => { const r = d.getBoundingClientRect(); return r.width > 300 && r.height > 200; });
-  const root = dialogs[0] || document.body;
+  const capture = (dialogs) => {
+  const root = dialogs[0];
   const CLICKABLE = 'a[href],button,[role="link"],[role="button"],[role="tab"],[role="menuitem"],[role="option"]';
   const lines = [`viewport ${innerWidth}x${innerHeight} · dialogs ${dialogs.length} · root ${root.tagName.toLowerCase()}${root.getAttribute('role') ? '[' + root.getAttribute('role') + ']' : ''}`];
   const label = (el) => {
@@ -49,6 +51,18 @@
   };
   walk(root, 0);
   const out = lines.join('\n');
-  try { copy(out); console.log(`Copied ${lines.length} lines to the clipboard.`); } catch (_) { console.log(out); }
-  return out.length;
+  // copy() is a DevTools helper; it can fail once the console no longer has focus.
+  try { copy(out); console.log(`Copied ${lines.length} lines to the clipboard. If pasting gives nothing, copy the text below.`); } catch (_) {}
+  console.log(out);
+  };
+  const started = Date.now();
+  const check = () => {
+    const dialogs = findDialogs();
+    // Wait a moment after the window appears, so its contents have rendered.
+    if (dialogs.length) { console.log('Settings window found, capturing…'); setTimeout(() => capture(findDialogs()), 1500); return; }
+    if (Date.now() - started > 60000) { console.log('No Settings window appeared within 60 seconds. Open Settings → Usage and run this again.'); return; }
+    setTimeout(check, 300);
+  };
+  if (!findDialogs().length) console.log('Waiting up to 60 seconds: open Settings → Usage now.');
+  check();
 })();

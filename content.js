@@ -72,13 +72,14 @@
     resize:{label:'Resize handle on hover only',selector:'.resize'},
     scrollbar:{label:'Scrollbar on hover only'}
   };
-  function defaultPreferences(){return {
+  // Defaults differ slightly per site; Sync's undo needs the other site's defaults too.
+  function defaultPreferences(site=SITE){const claude=site===SITES.claude,T=(chatgpt,claudeValue)=>claude?claudeValue:chatgpt;return {
     floatHandlePosition:'after',hideFrame:false,hover:Object.fromEntries(Object.keys(HOVER_OPTIONS).map(key=>[key,true])),collapsed:false,compact:false,compactHeight:null,hideCollapsed:false,hideWithSidebar:true,footerPosition:T('top','header-after'),showUpdateTime:true,showDetails:true,marginTop:6,marginBottom:6,
-    showUsageResets:!IS_CLAUDE,showPaidReset:false,showAddCredits:true,showPlanTooltips:false,showRemainingPlan:true,showCreditBar:IS_CLAUDE,showCreditBalance:true,creditBalanceInTitle:false,creditReference:null,creditReferencePending:false,
+    showUsageResets:!claude,showPaidReset:false,showAddCredits:true,showPlanTooltips:false,showRemainingPlan:true,showCreditBar:claude,summaryCredits:true,showCreditBalance:true,creditBalanceInTitle:false,creditReference:null,creditReferencePending:false,
     position:'bottom',sections:['plan','credits','features'],closed:{credits:true},
     hidden:{features:true},hiddenFeatures:T({deep_research:true,file_upload:true,paste_text_to_file:true},{}),
     theme:'auto',preset:'auto',accent:'auto',contrast:'auto',barMode:'auto',barColor:T('#60a5fa','#d97757'),barStart:T('#60a5fa','#d97757'),barEnd:'#ff7983',barGradient:false,barGradientVisible:false,gradientStops:[],floating:{x:24,y:100},size:{width:300,height:null},
-    syncGroups:{layout:true,modules:true,theme:true,bars:true,spacing:true},settingsTab:'panel',settingsPosition:null,settingsSize:null,spacingMode:'auto',spacing:{normal:{},compact:{}},settingsClosed:{barSource:false,barDisplay:true,barEnds:false,barMiddle:false,hover:true,appearance:false,colors:true,status:true,placement:false,visibility:true,plan:false,credits:true,features:true,spacePanel:false,spaceStatus:true,spaceModules:true,spaceItems:true,spaceBars:true,spaceDetails:true}
+    usagePageMode:'dialog',syncGroups:{layout:true,modules:true,theme:true,bars:true,spacing:true,state:false},settingsTab:'panel',settingsPosition:null,settingsSize:null,spacingMode:'auto',spacing:{normal:{},compact:{}},settingsClosed:{barSource:false,barDisplay:true,barEnds:false,barMiddle:false,hover:true,appearance:false,colors:true,status:true,placement:false,visibility:true,plan:false,credits:true,features:true,spacePanel:false,spaceStatus:true,spaceModules:true,spaceItems:true,spaceBars:true,spaceDetails:true}
   };}
   const state = {
     usage:null,plan:null,usageAt:0,error:null,models:{},showRaw:false,resetInfo:null,
@@ -87,7 +88,7 @@
   let lastRefresh = 0;
 
   // ---------- persistence ----------
-  const saveKeys = ["syncGroups", "appliedAt", "floatHandlePosition", "creditBalanceInTitle", "showUsageResets", "barGradientVisible", "showPaidReset", "barMode", "barColor", "barStart", "barEnd", "gradientStops", "barGradient", "hideFrame", "hover", "usage", "plan", "usageAt", "models", "collapsed", "position", "sections", "closed", "hidden", "theme", "preset", "accent", "contrast", "floating", "size", "compact", "compactHeight", "hideCollapsed", "hideWithSidebar", "hiddenFeatures", "showAddCredits", "showPlanTooltips", "showRemainingPlan", "settingsClosed", "settingsTab", "settingsPosition", "settingsSize", "spacing", "spacingMode", "footerPosition", "showUpdateTime", "showDetails", "marginTop", "marginBottom", "showCreditBar", "showCreditBalance", "creditReference", "creditReferencePending"];
+  const saveKeys = ["summaryCredits", "usagePageMode", "syncGroups", "appliedAt", "floatHandlePosition", "creditBalanceInTitle", "showUsageResets", "barGradientVisible", "showPaidReset", "barMode", "barColor", "barStart", "barEnd", "gradientStops", "barGradient", "hideFrame", "hover", "usage", "plan", "usageAt", "models", "collapsed", "position", "sections", "closed", "hidden", "theme", "preset", "accent", "contrast", "floating", "size", "compact", "compactHeight", "hideCollapsed", "hideWithSidebar", "hiddenFeatures", "showAddCredits", "showPlanTooltips", "showRemainingPlan", "settingsClosed", "settingsTab", "settingsPosition", "settingsSize", "spacing", "spacingMode", "footerPosition", "showUpdateTime", "showDetails", "marginTop", "marginBottom", "showCreditBar", "showCreditBalance", "creditReference", "creditReferencePending"];
   const historyKeys=Object.keys(defaultPreferences()).filter(key=>!['settingsTab','settingsClosed','spacingMode','creditReferencePending','syncGroups'].includes(key));
   const undoChanges=[],redoChanges=[];
   let historyReady=false,historyCurrent=null,historyGroup='',historyEpoch=0;
@@ -143,6 +144,8 @@
     if(!Number.isFinite(state.creditReference)||state.creditReference<=0)state.creditReference=null;
     for(const key of ['marginTop','marginBottom'])state[key]=Number.isFinite(state[key])?Math.max(0,Math.min(120,state[key])):6;
     if(!['before','after'].includes(state.floatHandlePosition))state.floatHandlePosition='after';
+    if(!['dialog','tab'].includes(state.usagePageMode))state.usagePageMode='dialog';
+    state.summaryCredits=state.summaryCredits!==false;
     if(!['top','bottom','header','header-after'].includes(state.footerPosition))state.footerPosition='top';
     if(!Object.hasOwn(SETTINGS_TABS,state.settingsTab))state.settingsTab='panel';
     if(!state.settingsPosition||!Number.isFinite(state.settingsPosition.x)||!Number.isFinite(state.settingsPosition.y))state.settingsPosition=null;
@@ -186,6 +189,8 @@
     const d = Math.floor(h / 24), hh = h % 24;
     return hh ? `${d}d ${hh}h` : `${d}d`;
   }
+  // In the header the timestamp starts the phrase ("Just now"); elsewhere it follows "Updated" or "·".
+  const capitalize=text=>text.charAt(0).toUpperCase()+text.slice(1);
   function fmtAgo(t) {
     if (!t) return "never";
     const s = Math.round((Date.now() - t) / 1000);
@@ -560,13 +565,15 @@
   // Site-specific keys are never copied: resets, the credit reference (different units), feature
   // counters, and the settings window's own state.
   const SYNC_GROUPS={
-    layout:{label:'Layout',note:'Placement, floating position, size, compact mode, visibility, hover, drag handle, update time, module order and collapsed state',
-      keys:['position','floating','size','compact','compactHeight','hideCollapsed','hideWithSidebar','hideFrame','hover','floatHandlePosition','footerPosition','showUpdateTime','showDetails','collapsed','sections','closed']},
+    layout:{label:'Layout',note:'Placement, size, compact mode, visibility, hover, drag handle, update time, module order and how usage pages open',
+      keys:['position','size','compact','compactHeight','hideCollapsed','hideWithSidebar','hideFrame','hover','floatHandlePosition','footerPosition','showUpdateTime','showDetails','sections','usagePageMode']},
     modules:{label:'Modules',note:'Visible modules, remaining vs used, tooltips, balance bar and button options',
-      keys:['hidden','showRemainingPlan','showPlanTooltips','showCreditBar','showCreditBalance','creditBalanceInTitle','showAddCredits']},
+      keys:['hidden','showRemainingPlan','showPlanTooltips','showCreditBar','showCreditBalance','creditBalanceInTitle','showAddCredits','summaryCredits']},
     theme:{label:'Theme',note:'Preset, mode, accent and contrast. "Match site" stays matched to each site',keys:['theme','preset','accent','contrast']},
     bars:{label:'Bars',note:'Color source, custom colors, ranges and gradient display',keys:['barMode','barColor','barStart','barEnd','gradientStops','barGradient','barGradientVisible']},
-    spacing:{label:'Spacing',note:'Normal and compact spacing profiles',keys:['spacing','spacingMode','marginTop','marginBottom']}
+    spacing:{label:'Spacing',note:'Normal and compact spacing profiles',keys:['spacing','spacingMode','marginTop','marginBottom']},
+    // Temporary interface state, not visual preferences: off unless explicitly chosen.
+    state:{label:'Panel state',note:'Collapsed panel and sections, and the floating position. Off by default',keys:['collapsed','closed','floating']}
   };
   const SYNCABLE_KEYS=Object.values(SYNC_GROUPS).flatMap(group=>group.keys);
   let syncBackup=null,syncMessage='',otherSaved=undefined;
@@ -607,8 +614,11 @@
   async function undoSyncCopy(){
     if(!syncBackup)return;
     try{
-      if(syncBackup.value)await store.local.set({[OTHER.key]:{...syncBackup.value,appliedAt:Date.now()}});
-      else await store.local.remove(OTHER.key);
+      // Write the previous settings back, or the other site's defaults if it had none. Deleting the key
+      // instead would leave an open tab of that site with the copied settings, which it saves again.
+      const allGroups=Object.fromEntries(Object.keys(SYNC_GROUPS).map(key=>[key,true]));
+      const previous=syncBackup.value||pickSettings(defaultPreferences(OTHER),OTHER,OTHER,allGroups);
+      await store.local.set({[OTHER.key]:{...previous,appliedAt:Date.now()}});
       otherSaved=syncBackup.value;syncBackup=null;syncMessage=`Restored the previous ${OTHER.name} settings.`;
     }catch(_){syncMessage='Could not undo. Try again.';}
     renderSyncPanel();
@@ -634,7 +644,8 @@
     if(changes[OTHER.key]){otherSaved=changes[OTHER.key].newValue||null;if(settingsOpen&&state.settingsTab==='sync'&&!syncMessage)renderSyncPanel();}
     const change=changes[SITE.key];const value=change?.newValue;
     if(!value||!value.appliedAt||value.appliedAt===state.appliedAt)return;
-    for(const k of SYNCABLE_KEYS)if(value[k]!==undefined)state[k]=structuredClone(value[k]);
+    const windowKeys=['settingsTab','settingsClosed','settingsPosition','settingsSize','creditReferencePending'];
+    for(const k of Object.keys(defaultPreferences()))if(!windowKeys.includes(k)&&value[k]!==undefined)state[k]=structuredClone(value[k]);
     state.appliedAt=value.appliedAt;normalizePreferences();render();place(true);
     if(historyReady){historyCurrent=preferenceSnapshot();}
     if(settingsOpen){const scroll=$('.settings-body').scrollTop;renderSettings();$('.settings-body').scrollTop=scroll;}
@@ -659,11 +670,12 @@
   }
   function exportSettings(){
     const settings=Object.fromEntries(Object.keys(defaultPreferences()).filter(key=>key!=='creditReferencePending').map(key=>[key,structuredClone(state[key])]));
-    const data={format:'usage-meter-settings',site:SITE.id,version:1,extensionVersion:globalThis.chrome?.runtime?.getManifest?.().version||globalThis.browser?.runtime?.getManifest?.().version||'0.4.2',exportedAt:new Date().toISOString(),settings};
+    const data={format:'usage-meter-settings',site:SITE.id,version:1,extensionVersion:globalThis.chrome?.runtime?.getManifest?.().version||globalThis.browser?.runtime?.getManifest?.().version||'0.4.3',exportedAt:new Date().toISOString(),settings};
     let url;
     try{
       url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)+'\n'],{type:'application/json'}));
-      const link=document.createElement('a');link.href=url;link.download=SITE.name+'-Usage-Meter-settings-'+data.exportedAt.slice(0,10)+'.json';document.body.appendChild(link);link.click();link.remove();
+      const link=document.createElement('a');link.href=url;const now=new Date(),localDate=[now.getFullYear(),now.getMonth()+1,now.getDate()].map(n=>String(n).padStart(2,'0')).join('-');
+      link.download=SITE.name+'-Usage-Meter-settings-'+localDate+'.json';document.body.appendChild(link);link.click();link.remove();
       setTimeout(()=>URL.revokeObjectURL(url),60000);
       $('.export-status').textContent='Settings exported.';
     }catch(_){if(url)URL.revokeObjectURL(url);$('.export-status').textContent='Export failed. Please try again.';}
@@ -768,6 +780,8 @@
   let creditReturnFocus=null,creditReturnPath='',creditWatch=null,creditLoadTimeout=null;
   function openCreditDialog(link){openPageDialog(creditPurchaseUrl(),T('Add credits','Usage'),link,!IS_CLAUDE);}
   function openPageDialog(url,title,returnFocus,closeOnReturn=false){
+    // Optional fallback: open the page in a new tab instead of the dialog.
+    if(state.usagePageMode==='tab'){window.open(url,'_blank','noopener');return;}
     const dialog=$('.credits-modal');
     if(dialog.open){$('.credits-close').focus();return;}
     if(settingsOpen)closeSettings();
@@ -822,30 +836,34 @@
     for(const el of doc.querySelectorAll('[data-gptu-hidden],[data-gptu-path],[data-gptu-content]'))for(const a of GPTU_MARKS)el.removeAttribute(a);
     doc.documentElement.removeAttribute('data-gptu-isolated');
   }
-  // Settings use two columns: a narrow menu of sections on the left and the content pane beside it.
-  // Find that pair by layout, so it works whatever the menu items are made of and in any language.
+  // Claude's Settings window holds a header row, a narrow menu of sections ("…-settings" items) and the
+  // content column. Its parts sit inside display:contents wrappers, which have no box of their own,
+  // so unwrap those before looking at the layout. If the test ids change, a narrow tall column of
+  // clickable items still counts as the menu, and the largest pane to its right is the content.
+  const layoutChildren=el=>[...el.children].flatMap(k=>getComputedStyle(k).display==='contents'?layoutChildren(k):[k]);
+  const boxOf=el=>el.getBoundingClientRect();
+  const hasBox=el=>{const r=boxOf(el);return r.width>0&&r.height>0;};
+  const areaOf=el=>{const r=boxOf(el);return r.width*r.height;};
   function findSettingsContent(doc){
-    const box=el=>el.getBoundingClientRect();
-    const scope=[...doc.querySelectorAll('[role="dialog"],dialog')].find(d=>{const r=box(d);return r.width>300&&r.height>200;})||doc.body;
-    const sr=box(scope);
-    const clickables=el=>el.querySelectorAll('a[href],button,[role="link"],[role="tab"],[role="menuitem"],[role="option"]').length;
-    let best=null,bestArea=0;
-    for(const parent of [scope,...scope.querySelectorAll('*')]){
-      const kids=[...parent.children].filter(k=>{const r=box(k);return r.width>0&&r.height>0;});
-      if(kids.length<2)continue;
-      const pr=box(parent);
-      if(pr.height<sr.height*0.4||pr.width<sr.width*0.5)continue;
-      for(const menu of kids){
-        const m=box(menu);
-        if(m.height<pr.height*0.5||clickables(menu)<4)continue;
-        for(const pane of kids){
-          if(pane===menu)continue;
-          const c=box(pane),area=c.width*c.height;
-          if(m.right<=c.left+2&&m.width<c.width&&c.height>=pr.height*0.5&&area>bestArea){best=pane;bestArea=area;}
+    const CLICKABLE='a[href],button,[role="button"],[role="link"],[role="tab"],[role="menuitem"]';
+    for(const dialog of [...doc.querySelectorAll('[role="dialog"],dialog')].filter(hasBox)){
+      const d=boxOf(dialog),item=dialog.querySelector('li[data-testid$="-settings"],[data-testid$="-settings"]');
+      const narrow=el=>boxOf(el).width<d.width*0.5;
+      const isMenu=el=>narrow(el)&&boxOf(el).height>d.height*0.4&&((item&&el.contains(item))||el.querySelectorAll(CLICKABLE).length>=4);
+      let container=dialog;
+      for(let depth=0;depth<8&&container;depth++){
+        const parts=layoutChildren(container).filter(hasBox);
+        const menu=parts.find(isMenu);
+        if(menu){
+          const m=boxOf(menu);
+          const panes=parts.filter(el=>el!==menu&&boxOf(el).left>=m.right-2&&areaOf(el)>=d.width*d.height*0.25).sort((x,y)=>areaOf(y)-areaOf(x));
+          if(panes[0])return panes[0];
         }
+        // No menu/content pair at this level: go one level down, into the part holding the menu.
+        container=parts.find(el=>item&&el.contains(item))||parts.sort((x,y)=>areaOf(y)-areaOf(x))[0];
       }
     }
-    return best;
+    return null;
   }
   function isolateEmbeddedContent(doc){
     try{
@@ -954,8 +972,8 @@
       (state.barMode==='custom'&&state.barGradient?group('barDisplay','Meter display',toggle('Show gradient across meters','data-visible-gradient',state.barGradientVisible)+`<div class="note">Off: one color for the current percentage. On: show the color scale across the fill.</div>`)+group('barEnds','End colors',colorInput('Color at 0%','barStart')+colorInput('Color at 100%','barEnd'))+group('barMiddle','Middle colors & transitions',middleControls):'');
     const themeSelect=`<label class="setting"><span>Theme preset</span><select aria-label="Theme preset" data-setting="preset"><optgroup label="${SITE.name}"><option value="auto" ${state.preset==='auto'?'selected':''}>Match ${SITE.name}</option><option value="${SITE.preset}" ${state.preset===SITE.preset?'selected':''}>${T('ChatGPT','Claude (page colors, Claude accent)')}</option></optgroup><optgroup label="Codex themes">${THEME_FAMILIES.map(name=>`<option value="${esc(name)}" ${state.preset===name?'selected':''}>${esc(name)}</option>`).join('')}</optgroup></select></label>`;
     $('.settings').innerHTML=`<div class="settings-header"><div class="settings-title" title="Drag to move settings · Double-click to reset position"><button class="icon settings-grab" aria-label="Move settings" title="Drag or use arrow keys · Home resets position">${icon('grip')}</button><span>Usage settings</span><div class="history-buttons"><button class="icon undo-changes" aria-label="Undo changes" title="Undo changes" ${undoChanges.length?'':'disabled'}>${icon('undo')}</button><button class="icon redo-changes" aria-label="Redo changes" title="Redo changes" ${redoChanges.length?'':'disabled'}>${icon('redo')}</button></div><button class="icon close-settings" aria-label="Close settings">✕</button></div><div class="settings-tabs" role="tablist" aria-label="Settings categories">${Object.entries(SETTINGS_TABS).map(([key,label])=>`<button class="settings-tab" role="tab" id="gptu-tab-${key}" aria-controls="gptu-settings-${key}" aria-selected="${state.settingsTab===key}" tabindex="${state.settingsTab===key?0:-1}" data-settings-tab="${key}">${label}</button>`).join('')}</div></div><div class="settings-body">${
-      tab('panel',group('placement','Docking & size',select('Placement','position',{top:'Sidebar top',bottom:'Sidebar bottom',floating:'Floating'})+toggle('Compact mode','data-compact',state.compact)+select('Drag handle position','floatHandlePosition',{before:'Before Usage',after:'After settings'}))+group('visibility','Visibility',toggle('Hide docked panel with sidebar','data-hide-with-sidebar',state.hideWithSidebar)+toggle('Hide frame completely','data-hide-frame',state.hideFrame))+group('hover','Hover behavior',`<div class="note">Turn a switch off to keep that element visible. Keyboard focus also reveals hover-only controls.</div>`+Object.entries(HOVER_OPTIONS).map(([key,item])=>toggle(item.label,`data-hover="${key}" ${key==='frame'&&state.hideFrame?'disabled':''}`,state.hover[key])).join('')+toggle('Hide collapsed Usage until hover','data-hide-collapsed',state.hideCollapsed))+group('status','Update time & Details',toggle('Show update time','data-show-update',state.showUpdateTime)+toggle('Show Details button','data-show-details',state.showDetails)+select('Status position','footerPosition',{header:'Header: before refresh','header-after':'Header: after refresh',top:'Above modules',bottom:'Below modules'})))+
-      tab('modules',group('plan','Plan limits',moduleToggle('plan')+(IS_CLAUDE?'':toggle('Show banked reset count & button','data-usage-resets',state.showUsageResets)+toggle('Show paid reset button','data-paid-reset',state.showPaidReset))+toggle('Show remaining plan allowance','data-remaining-plan',state.showRemainingPlan)+`<div class="note">Also applies to the ${T('credits','extra usage')} bar: remaining when enabled, used when disabled.</div>`+toggle('Plan limit tooltips','data-plan-tooltips',state.showPlanTooltips))+group('credits',labels.credits,moduleToggle('credits')+toggle(T('Show credit balance bar','Show extra usage bar'),'data-credit-bar',state.showCreditBar)+`<div class="credit-reference-controls" ${state.showCreditBar?'':'hidden'}>${toggle(T('Show available balance','Show amount left'),'data-credit-balance',state.showCreditBalance)}${toggle(T('Balance beside Credits title','Amount beside Extra usage title'),`data-credit-title ${state.showCreditBalance?'disabled':''}`,state.creditBalanceInTitle)}<div class="note">When the large balance is hidden, move its amount from the percentage row to the ${labels.credits} title.</div><label class="setting"><span>${T('Full balance','Fallback limit')}</span><span class="margin-input"><input type="number" aria-label="Full credit balance" min="0.01" step="any" data-credit-reference value="${state.creditReference??''}" placeholder="${T('e.g. 1000','e.g. 50')}">${T('credits','')}</span></label><div class="note">${T('This amount counts as 100%. Initially uses your balance when enabled; you can change it.','Claude normally reports your monthly extra-usage limit, which counts as 100%. This value is used only when it does not.')}</div></div>`+toggle(T('Add credits button','Manage extra usage button'),'data-add-credits',state.showAddCredits))+group('features','Models & features',moduleToggle('features')+`<div class="feature-settings"><div class="feature-settings-title">Individual counters</div><div class="feature-options" role="group" aria-label="Models & features to show"></div><div class="note">Selections are kept when the module is hidden.</div></div>`))+
+      tab('panel',group('placement','Docking & size',select('Placement','position',{top:'Sidebar top',bottom:'Sidebar bottom',floating:'Floating'})+toggle('Compact mode','data-compact',state.compact)+select('Drag handle position','floatHandlePosition',{before:'Before Usage',after:'After settings'}))+group('visibility','Visibility',toggle('Hide docked panel with sidebar','data-hide-with-sidebar',state.hideWithSidebar)+toggle('Hide frame completely','data-hide-frame',state.hideFrame)+select('Open usage pages','usagePageMode',{dialog:'In a dialog over the page',tab:'In a new tab'}))+group('hover','Hover behavior',`<div class="note">Turn a switch off to keep that element visible. Keyboard focus also reveals hover-only controls.</div>`+Object.entries(HOVER_OPTIONS).map(([key,item])=>toggle(item.label,`data-hover="${key}" ${key==='frame'&&state.hideFrame?'disabled':''}`,state.hover[key])).join('')+toggle('Hide collapsed Usage until hover','data-hide-collapsed',state.hideCollapsed))+group('status','Update time & Details',toggle('Show update time','data-show-update',state.showUpdateTime)+toggle('Show Details button','data-show-details',state.showDetails)+select('Status position','footerPosition',{header:'Header: before refresh','header-after':'Header: after refresh',top:'Above modules',bottom:'Below modules'})))+
+      tab('modules',group('plan','Plan limits',moduleToggle('plan')+(IS_CLAUDE?'':toggle('Show banked reset count & button','data-usage-resets',state.showUsageResets)+toggle('Show paid reset button','data-paid-reset',state.showPaidReset))+toggle('Show remaining plan allowance','data-remaining-plan',state.showRemainingPlan)+`<div class="note">Also applies to the ${T('credits','extra usage')} bar: remaining when enabled, used when disabled.</div>`+toggle('Plan limit tooltips','data-plan-tooltips',state.showPlanTooltips))+group('credits',labels.credits,moduleToggle('credits')+toggle(T('Show credit balance bar','Show extra usage bar'),'data-credit-bar',state.showCreditBar)+`<div class="credit-reference-controls" ${state.showCreditBar?'':'hidden'}>${toggle(T('Show available balance','Show amount left'),'data-credit-balance',state.showCreditBalance)}${toggle(T('Balance beside Credits title','Amount beside Extra usage title'),`data-credit-title ${state.showCreditBalance?'disabled':''}`,state.creditBalanceInTitle)}<div class="note">When the large balance is hidden, move its amount from the percentage row to the ${labels.credits} title.</div><label class="setting"><span>${T('Full balance','Fallback limit')}</span><span class="margin-input"><input type="number" aria-label="Full credit balance" min="0.01" step="any" data-credit-reference value="${state.creditReference??''}" placeholder="${T('e.g. 1000','e.g. 50')}">${T('credits','')}</span></label><div class="note">${T('This amount counts as 100%. Initially uses your balance when enabled; you can change it.','Claude normally reports your monthly extra-usage limit, which counts as 100%. This value is used only when it does not.')}</div></div>`+toggle(T('Add credits button','Manage extra usage button'),'data-add-credits',state.showAddCredits)+toggle('Show in collapsed summary','data-summary-credits',state.summaryCredits)+`<div class="note">When the panel is collapsed, shows ${T('your credit balance','extra usage left this month')} after the plan limit. Hidden when there are none.</div>`)+group('features','Models & features',moduleToggle('features')+`<div class="feature-settings"><div class="feature-settings-title">Individual counters</div><div class="feature-options" role="group" aria-label="Models & features to show"></div><div class="note">Selections are kept when the module is hidden.</div></div>`))+
       tab('appearance',group('appearance','Theme & mode',themeSelect+select('Appearance','theme',{auto:'Match '+SITE.name,system:'System',light:'Light',dark:'Dark'})+`<div class="note">Match ${SITE.name} follows the page palette and custom colors. Codex presets use available light/dark variants; some have only one mode.</div>`)+group('colors','Accent & contrast',select('Accent color','accent',accentNames)+select('Contrast','contrast',{auto:'Match '+SITE.name,system:'System',medium:'Medium',increased:'Increased'})))+
       tab('bars',barControls+`<button class="text-btn" data-reset-bar-colors>Reset bar colors</button>`)+
       tab('spacing',`${select('Editing spacing','spacingMode',{auto:'Current density',normal:'Normal',compact:'Compact'})}<div class="note">Editing ${profile==='normal'?'normal':'compact'} mode. All values are in pixels. Inside frame controls the space within the border; outside frame controls the surrounding gap.</div>`+group('spacePanel','Panel & header',['outer','frame','header'].map(box).join(''))+group('spaceStatus','Update time & summary',['status','headerStatus','statusButton','summary'].map(box).join(''))+group('spaceModules','Module spacing',['plan','credits','features','sectionHeader','sectionContent'].map(box).join(''))+group('spaceItems','Items & credits',['planRows','featureRows','creditBalance','creditMeter','addCredits'].map(box).join(''))+group('spaceBars','Bars & captions',['planBars','creditBars','featureBars','captions'].map(box).join(''))+group('spaceDetails','Expanded Details',['details','detailsContent'].map(box).join(''))+`<button class="text-btn reset-spacing" data-reset-spacing="${profile}">Reset ${profile} spacing</button>`)
@@ -977,6 +995,15 @@
     $('.feature-options').innerHTML=names.map(name=>`<label><span>${esc(featureLabel(name))}</span><input type="checkbox" role="switch" aria-label="Show ${esc(featureLabel(name))} counter" data-feature="${esc(name)}" ${state.hiddenFeatures[name]!==true?'checked':''}></label>`).join('');
     if(active)[...$('.feature-options').querySelectorAll('[data-feature]')].find(el=>el.dataset.feature===active)?.focus();
   }
+  function formatMoney(n,currency){try{return currency?new Intl.NumberFormat(undefined,{style:'currency',currency}).format(n):format(n);}catch(_){return format(n);}}
+  // Shown only when there are credits to spend: a positive balance, unlimited credits, or (Claude)
+  // extra usage turned on without a monthly limit. Zero, off or unreported shows nothing.
+  function creditSummaryText(parsed){
+    const balance=num(parsed.credits);
+    if(balance!=null&&balance>0)return IS_CLAUDE?`${formatMoney(balance,parsed.currency)} extra`:`${format(balance)} credits`;
+    if(parsed.credits==='Unlimited')return T('Unlimited credits','Extra usage on');
+    return '';
+  }
   function render() {
     const head=$('.head'),handle=$('.grab');
     if(state.floatHandlePosition==='after'){if(head.lastElementChild!==handle)head.appendChild(handle);}
@@ -995,7 +1022,13 @@
     $('.body').hidden=!!state.collapsed;
     const pcts=parsed.rows.map(r=>r.pct).filter(p=>p!=null);
     $('.summary').hidden=!state.collapsed;
-    $('.summary').textContent=pcts.length?`${Math.round(state.showRemainingPlan?100-Math.max(...pcts):Math.max(...pcts))}% ${state.showRemainingPlan?'left':'used'}${state.showUpdateTime?' · '+fmtAgo(state.usageAt):''}`:'No usage reported yet';
+    // Collapsed summary: plan limit, then credits when available (optional), then the update time.
+    const summary=[];
+    if(pcts.length)summary.push(`${Math.round(state.showRemainingPlan?100-Math.max(...pcts):Math.max(...pcts))}% ${state.showRemainingPlan?'left':'used'}`);
+    const creditSummary=state.summaryCredits&&!state.hidden.credits?creditSummaryText(parsed):'';
+    if(creditSummary)summary.push(creditSummary);
+    if(summary.length&&state.showUpdateTime)summary.push(fmtAgo(state.usageAt));
+    $('.summary').textContent=summary.length?summary.join(' · '):'No usage reported yet';
     const blocks={};
     blocks.plan=parsed.rows.length?`<div class="plan-grid">${parsed.rows.map(r=>{
       const left=r.resetsAt?r.resetsAt-Date.now():null;
@@ -1007,7 +1040,7 @@
     }).join('')}</div>`:`<div class="empty">${state.error?'Usage unavailable. Try refreshing.':state.usageAt?'No plan limits reported.':'Waiting for usage…'}</div>`;
     if(state.showPaidReset)blocks.plan+=`<button class="add-credits paid-reset" title="Open ChatGPT Usage to review paid reset offers">Paid reset…</button>`;
     const balance=num(parsed.credits),creditRef=parsed.creditLimit>0?parsed.creditLimit:state.creditReference;
-    const money=n=>{try{return parsed.currency?new Intl.NumberFormat(undefined,{style:'currency',currency:parsed.currency}).format(n):format(n);}catch(_){return format(n);}};
+    const money=n=>formatMoney(n,parsed.currency);
     if(state.showCreditBar&&state.creditReferencePending&&!(parsed.creditLimit>0)&&balance>0){state.creditReference=Number(balance.toFixed(2))||balance;state.creditReferencePending=false;persist(false);syncCreditBarSettings();}
     const creditText=balance!=null?money(balance):parsed.credits??'—';
     const balanceInTitle=state.creditBalanceInTitle&&state.showCreditBar&&!state.showCreditBalance&&balance!=null&&creditRef>0;
@@ -1035,7 +1068,7 @@
     const focused=root.activeElement?.dataset;
     const rawFocused=root.activeElement?.classList.contains('raw');
     const inHeader=['header','header-after'].includes(state.footerPosition);
-    const footer=state.showUpdateTime||(!inHeader&&state.showDetails)?`<div class="foot ${inHeader?'head-status':''}">${state.showUpdateTime?`<span class="updated-at" title="Updated ${esc(fmtAgo(state.usageAt))}">${inHeader?'':'Updated '}${fmtAgo(state.usageAt)}</span>`:''}${!inHeader&&state.showDetails?`<button class="text-btn raw" aria-expanded="${state.showRaw}">${state.showRaw?'Hide data':'Details'}</button>`:''}</div>`:'';
+    const footer=state.showUpdateTime||(!inHeader&&state.showDetails)?`<div class="foot ${inHeader?'head-status':''}">${state.showUpdateTime?`<span class="updated-at" title="Updated ${esc(fmtAgo(state.usageAt))}">${inHeader?capitalize(fmtAgo(state.usageAt)):'Updated '+fmtAgo(state.usageAt)}</span>`:''}${!inHeader&&state.showDetails?`<button class="text-btn raw" aria-expanded="${state.showRaw}">${state.showRaw?'Hide data':'Details'}</button>`:''}</div>`:'';
     $('.head-status-slot').innerHTML=state.footerPosition==='header'?footer:'';
     $('.head-status-after-slot').innerHTML=state.footerPosition==='header-after'?footer:'';
     $('.head').classList.toggle('has-header-status',inHeader&&!!footer);
@@ -1206,6 +1239,7 @@
     if(e.target.hasAttribute('data-footer-top')){state.footerPosition=e.target.checked?'top':'bottom';persist();render();positionSettings();}
     if(e.target.hasAttribute('data-remaining-plan')){state.showRemainingPlan=e.target.checked;persist();render();positionSettings();}
     if(e.target.hasAttribute('data-add-credits')){state.showAddCredits=e.target.checked;persist();render();positionSettings();}
+    if(e.target.hasAttribute('data-summary-credits')){state.summaryCredits=e.target.checked;persist();render();positionSettings();}
     if(e.target.hasAttribute('data-plan-tooltips')){state.showPlanTooltips=e.target.checked;persist();render();positionSettings();}
     if(e.target.hasAttribute('data-feature')){state.hiddenFeatures={...state.hiddenFeatures,[e.target.dataset.feature]:!e.target.checked};persist();render();positionSettings();}
     if(e.target.hasAttribute('data-hide-frame')){state.hideFrame=e.target.checked;persist();render();const control=$('[data-hover="frame"]');if(control)control.disabled=state.hideFrame;}
@@ -1303,9 +1337,17 @@
     }
     return true;
   }
+  // Dialogs (such as Claude's Settings window) have their own tall left-hand menus. The panel must
+  // never dock into one of those.
+  const inDialog=el=>!!el.closest('[role="dialog"],dialog,[aria-modal="true"]');
   function claudeSidebar(){
-    // claude.ai keeps the account button at the foot of the left sidebar; climb to the column that holds it.
-    const account=[...document.querySelectorAll('[data-testid="user-menu-button"]')].find(el=>!host.contains(el)&&isVisibleElement(el));
+    // The app sidebar column carries a stable test id. Ignore aria-hidden/inert here: Claude marks it
+    // that way while a modal or menu is open, although it stays on screen.
+    for(const el of document.querySelectorAll('[data-testid="sidebar"]')){
+      if(!host.contains(el)&&!inDialog(el)&&el.getBoundingClientRect().width>120&&isVisibleElement(el,false,true))return el;
+    }
+    // Fallback: climb from the account button at the foot of the sidebar to the column that holds it.
+    const account=[...document.querySelectorAll('[data-testid="user-menu-button"]')].find(el=>!host.contains(el)&&!inDialog(el)&&isVisibleElement(el,false,true));
     for(let el=account?.parentElement;el&&el!==document.body;el=el.parentElement){
       const r=el.getBoundingClientRect();
       if(r.left>innerWidth/2||r.width>520)break;
@@ -1324,7 +1366,7 @@
     for(const selector of IS_CLAUDE?['nav[aria-label="Sidebar"]','[data-testid="menu-sidebar"]','aside nav','nav']:['nav[aria-label="Chat history"]','#stage-slideover-sidebar nav','[data-testid="sidebar"] nav','nav']){
       for(const el of document.querySelectorAll(selector)){
         const r=el.getBoundingClientRect();
-        if(el.getAttribute('aria-label')!=='Show sidebar'&&r.width>120&&(selector==='nav'?r.height>160:r.height>=0)&&r.left>=0&&r.left<innerWidth/2&&isVisibleElement(el,selector!=='nav'))return el;
+        if(!host.contains(el)&&!inDialog(el)&&el.getAttribute('aria-label')!=='Show sidebar'&&r.width>120&&(selector==='nav'?r.height>160:r.height>=0)&&r.left>=0&&r.left<innerWidth/2&&isVisibleElement(el,selector!=='nav'))return el;
       }
     }
     return null;

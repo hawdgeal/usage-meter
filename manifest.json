@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Usage Meter for ChatGPT & Claude",
   "short_name": "Usage Meter",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "Shows your ChatGPT / Codex and Claude plan usage, credits and limits in each site's sidebar, with settings you can copy between them.",
   "icons": {
     "16": "icons/icon16.png",

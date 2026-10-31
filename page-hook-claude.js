@@ -1,6 +1,6 @@
 // Runs in the page's own JS world (MAIN) on claude.ai.
 // 1) Fetches plan usage from Claude's internal usage endpoint using your existing session.
-// 2) Watches Claude's own requests so usage refreshes right after you send a message.
+// 2) Watches the page's resource timeline so usage refreshes right after a reply finishes.
 // Results are posted to content.js (isolated world) via window.postMessage, converted
 // into the generic shape the panel draws (rate_limit / additional_rate_limits / credits).
 // Nothing leaves your browser: the only requests made go to claude.ai.
@@ -148,81 +148,24 @@
     }
   }
 
-  // ---------- passive scan for extra limits in Claude's own JSON ----------
-  const LIMIT_KEYS = ["limits_progress", "model_limits", "message_limits", "usage_limits"];
-
-  function normalizeLimit(item) {
-    if (!item || typeof item !== "object") return null;
-    const name = item.feature_name || item.model_slug || item.model || item.slug || item.name || item.feature || item.limit_name;
-    if (!name) return null;
-    const remaining = num(item.remaining ?? item.remaining_messages ?? item.messages_remaining);
-    const limit = num(item.limit ?? item.max ?? item.cap ?? item.total);
-    const used = num(item.used ?? item.count ?? item.usage);
-    let resetsAt = null;
-    const ra = item.reset_after ?? item.resets_at ?? item.reset_at ?? item.resetsAt ?? item.reset_time;
-    if (typeof ra === "string" && isNaN(+ra)) {
-      const t = Date.parse(ra);
-      if (!isNaN(t)) resetsAt = t;
-    } else if (num(ra) != null) {
-      const n = num(ra);
-      resetsAt = n > 1e12 ? n : n > 1e9 ? n * 1000 : Date.now() + n * 1000;
-    }
-    if (remaining == null && limit == null && used == null && resetsAt == null) return null;
-    return { name: String(name), remaining, limit, used, resetsAt };
-  }
-
-  function scan(obj, found, depth) {
-    if (!obj || typeof obj !== "object" || depth > 6) return;
-    if (Array.isArray(obj)) {
-      for (const v of obj.slice(0, 200)) scan(v, found, depth + 1);
-      return;
-    }
-    for (const k of Object.keys(obj)) {
-      const v = obj[k];
-      if (LIMIT_KEYS.includes(k)) {
-        const arr = Array.isArray(v) ? v : v && typeof v === "object"
-          ? Object.entries(v).map(([n, x]) => (x && typeof x === "object" ? { name: n, ...x } : null))
-          : [];
-        for (const it of arr) {
-          const n = normalizeLimit(it);
-          if (n) found.push(n);
-        }
-      } else if (v && typeof v === "object") {
-        scan(v, found, depth + 1);
+  // ---------- refresh after replies ----------
+  // Watch the browser's resource timeline instead of wrapping window.fetch. Claude's own requests
+  // then never pass through this script, so their failures (for example analytics blocked by an ad
+  // blocker) are not attributed to the extension. A fetch entry is recorded when its response has
+  // fully arrived, so a streamed reply is reported when it finishes, and stopped or failed
+  // requests are reported too. Requests made inside Web Workers are not visible here; the panel
+  // also refreshes every two minutes and when the tab becomes visible.
+  const SPENDS_USAGE = /\/(completion|retry_completion|messages|events)$/;
+  try {
+    new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) {
+        if (entry.initiatorType !== "fetch") continue;
+        let url;
+        try { url = new URL(entry.name); } catch (_) { continue; }
+        if (url.origin === location.origin && SPENDS_USAGE.test(url.pathname)) post("activity", {});
       }
-    }
-  }
-
-  // Requests that spend usage: chat completions on claude.ai and session turns on claude.ai/code.
-  const SPENDS_USAGE = /\/(completion|retry_completion|messages|events)(\?|$)/;
-
-  window.fetch = async function (input, init) {
-    const res = await origFetch(input, init);
-    try {
-      const url = input instanceof Request ? input.url : String(input || "");
-      const method = ((init && init.method) || (input && input.method) || "GET").toUpperCase();
-      const sameOrigin = url.startsWith("/") || url.startsWith(location.origin);
-      if (sameOrigin && method === "POST" && SPENDS_USAGE.test(url)) {
-        const ct = res.headers.get("content-type") || "";
-        if (ct.includes("text/event-stream") && res.body) {
-          // Refresh once the reply has finished streaming, when the new usage is recorded.
-          res.clone().text().then(() => post("activity", {}), () => post("activity", {}));
-        } else {
-          post("activity", {});
-        }
-      } else if (sameOrigin && url.includes("/api/") && !/\/usage(\?|$)/.test(url)) {
-        const ct = res.headers.get("content-type") || "";
-        if (ct.includes("application/json")) {
-          res.clone().json().then((j) => {
-            const found = [];
-            scan(j, found, 0);
-            if (found.length) post("model-limits", { items: found, from: url.split("?")[0], at: Date.now() });
-          }).catch(() => {});
-        }
-      }
-    } catch (_) { /* never break the page */ }
-    return res;
-  };
+    }).observe({ type: "resource" });
+  } catch (_) { /* no PerformanceObserver: rely on periodic refresh */ }
 
   window.addEventListener("message", (ev) => {
     if (ev.source !== window || !ev.data || ev.data.source !== TAG_IN) return;

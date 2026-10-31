@@ -131,25 +131,40 @@
     }
   }
 
-  window.fetch = async function (input, init) {
-    const res = await origFetch(input, init);
+  // The wrapper hands the page its own promise unchanged: the page's requests, their timing and
+  // their errors stay the page's. Inspection runs on the side, after the response, when idle.
+  const MAX_SCAN_BYTES = 2 * 1024 * 1024;
+  const whenIdle = window.requestIdleCallback ? (fn) => requestIdleCallback(fn, { timeout: 2000 }) : (fn) => setTimeout(fn, 0);
+  function inspect(res, url, method) {
+    try {
+      // After you send a message, nudge the UI to re-check usage shortly after.
+      if (method === "POST" && /\/backend-api\/(f\/)?conversation(\?|$)/.test(url)) post("activity", {});
+      if (!url.includes("/backend-api/") || url.includes("/wham/usage")) return;
+      const ct = res.headers.get("content-type") || "";
+      if (!ct.includes("application/json")) return;
+      // Skip very large bodies (for example long conversation histories) rather than parse them twice.
+      const size = +(res.headers.get("content-length") || 0);
+      if (size > MAX_SCAN_BYTES) return;
+      const copy = res.clone();
+      whenIdle(() => {
+        copy.text().then((text) => {
+          if (text.length > MAX_SCAN_BYTES) return;
+          const found = [];
+          scan(JSON.parse(text), found, 0);
+          if (found.length) post("model-limits", { items: found, from: url.split("?")[0], at: Date.now() });
+        }).catch(() => {});
+      });
+    } catch (_) { /* never break the page */ }
+  }
+
+  window.fetch = function (input, init) {
+    const request = origFetch(input, init);
     try {
       const url = input instanceof Request ? input.url : String(input || "");
       const method = ((init && init.method) || (input && input.method) || "GET").toUpperCase();
-      // After you send a message, nudge the UI to re-check usage shortly after.
-      if (method === "POST" && /\/backend-api\/(f\/)?conversation(\?|$)/.test(url)) post("activity", {});
-      if (url.includes("/backend-api/") && !url.includes("/wham/usage")) {
-        const ct = res.headers.get("content-type") || "";
-        if (ct.includes("application/json")) {
-          res.clone().json().then((j) => {
-            const found = [];
-            scan(j, found, 0);
-            if (found.length) post("model-limits", { items: found, from: url.split("?")[0], at: Date.now() });
-          }).catch(() => {});
-        }
-      }
+      request.then((res) => inspect(res, url, method), () => {});
     } catch (_) { /* never break the page */ }
-    return res;
+    return request;
   };
 
   window.addEventListener("message", (ev) => {
