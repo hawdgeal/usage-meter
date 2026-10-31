@@ -7,7 +7,7 @@
   const store = (globalThis.browser && browser.storage) || chrome.storage;
 
   function defaultPreferences(){return {
-    collapsed:false,compact:false,compactHeight:null,hideCollapsed:false,
+    collapsed:false,compact:false,compactHeight:null,hideCollapsed:false,footerPosition:'top',
     showAddCredits:true,showPlanTooltips:false,showRemainingPlan:false,
     position:'bottom',sections:['plan','credits','features'],closed:{credits:true},
     hidden:{features:true},hiddenFeatures:{deep_research:true,file_upload:true,paste_text_to_file:true},
@@ -21,7 +21,7 @@
   let lastRefresh = 0;
 
   // ---------- persistence ----------
-  const saveKeys = ["usage", "plan", "usageAt", "models", "collapsed", "position", "sections", "closed", "hidden", "theme", "floating", "size", "compact", "compactHeight", "hideCollapsed", "hiddenFeatures", "showAddCredits", "showPlanTooltips", "showRemainingPlan", "settingsClosed", "settingsTab"];
+  const saveKeys = ["usage", "plan", "usageAt", "models", "collapsed", "position", "sections", "closed", "hidden", "theme", "floating", "size", "compact", "compactHeight", "hideCollapsed", "hiddenFeatures", "showAddCredits", "showPlanTooltips", "showRemainingPlan", "settingsClosed", "settingsTab", "footerPosition"];
   function persist() {
     const o = {};
     for (const k of saveKeys) o[k] = state[k];
@@ -32,6 +32,7 @@
       const r = await store.local.get("gptu");
       if (r && r.gptu) for (const k of saveKeys) if (r.gptu[k] !== undefined) state[k] = r.gptu[k];
     } catch (_) {}
+    if(!['top','bottom'].includes(state.footerPosition))state.footerPosition='top';
     if(!['panel','modules'].includes(state.settingsTab))state.settingsTab='panel';
     if (!Array.isArray(state.sections)) state.sections = ["plan", "credits", "features"];
     for (const key of ["closed", "hidden", "models", "hiddenFeatures", "settingsClosed"]) if (!state[key] || typeof state[key] !== "object") state[key] = {};
@@ -150,7 +151,7 @@
     :host { all:initial; display:block; min-width:0; flex-shrink:0; color-scheme:light; }
     * { box-sizing:border-box; }
     [hidden] { display:none !important; }
-    .card, .settings { --fg:#202123; --muted:#656565; --line:#e3e3e3; --surface:#f9f9f9; --hover:#ededed; --track:#e5e5e5; --ok:#087f65; --warn:#966000; --bad:#c53240;
+    .card, .settings, .credits-modal { --fg:#202123; --muted:#656565; --line:#e3e3e3; --surface:#f9f9f9; --hover:#ededed; --track:#e5e5e5; --ok:#087f65; --warn:#966000; --bad:#c53240;
       color:var(--fg); background:var(--surface); font:13px/1.45 ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
       margin:6px 8px; border:1px solid var(--line); border-radius:14px; overflow:hidden; text-align:left; display:flex; flex-direction:column; }
     .card { position:relative; border-color:transparent; }
@@ -165,7 +166,7 @@
     .card.collapsed.hide-collapsed:has(:focus-visible) .usage-icon,.card.collapsed.hide-collapsed:has(:focus-visible) .title,.card.collapsed.hide-collapsed:has(:focus-visible) .badge,.card.collapsed.hide-collapsed:has(:focus-visible) .summary { opacity:1; pointer-events:auto; }
     @media(hover:none) { .card.collapsed.hide-collapsed .usage-icon,.card.collapsed.hide-collapsed .title,.card.collapsed.hide-collapsed .badge,.card.collapsed.hide-collapsed .summary { opacity:1; pointer-events:auto; } }
     :host([data-dark]) { color-scheme:dark; }
-    :host([data-dark]) .card, :host([data-dark]) .settings { --fg:#ececec; --muted:#ababab; --line:#292929; --surface:#000000; --hover:#171717; --track:#292929; --ok:#57c7a6; --warn:#e9b55f; --bad:#ff7983; }
+    :host([data-dark]) .card, :host([data-dark]) .settings, :host([data-dark]) .credits-modal { --fg:#ececec; --muted:#ababab; --line:#292929; --surface:#000000; --hover:#171717; --track:#292929; --ok:#57c7a6; --warn:#e9b55f; --bad:#ff7983; }
     button,select { font:inherit; color:inherit; }
     button { border:0; background:none; cursor:pointer; padding:0; }
     button:hover { background:var(--hover); }
@@ -204,7 +205,7 @@
     .sub,.empty,.note { color:var(--muted); font-size:11px; line-height:1.5; }
     .empty { padding-bottom:8px; }
     .credit { font-size:23px; font-weight:600; letter-spacing:-.6px; font-variant-numeric:tabular-nums; }
-    .foot { flex-shrink:0; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:7px 24px 9px 12px; color:var(--muted); font-size:10px; }
+    .foot { flex-shrink:0; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:2px 22px 2px 12px; line-height:1.3; color:var(--muted); font-size:10px; }
     .text-btn { color:var(--muted); border-radius:4px; padding:3px; font-size:10px; }
     .err { margin:8px 12px; font-size:11px; color:var(--bad); overflow-wrap:anywhere; }
     pre { margin:0 12px 10px; padding:8px; background:var(--hover); border-radius:8px; max-height:160px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; font:10px/1.5 ui-monospace,monospace; }
@@ -246,7 +247,8 @@
     .compact .sub,.compact .empty { font-size:11px; line-height:1.35; }
     .compact .bar { height:3px; margin:4px 0; }
     .compact .credit { font-size:19px; line-height:1.3; }
-    .compact .foot { padding:4px 22px 5px 9px; }
+    .compact .foot { padding:1px 22px 1px 9px; }
+    .foot .text-btn { padding:1px 3px; }
     .compact .summary { padding:0 9px 5px; }
     .compact-toggle { padding-top:8px; border-top:1px solid var(--line); }
     .compact-toggle input { width:16px; height:16px; cursor:pointer; }
@@ -309,6 +311,17 @@
     .settings::-webkit-scrollbar-thumb { background:var(--track); border-radius:6px; }
     .card:hover .body::-webkit-scrollbar-thumb,.card:has(:focus-visible) .body::-webkit-scrollbar-thumb { background:var(--track); }
     @media(hover:none) { .body { scrollbar-color:var(--track) transparent; } }
+    .credits-modal { position:fixed; inset:0; margin:auto; padding:0; width:min(900px,calc(100vw - 40px)); height:min(740px,calc(100dvh - 40px)); max-width:none; max-height:none; border:1px solid var(--line); border-radius:16px; box-shadow:0 20px 80px #0006; }
+    .credits-modal:not([open]) { display:none; }
+    .credits-modal::backdrop { background:#0009; }
+    .credits-header { display:flex; align-items:center; gap:10px; padding:12px 16px; border-bottom:1px solid var(--line); flex-shrink:0; }
+    .credits-header h2 { font:600 14px/1.4 ui-sans-serif,system-ui,sans-serif; margin:0; flex:1; }
+    .credit-external { color:var(--fg); text-decoration:none; font-size:12px; border-radius:6px; padding:5px 8px; }
+    .credit-external:hover { background:var(--hover); }
+    .credit-external:focus-visible { outline:2px solid var(--ok); outline-offset:2px; }
+    .credits-frame { display:block; border:0; width:100%; flex:1; min-height:0; background:var(--surface); }
+    .credits-status { margin:0; padding:8px 16px; font-size:11px; color:var(--muted); border-bottom:1px solid var(--line); flex-shrink:0; }
+    @media(max-width:480px) { .credits-modal { width:calc(100vw - 16px); height:calc(100dvh - 16px); } .credits-header { padding:10px; gap:4px; } }
     .live { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
     @media(prefers-reduced-motion:reduce) { * { animation:none !important; transition:none !important; } }
   `;
@@ -330,7 +343,7 @@
     <button class="toggle" aria-expanded="true"><span class="usage-icon">${USAGE_ICON}</span><span class="title">Usage</span><span class="badge" hidden></span>${icon('chevron')}</button>
     <button class="icon refresh" title="Refresh usage" aria-label="Refresh usage">${icon('refresh')}</button>
     <button class="icon customize" title="Customize panel" aria-label="Customize panel" aria-expanded="false">${icon('settings')}</button></div>
-    <div class="summary" hidden></div><div class="body"></div><button class="resize" aria-label="Resize panel" title="Drag to resize · Arrow keys to resize · Double-click to reset size"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m5 13 8-8m-3 8 3-3"/></svg></button><div class="live" aria-live="polite"></div></div><div class="settings" popover="auto" role="dialog" aria-label="Usage settings"></div>`;
+    <div class="summary" hidden></div><div class="body"></div><button class="resize" aria-label="Resize panel" title="Drag to resize · Arrow keys to resize · Double-click to reset size"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m5 13 8-8m-3 8 3-3"/></svg></button><div class="live" aria-live="polite"></div></div><div class="settings" popover="auto" role="dialog" aria-label="Usage settings"></div><dialog class="credits-modal" aria-labelledby="gptu-credits-heading"><div class="credits-header"><h2 id="gptu-credits-heading">Add credits</h2><a class="credit-external" target="_blank" rel="noopener noreferrer">Open in tab</a><button class="icon credits-close" aria-label="Close credits">✕</button></div><p class="credits-status" role="status">Loading credits…</p><iframe class="credits-frame" title="ChatGPT credits purchase" allow="payment" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads"></iframe></dialog>`;
   const $=s=>root.querySelector(s), card=$('.card');
   let busyTimer, settingsOpen=false, drag=null, resizing=null, sectionDrag=null;
   const ui={ setBusy(b) { card.classList.toggle('busy',b); $('.refresh').disabled=b; $('.refresh').setAttribute('aria-busy',String(b)); clearTimeout(busyTimer); if(b) busyTimer=setTimeout(()=>{ui.setBusy(false); state.error='Refresh timed out. Try again.'; render();},20000); } };
@@ -341,6 +354,52 @@
   const featureLabel=name=>featureNames[name]||name.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
   const format=n=>new Intl.NumberFormat(undefined,{maximumFractionDigits:2}).format(n);
   const bar=(p,label,remaining=false)=>`<div class="bar" role="progressbar" aria-label="${esc(label)} ${remaining?'remaining':'used'}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${p}"><i class="${remaining?'remaining':level(p)}" style="width:${p}%"></i></div>`;
+  function creditPurchaseUrl(){
+    const url=new URL('/pricing/credits',location.origin);
+    url.searchParams.set('source','chatgpt_web_merged');
+    url.searchParams.set('return_to',location.pathname+location.search+location.hash);
+    return url.href;
+  }
+  function updateCreditLink(event){
+    const link=event.target.closest?.('.add-credits');
+    if(link)link.href=creditPurchaseUrl();
+  }
+  root.addEventListener('pointerdown',updateCreditLink);
+  root.addEventListener('click',event=>{
+    const link=event.target.closest?.('.add-credits');if(!link)return;
+    updateCreditLink(event);
+    if(event.button!==0||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
+    event.preventDefault();openCreditDialog(link);
+  });
+  root.addEventListener('auxclick',updateCreditLink);
+  let creditReturnFocus=null,creditReturnPath='',creditWatch=null,creditLoadTimeout=null;
+  function openCreditDialog(link){
+    const dialog=$('.credits-modal'),frame=$('.credits-frame');
+    if(dialog.open){$('.credits-close').focus();return;}
+    if(settingsOpen)closeSettings();
+    creditReturnFocus=link;creditReturnPath=location.pathname+location.search+location.hash;
+    $('.credit-external').href=creditPurchaseUrl();$('.credits-status').textContent='Loading credits…';$('.credits-status').hidden=false;
+    frame.src=creditPurchaseUrl();dialog.showModal();$('.credits-close').focus();
+    creditLoadTimeout=setTimeout(()=>{if(dialog.open){$('.credits-status').textContent='If the page stays blank, choose Open in tab.';$('.credits-status').hidden=false;}},12000);
+    creditWatch=setInterval(()=>{
+      try{const destination=new URL(frame.contentWindow.location.href);if(destination.origin===location.origin&&destination.pathname+destination.search+destination.hash===creditReturnPath){dialog.close();requestRefresh(false);}}catch(_){}
+    },1000);
+  }
+  $('.credits-close').onclick=()=>$('.credits-modal').close();
+  $('.credits-modal').addEventListener('close',()=>{
+    clearInterval(creditWatch);clearTimeout(creditLoadTimeout);creditWatch=null;
+    $('.credits-frame').removeAttribute('src');
+    const target=creditReturnFocus?.isConnected?creditReturnFocus:$('.add-credits');target?.focus();creditReturnFocus=null;
+  });
+  $('.credits-modal').addEventListener('click',event=>{
+    if(event.target!==$('.credits-modal'))return;
+    const r=event.target.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)event.target.close();
+  });
+  $('.credits-frame').addEventListener('load',()=>{
+    if(!$('.credits-modal').open)return;
+    clearTimeout(creditLoadTimeout);$('.credits-status').hidden=true;
+    try{$('.credits-frame').contentDocument?.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();$('.credits-modal').close();}});}catch(_){}
+  });
   function applyTheme() {
     const html=document.documentElement;
     const dark=state.theme==='dark'||state.theme==='auto'&&(html.classList.contains('dark')||html.dataset.theme==='dark'||(!html.classList.contains('light')&&html.dataset.theme!=='light'&&(getComputedStyle(html).colorScheme==='dark'||getComputedStyle(html).colorScheme!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches)));
@@ -354,7 +413,7 @@
     const tabs=['panel','modules'].map(key=>`<button class="settings-tab" role="tab" id="gptu-tab-${key}" aria-controls="gptu-settings-${key}" aria-selected="${state.settingsTab===key}" tabindex="${state.settingsTab===key?0:-1}" data-settings-tab="${key}">${key==='panel'?'Panel':'Modules'}</button>`).join('');
     $('.settings').innerHTML=`<div class="settings-header"><div class="settings-title"><span>Usage settings</span><button class="icon close-settings" aria-label="Close settings">✕</button></div><div class="settings-tabs" role="tablist" aria-label="Settings categories">${tabs}</div></div><div class="settings-body">
       <div class="settings-panel" role="tabpanel" id="gptu-settings-panel" aria-labelledby="gptu-tab-panel" ${state.settingsTab==='panel'?'':'hidden'}>${
-        group('appearance','Appearance',`<div class="setting"><span>Theme</span><select aria-label="Appearance" data-setting="theme">${['auto','light','dark'].map(k=>`<option value="${k}" ${state.theme===k?'selected':''}>${k==='auto'?'Match ChatGPT':k==='light'?'Light':'Dark'}</option>`).join('')}</select></div>${toggle('Compact mode','data-compact',state.compact)}`)+
+        group('appearance','Appearance',`<div class="setting"><span>Theme</span><select aria-label="Appearance" data-setting="theme">${['auto','light','dark'].map(k=>`<option value="${k}" ${state.theme===k?'selected':''}>${k==='auto'?'Match ChatGPT':k==='light'?'Light':'Dark'}</option>`).join('')}</select></div>${toggle('Compact mode','data-compact',state.compact)}${toggle('Update time and Details at top','data-footer-top',state.footerPosition==='top')}`)+
         group('placement','Placement & visibility',`<div class="setting"><span>Placement</span><select aria-label="Placement" data-setting="position">${['top','bottom','floating'].map(k=>`<option value="${k}" ${state.position===k?'selected':''}>${k==='top'?'Sidebar top':k==='bottom'?'Sidebar bottom':'Floating'}</option>`).join('')}</select></div>${toggle('Hide collapsed Usage until hover','data-hide-collapsed',state.hideCollapsed)}`)
       }</div>
       <div class="settings-panel" role="tabpanel" id="gptu-settings-modules" aria-labelledby="gptu-tab-modules" ${state.settingsTab==='modules'?'':'hidden'}>${
@@ -402,7 +461,7 @@
     }).join('')}</div>`:`<div class="empty">${state.error?'Usage unavailable. Try refreshing.':state.usageAt?'No plan limits reported.':'Waiting for usage…'}</div>`;
     const balance=num(parsed.credits);
     const creditText=balance!=null?format(balance):parsed.credits??'—';
-    blocks.credits=`<div class="credit">${esc(creditText)}</div><div class="sub">${parsed.credits==null?'No credit balance reported':'Available balance'}</div>${state.showAddCredits?'<a class="add-credits" href="https://chatgpt.com/codex/settings/usage" target="_blank" rel="noopener noreferrer"><svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M3 8h10"/></svg>Add credits</a>':''}`;
+    blocks.credits=`<div class="credit">${esc(creditText)}</div><div class="sub">${parsed.credits==null?'No credit balance reported':'Available balance'}</div>${state.showAddCredits?'<a class="add-credits" href="'+esc(creditPurchaseUrl())+'" target="_blank" rel="noopener noreferrer"><svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M3 8h10"/></svg>Add credits</a>':''}`;
     const models=Object.entries(state.models).filter(([name])=>state.hiddenFeatures[name]!==true).sort((a,b)=>(b[1].seenAt||0)-(a[1].seenAt||0)).slice(0,12);
     blocks.features=models.map(([name,m])=>{
       const expired=m.resetsAt&&m.resetsAt<=Date.now();
@@ -414,8 +473,9 @@
     const scroll=$('.body').scrollTop;
     const focused=root.activeElement?.dataset;
     const rawFocused=root.activeElement?.classList.contains('raw');
-    $('.body').innerHTML=state.sections.filter(k=>!state.hidden[k]).map(k=>`<section class="section" data-section="${k}"><div class="section-head"><button class="section-toggle" data-collapse="${k}" aria-expanded="${!state.closed[k]}" aria-controls="gptu-${k}">${icon(k)}<span>${labels[k]}</span>${k==='credits'&&state.closed.credits?`<span class="credit-inline">${esc(creditText)}</span>`:''}${icon('chevron')}</button><button class="icon section-handle" draggable="true" data-handle="${k}" aria-label="Reorder ${labels[k]}" title="Drag to reorder · ↑ / ↓">${icon('grip')}</button></div><div class="section-content" id="gptu-${k}" ${state.closed[k]?'hidden':''}>${blocks[k]}</div></section>`).join('')+
-      `${state.error?`<div class="err" role="status">${esc(state.error)}</div>`:''}<div class="foot"><span>Updated ${fmtAgo(state.usageAt)}</span><button class="text-btn raw" aria-expanded="${state.showRaw}">${state.showRaw?'Hide data':'Details'}</button></div>${state.showRaw?`<pre>${esc(JSON.stringify({usage:state.usage,models:state.models},null,2))}</pre>`:''}`;
+    const footer=`<div class="foot"><span>Updated ${fmtAgo(state.usageAt)}</span><button class="text-btn raw" aria-expanded="${state.showRaw}">${state.showRaw?'Hide data':'Details'}</button></div>`;
+    $('.body').innerHTML=(state.footerPosition==='top'?footer:'')+state.sections.filter(k=>!state.hidden[k]).map(k=>`<section class="section" data-section="${k}"><div class="section-head"><button class="section-toggle" data-collapse="${k}" aria-expanded="${!state.closed[k]}" aria-controls="gptu-${k}">${icon(k)}<span>${labels[k]}</span>${k==='credits'&&state.closed.credits?`<span class="credit-inline">${esc(creditText)}</span>`:''}${icon('chevron')}</button><button class="icon section-handle" draggable="true" data-handle="${k}" aria-label="Reorder ${labels[k]}" title="Drag to reorder · ↑ / ↓">${icon('grip')}</button></div><div class="section-content" id="gptu-${k}" ${state.closed[k]?'hidden':''}>${blocks[k]}</div></section>`).join('')+
+      `${state.error?`<div class="err" role="status">${esc(state.error)}</div>`:''}${state.footerPosition==='bottom'?footer:''}${state.showRaw?`<pre>${esc(JSON.stringify({usage:state.usage,models:state.models},null,2))}</pre>`:''}`;
     $('.body').scrollTop=scroll;
     if(host.hasAttribute('data-bottom')) layoutBottom();
     if(rawFocused) $('.raw')?.focus();
@@ -454,6 +514,7 @@
     if(e.target.closest('.reset')){Object.assign(state,defaultPreferences());persist();closeSettings(true);render();place(true);}
   });
   root.addEventListener('change',e=>{
+    if(e.target.hasAttribute('data-footer-top')){state.footerPosition=e.target.checked?'top':'bottom';persist();render();positionSettings();}
     if(e.target.hasAttribute('data-remaining-plan')){state.showRemainingPlan=e.target.checked;persist();render();positionSettings();}
     if(e.target.hasAttribute('data-add-credits')){state.showAddCredits=e.target.checked;persist();render();positionSettings();}
     if(e.target.hasAttribute('data-plan-tooltips')){state.showPlanTooltips=e.target.checked;persist();render();positionSettings();}

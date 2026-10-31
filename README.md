@@ -6,12 +6,13 @@ A browser extension that adds a **Usage** card to ChatGPT's left sidebar, showin
 - **Credits** — your pay-as-you-go usage-credit balance, or "Unlimited".
 - **Model & feature limits** — remaining messages/uses per model or feature (Deep Research, image generation…), captured whenever ChatGPT reports them.
 
-## Panel controls (0.3.13)
+## Panel controls (0.3.14)
 
-- **Add credits button** in settings shows or hides the action in expanded Credits. It opens the [Codex usage dashboard](https://chatgpt.com/codex/settings/usage) in a new tab; buying credits happens there.
+- **Add credits button** in settings shows or hides the action in expanded Credits. It opens the [ChatGPT credits purchase page](https://chatgpt.com/pricing/credits) in a centered dialog, with the return path set to the current chat when clicked. Close it with ✕, Escape, or a click outside. **Open in tab** is available if the checkout cannot be embedded. Buying credits happens on the official page. Returning to the original chat in the frame closes the dialog and refreshes usage.
 - **Show remaining plan allowance** switches plan percentages, bars, tooltips and the collapsed summary to remaining allowance, matching the original usage page. Full neutral bars mean 100% left; empty bars mean 0% left. Feature counters are unaffected.
 - **Plan limit tooltips** in settings enables or disables the compact limit detail popups. Short reset captions remain visible.
 - **Models & features to show** in settings lets you toggle individual counters (Deep Research, File uploads, Paste text to file, Image generation, and reported models). These choices are saved separately from the whole module switch. Hiding a counter keeps its cached data and does not affect your account limits. Counters still require data reported by ChatGPT.
+- **Update time and Details at top** in Panel → Appearance moves the status row above the modules (the default). Turn it off for bottom placement. The row uses reduced vertical spacing in both modes, and the choice is saved.
 - The Usage panel scrollbar appears on hover or keyboard focus, with its space reserved to avoid text shifting. Settings retain a normal scrollbar.
 - Drag, refresh, customize, reorder, collapse arrows, update time, and Details appear on panel hover or keyboard focus. Touch devices keep controls visible. Hidden controls retain their space so rows do not jump.
 - Compact plan limits use responsive columns with short reset captions. Hover or focus a limit for its full status and reset time. Narrow panels stack them automatically.
