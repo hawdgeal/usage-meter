@@ -6,7 +6,7 @@ A browser extension that adds a **Usage** card to ChatGPT's left sidebar, showin
 - **Credits** — your pay-as-you-go usage-credit balance, or "Unlimited".
 - **Model & feature limits** — remaining messages/uses per model or feature (Deep Research, image generation…), captured whenever ChatGPT reports them.
 
-## Panel controls (0.3.31)
+## Panel controls (0.3.32)
 
 - The settings window has a lower-right resize handle. Its size is saved separately from the Usage panel; resizing fixes its current position. Double-click the handle or press Home while it is focused to restore automatic sizing.
 
@@ -107,3 +107,5 @@ Undo and Redo buttons in the settings title bar restore up to 100 extension pref
 Modules → Plan limits → Show banked reset count & button independently toggles banked-reset controls (on by default). Show paid reset button remains separate. Bars → Reset bar colors restores only the bar color source, custom colors, ranges/blend widths and gradient display defaults; it is undoable and preserves theme, module and spacing choices.
 
 Modules → Credits → Balance beside Credits title moves the available amount from beside the percentage into the section heading when the bar is enabled and the large available-balance display is hidden. It defaults off, persists independently and is undoable. The percentage remains in the meter; no duplicate amount appears there. Collapsed Credits continues showing its balance as before.
+
+Layout → Docking & size → Drag handle position selects Before Usage or After settings (default). The actual control order follows this choice for both pointer and keyboard use. Hover-only visibility, drag/docking and resizing remain available. The setting persists and supports Undo/Redo.
