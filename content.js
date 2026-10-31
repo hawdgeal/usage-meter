@@ -8,7 +8,7 @@
 
   function defaultPreferences(){return {
     collapsed:false,compact:false,compactHeight:null,hideCollapsed:false,footerPosition:'top',showUpdateTime:true,showDetails:true,marginTop:6,marginBottom:6,
-    showAddCredits:true,showPlanTooltips:false,showRemainingPlan:false,
+    showAddCredits:true,showPlanTooltips:false,showRemainingPlan:true,showCreditBar:false,creditReference:null,creditReferencePending:false,
     position:'bottom',sections:['plan','credits','features'],closed:{credits:true},
     hidden:{features:true},hiddenFeatures:{deep_research:true,file_upload:true,paste_text_to_file:true},
     theme:'auto',floating:{x:24,y:100},size:{width:300,height:null},
@@ -21,7 +21,7 @@
   let lastRefresh = 0;
 
   // ---------- persistence ----------
-  const saveKeys = ["usage", "plan", "usageAt", "models", "collapsed", "position", "sections", "closed", "hidden", "theme", "floating", "size", "compact", "compactHeight", "hideCollapsed", "hiddenFeatures", "showAddCredits", "showPlanTooltips", "showRemainingPlan", "settingsClosed", "settingsTab", "footerPosition", "showUpdateTime", "showDetails", "marginTop", "marginBottom"];
+  const saveKeys = ["usage", "plan", "usageAt", "models", "collapsed", "position", "sections", "closed", "hidden", "theme", "floating", "size", "compact", "compactHeight", "hideCollapsed", "hiddenFeatures", "showAddCredits", "showPlanTooltips", "showRemainingPlan", "settingsClosed", "settingsTab", "footerPosition", "showUpdateTime", "showDetails", "marginTop", "marginBottom", "showCreditBar", "creditReference", "creditReferencePending"];
   function persist() {
     const o = {};
     for (const k of saveKeys) o[k] = state[k];
@@ -32,6 +32,7 @@
       const r = await store.local.get("gptu");
       if (r && r.gptu) for (const k of saveKeys) if (r.gptu[k] !== undefined) state[k] = r.gptu[k];
     } catch (_) {}
+    if(!Number.isFinite(state.creditReference)||state.creditReference<=0)state.creditReference=null;
     for(const key of ['marginTop','marginBottom'])state[key]=Number.isFinite(state[key])?Math.max(0,Math.min(120,state[key])):6;
     if(!['top','bottom'].includes(state.footerPosition))state.footerPosition='top';
     if(!['panel','modules'].includes(state.settingsTab))state.settingsTab='panel';
@@ -150,10 +151,11 @@
 
   // All panel colors are owned here: page custom properties can change independently.
   const CSS = `
-    :host { all:initial; display:block; box-sizing:border-box; padding-top:var(--gptu-margin-top,6px); padding-bottom:var(--gptu-margin-bottom,6px); min-width:0; flex-shrink:0; color-scheme:light; }
+    :host { all:initial; display:block; box-sizing:border-box; padding:0; min-width:0; flex-shrink:0; color-scheme:light; }
     * { box-sizing:border-box; }
     [hidden] { display:none !important; }
-    .card, .settings, .credits-modal, .dock-zone { --fg:#202123; --muted:#656565; --line:#e3e3e3; --surface:#f9f9f9; --hover:#ededed; --track:#e5e5e5; --ok:#087f65; --warn:#966000; --bad:#c53240;
+    .panel-layout { display:flow-root; min-width:0; padding-top:var(--gptu-margin-top,6px); padding-bottom:var(--gptu-margin-bottom,6px); }
+    .card, .settings, .credits-modal, .dock-zone { --fg:#202123; --muted:#656565; --line:#e3e3e3; --surface:#f9f9f9; --hover:#ededed; --track:#e5e5e5; --ok:#087f65; --remaining:#2563eb; --warn:#966000; --bad:#c53240;
       color:var(--fg); background:var(--surface); font:13px/1.45 ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
       margin:0 8px; border:1px solid var(--line); border-radius:14px; overflow:hidden; text-align:left; display:flex; flex-direction:column; }
     .card { position:relative; border-color:transparent; }
@@ -168,7 +170,7 @@
     .card.collapsed.hide-collapsed:has(:focus-visible) .usage-icon,.card.collapsed.hide-collapsed:has(:focus-visible) .title,.card.collapsed.hide-collapsed:has(:focus-visible) .badge,.card.collapsed.hide-collapsed:has(:focus-visible) .summary { opacity:1; pointer-events:auto; }
     @media(hover:none) { .card.collapsed.hide-collapsed .usage-icon,.card.collapsed.hide-collapsed .title,.card.collapsed.hide-collapsed .badge,.card.collapsed.hide-collapsed .summary { opacity:1; pointer-events:auto; } }
     :host([data-dark]) { color-scheme:dark; }
-    :host([data-dark]) .card, :host([data-dark]) .settings, :host([data-dark]) .credits-modal, :host([data-dark]) .dock-zone { --fg:#ececec; --muted:#ababab; --line:#292929; --surface:#000000; --hover:#171717; --track:#292929; --ok:#57c7a6; --warn:#e9b55f; --bad:#ff7983; }
+    :host([data-dark]) .card, :host([data-dark]) .settings, :host([data-dark]) .credits-modal, :host([data-dark]) .dock-zone { --fg:#ececec; --muted:#ababab; --line:#292929; --surface:#000000; --hover:#171717; --track:#292929; --ok:#57c7a6; --remaining:#60a5fa; --warn:#e9b55f; --bad:#ff7983; }
     button,select { font:inherit; color:inherit; }
     button { border:0; background:none; cursor:pointer; padding:0; }
     button:hover { background:var(--hover); }
@@ -178,7 +180,7 @@
     .icon { width:28px; height:28px; display:inline-flex; align-items:center; justify-content:center; border-radius:7px; flex-shrink:0; color:var(--muted); }
     .grab { cursor:grab; touch-action:none; }
     .grab:active { cursor:grabbing; }
-    .toggle { display:flex; align-items:center; gap:8px; min-width:0; flex:1; border-radius:7px; padding:5px 2px; text-align:left; }
+    .usage-open { display:flex; align-items:center; gap:8px; min-width:0; flex:1; border-radius:7px; padding:5px 2px; text-align:left; }
     .title { font-size:var(--gptu-title-size,14px); font-weight:500; white-space:nowrap; }
     .badge { color:var(--muted); border:1px solid var(--line); font-size:9px; padding:1px 4px; border-radius:5px; text-transform:uppercase; max-width:58px; overflow:hidden; text-overflow:ellipsis; }
     .chev { width:13px; transition:transform .15s; }
@@ -192,6 +194,11 @@
     .add-credits:focus-visible { outline:2px solid var(--ok); outline-offset:2px; }
     .add-credits svg { width:13px; height:13px; }
     .compact .add-credits { margin-top:5px; padding:3px 7px; font-size:11px; }
+    .credit-meter { margin-top:8px; }
+    .credit-meter .rl { font-size:11px; }
+    .credit-meter .v { font-size:11px; }
+    .credit-reference-controls input { width:94px; }
+    .compact .credit-meter { margin-top:5px; }
     .credit-inline { color:var(--fg); font-size:12px; font-weight:600; font-variant-numeric:tabular-nums; }
     .section-toggle .chev { margin-left:auto; }
     .section-handle { width:22px; height:24px; cursor:grab; }
@@ -202,7 +209,7 @@
     .v { font-size:12px; font-weight:600; font-variant-numeric:tabular-nums; flex-shrink:0; }
     .bar { height:4px; background:var(--track); border-radius:9px; overflow:hidden; margin:7px 0 5px; }
     .bar i { display:block; height:100%; border-radius:9px; background:var(--ok); }
-    .bar i.remaining { background:var(--fg); }
+    .bar i.remaining { background:var(--remaining); }
     .bar i.warn { background:var(--warn); } .bar i.bad { background:var(--bad); }
     .sub,.empty,.note { color:var(--muted); font-size:11px; line-height:1.5; }
     .empty { padding-bottom:8px; }
@@ -258,9 +265,9 @@
     .compact-toggle { padding-top:8px; border-top:1px solid var(--line); }
     .compact-toggle input { width:16px; height:16px; cursor:pointer; }
     /* Opacity preserves layout and tab order while keeping the idle view quiet. */
-    .card .grab,.card .refresh,.card .customize,.card .section-handle,.card .foot,.card .chev { opacity:0; pointer-events:none; }
-    .card:hover .grab,.card:hover .refresh,.card:hover .customize,.card:hover .section-handle,.card:hover .foot,.card:hover .chev,
-    .card:has(:focus-visible) .grab,.card:has(:focus-visible) .refresh,.card:has(:focus-visible) .customize,.card:has(:focus-visible) .section-handle,.card:has(:focus-visible) .foot,.card:has(:focus-visible) .chev { opacity:1; pointer-events:auto; }
+    .card .grab,.card .refresh,.card .customize,.card .collapse-panel,.card .section-handle,.card .foot,.card .chev { opacity:0; pointer-events:none; }
+    .card:hover .grab,.card:hover .refresh,.card:hover .customize,.card:hover .collapse-panel,.card:hover .section-handle,.card:hover .foot,.card:hover .chev,
+    .card:has(:focus-visible) .grab,.card:has(:focus-visible) .refresh,.card:has(:focus-visible) .customize,.card:has(:focus-visible) .collapse-panel,.card:has(:focus-visible) .section-handle,.card:has(:focus-visible) .foot,.card:has(:focus-visible) .chev { opacity:1; pointer-events:auto; }
     :host([data-settings-open]) .customize { opacity:1; pointer-events:auto; }
     .compact .plan-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(112px,100%),1fr)); column-gap:14px; position:relative; }
     .compact .plan-row { min-width:0; border-radius:4px; }
@@ -270,7 +277,7 @@
     .plan-tip { display:none; position:absolute; left:0; right:0; top:0; z-index:2; padding:5px 7px; border:1px solid var(--line); border-radius:6px; background:var(--surface); color:var(--fg); font-size:11px; line-height:1.35; box-shadow:0 2px 8px #0003; pointer-events:none; }
     .plan-row:hover .plan-tip,.plan-row:focus-visible .plan-tip { display:block; }
     .plan-row:focus-visible { outline:2px solid var(--ok); outline-offset:2px; }
-    @media(hover:none) { .card .grab,.card .refresh,.card .customize,.card .section-handle,.card .foot,.card .chev { opacity:1; pointer-events:auto; } }
+    @media(hover:none) { .card .grab,.card .refresh,.card .customize,.card .collapse-panel,.card .section-handle,.card .foot,.card .chev { opacity:1; pointer-events:auto; } }
     .card .head .grab { width:0; min-width:0; margin-right:-3px; overflow:hidden; }
     .card:hover .head .grab,.card:has(:focus-visible) .head .grab { width:28px; margin-right:0; overflow:visible; }
     .card.compact:hover .head .grab,.card.compact:has(:focus-visible) .head .grab { width:24px; }
@@ -282,7 +289,6 @@
     .feature-options input { flex-shrink:0; }
     .usage-icon { display:inline-flex; flex:0 0 20px; width:20px; color:var(--fg); }
     .usage-icon svg,.compact .usage-icon svg { width:20px; height:20px; }
-    .head .toggle .chev { margin-left:auto; }
     .settings { padding:0; width:min(324px,calc(100vw - 16px)); }
     .settings-title { position:sticky; top:0; z-index:3; background:var(--surface); margin:0; padding:12px 14px; border-bottom:1px solid var(--line); }
     .settings-header { position:sticky; top:0; z-index:3; background:var(--surface); }
@@ -345,12 +351,12 @@
   const USAGE_ICON = `<svg aria-hidden="true" height="20" viewBox="0 0 20 20" width="20" xmlns="http://www.w3.org/2000/svg"><path d="M10.0017 1.83496C10.9451 1.83499 11.8556 1.9809 12.7117 2.25098C13.0619 2.36148 13.2567 2.73471 13.1462 3.08496C13.0357 3.43506 12.6624 3.62884 12.3123 3.51855C11.5841 3.28882 10.8078 3.16507 10.0017 3.16504C5.76585 3.16504 2.33179 6.5991 2.33179 10.835C2.33186 12.8582 3.11408 14.6974 4.39429 16.0684C4.64484 16.3367 4.63109 16.7571 4.36304 17.0078C4.09461 17.2585 3.67328 17.244 3.42261 16.9756C1.92156 15.3681 1.00178 13.2083 1.00171 10.835C1.00171 5.86457 5.03131 1.83496 10.0017 1.83496Z" fill="currentColor"></path><path d="M17.7751 7.74902C18.1261 7.64142 18.4984 7.83849 18.6062 8.18945C18.8633 9.02663 19.0007 9.91545 19.0007 10.835C19.0007 13.2083 18.0819 15.369 16.5808 16.9766C16.3302 17.2449 15.9088 17.2583 15.6404 17.0078C15.3723 16.7572 15.3577 16.3367 15.6082 16.0684C16.8883 14.6974 17.6716 12.8582 17.6716 10.835C17.6716 10.0493 17.5534 9.29214 17.3347 8.58008C17.2269 8.22899 17.4241 7.85683 17.7751 7.74902Z" fill="currentColor"></path><path d="M14.8269 5.0957C15.0864 4.83644 15.5076 4.8368 15.7673 5.0957C16.027 5.35536 16.0269 5.7774 15.7673 6.03711L12.2273 9.57617C12.438 9.94814 12.5603 10.377 12.5603 10.835C12.5602 12.2482 11.4149 13.3934 10.0017 13.3936C8.58836 13.3936 7.44228 12.2483 7.44214 10.835C7.4422 9.42157 8.58831 8.27539 10.0017 8.27539C10.4735 8.27544 10.9143 8.40519 11.2937 8.62793L14.8269 5.0957ZM10.0017 9.60547C9.32285 9.60547 8.77228 10.1561 8.77222 10.835C8.77236 11.5137 9.3229 12.0635 10.0017 12.0635C10.6804 12.0633 11.2301 11.5137 11.2302 10.835C11.2302 10.1562 10.6804 9.60561 10.0017 9.60547Z" fill-rule="evenodd" clip-rule="evenodd" fill="currentColor"></path></svg>`;
   const host = document.createElement('div'); host.id='gptu-usage-host';
   const root=host.attachShadow({mode:'open'});
-  root.innerHTML=`<style>${CSS}</style><div class="card" part="card">
+  root.innerHTML=`<style>${CSS}</style><div class="panel-layout"><div class="card" part="card">
     <div class="head"><button class="icon grab" aria-label="Drag panel; use arrow keys to move, Escape to dock" title="Drag to float · Arrow keys to move · Escape to dock">${icon('grip')}</button>
-    <button class="toggle" aria-expanded="true"><span class="usage-icon">${USAGE_ICON}</span><span class="title">Usage</span><span class="badge" hidden></span>${icon('chevron')}</button>
+    <button class="usage-open" aria-label="Open usage overview" title="Open usage overview"><span class="usage-icon">${USAGE_ICON}</span><span class="title">Usage</span><span class="badge" hidden></span></button><button class="icon toggle collapse-panel" aria-expanded="true" aria-label="Collapse usage panel" title="Collapse usage panel">${icon('chevron')}</button>
     <button class="icon refresh" title="Refresh usage" aria-label="Refresh usage">${icon('refresh')}</button>
     <button class="icon customize" title="Customize panel" aria-label="Customize panel" aria-expanded="false">${icon('settings')}</button></div>
-    <div class="summary" hidden></div><div class="body"></div><button class="resize" aria-label="Resize panel" title="Drag to resize · Arrow keys to resize · Double-click to reset size"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m5 13 8-8m-3 8 3-3"/></svg></button><div class="live" aria-live="polite"></div></div><div class="settings" popover="auto" role="dialog" aria-label="Usage settings"></div><dialog class="credits-modal" aria-labelledby="gptu-credits-heading"><div class="credits-header"><h2 id="gptu-credits-heading">Add credits</h2><a class="credit-external" target="_blank" rel="noopener noreferrer">Open in tab</a><button class="icon credits-close" aria-label="Close credits">✕</button></div><p class="credits-status" role="status">Loading credits…</p><iframe class="credits-frame" title="ChatGPT credits purchase" allow="payment" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads"></iframe></dialog><div class="dock-targets" hidden aria-hidden="true"><div class="dock-zone" data-dock="top">Dock at top</div><div class="dock-zone" data-dock="bottom">Dock at bottom</div></div>`;
+    <div class="summary" hidden></div><div class="body"></div><button class="resize" aria-label="Resize panel" title="Drag to resize · Arrow keys to resize · Double-click to reset size"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m5 13 8-8m-3 8 3-3"/></svg></button><div class="live" aria-live="polite"></div></div></div><div class="settings" popover="auto" role="dialog" aria-label="Usage settings"></div><dialog class="credits-modal" aria-labelledby="gptu-page-heading"><div class="credits-header"><h2 id="gptu-page-heading">Add credits</h2><a class="credit-external" target="_blank" rel="noopener noreferrer">Open in tab</a><button class="icon credits-close" aria-label="Close credits">✕</button></div><p class="credits-status" role="status">Loading credits…</p><iframe class="credits-frame" title="ChatGPT credits purchase" allow="payment" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads"></iframe></dialog><div class="dock-targets" hidden aria-hidden="true"><div class="dock-zone" data-dock="top">Dock at top</div><div class="dock-zone" data-dock="bottom">Dock at bottom</div></div>`;
   const $=s=>root.querySelector(s), card=$('.card');
   let busyTimer, settingsOpen=false, drag=null, resizing=null, sectionDrag=null;
   const ui={ setBusy(b) { card.classList.toggle('busy',b); $('.refresh').disabled=b; $('.refresh').setAttribute('aria-busy',String(b)); clearTimeout(busyTimer); if(b) busyTimer=setTimeout(()=>{ui.setBusy(false); state.error='Refresh timed out. Try again.'; render();},20000); } };
@@ -380,18 +386,21 @@
   });
   root.addEventListener('auxclick',updateCreditLink);
   let creditReturnFocus=null,creditReturnPath='',creditWatch=null,creditLoadTimeout=null;
-  function openCreditDialog(link){
+  function openCreditDialog(link){openPageDialog(creditPurchaseUrl(),'Add credits',link,true);}
+  function openPageDialog(url,title,returnFocus,closeOnReturn=false){
     const dialog=$('.credits-modal'),frame=$('.credits-frame');
     if(dialog.open){$('.credits-close').focus();return;}
     if(settingsOpen)closeSettings();
-    creditReturnFocus=link;creditReturnPath=location.pathname+location.search+location.hash;
-    $('.credit-external').href=creditPurchaseUrl();$('.credits-status').textContent='Loading credits…';$('.credits-status').hidden=false;
-    frame.src=creditPurchaseUrl();dialog.showModal();$('.credits-close').focus();
+    creditReturnFocus=returnFocus;creditReturnPath=location.pathname+location.search+location.hash;
+    $('#gptu-page-heading').textContent=title;frame.title=title==='Add credits'?'ChatGPT credits purchase':'ChatGPT usage overview';
+    $('.credit-external').href=url;$('.credits-status').textContent='Loading…';$('.credits-status').hidden=false;
+    frame.src=url;dialog.showModal();$('.credits-close').focus();
     creditLoadTimeout=setTimeout(()=>{if(dialog.open){$('.credits-status').textContent='If the page stays blank, choose Open in tab.';$('.credits-status').hidden=false;}},12000);
-    creditWatch=setInterval(()=>{
+    if(closeOnReturn)creditWatch=setInterval(()=>{
       try{const destination=new URL(frame.contentWindow.location.href);if(destination.origin===location.origin&&destination.pathname+destination.search+destination.hash===creditReturnPath){dialog.close();requestRefresh(false);}}catch(_){}
     },1000);
   }
+  $('.usage-open').onclick=()=>openPageDialog(new URL('/settings/usage?tab=overview',location.origin).href,'Usage',$('.usage-open'));
   $('.credits-close').onclick=()=>$('.credits-modal').close();
   $('.credits-modal').addEventListener('close',()=>{
     clearInterval(creditWatch);clearTimeout(creditLoadTimeout);creditWatch=null;
@@ -426,7 +435,7 @@
       }</div>
       <div class="settings-panel" role="tabpanel" id="gptu-settings-modules" aria-labelledby="gptu-tab-modules" ${state.settingsTab==='modules'?'':'hidden'}>${
         group('plan','Plan limits',`${moduleToggle('plan')}<div class="module-hint">Choose how the allowance is displayed.</div>${toggle('Show remaining plan allowance','data-remaining-plan',state.showRemainingPlan)}${toggle('Plan limit tooltips','data-plan-tooltips',state.showPlanTooltips)}`)+
-        group('credits','Credits',`${moduleToggle('credits')}${toggle('Add credits button','data-add-credits',state.showAddCredits)}`)+
+        group('credits','Credits',`${moduleToggle('credits')}${toggle('Show credit balance bar','data-credit-bar',state.showCreditBar)}<div class="credit-reference-controls" ${state.showCreditBar?'':'hidden'}><label class="setting"><span>Full balance</span><span class="margin-input"><input type="number" aria-label="Full credit balance" min="0.01" step="any" data-credit-reference value="${state.creditReference??''}" placeholder="e.g. 1000">credits</span></label><div class="note">This amount counts as 100%. Initially uses your balance when enabled; you can change it.</div></div>${toggle('Add credits button','data-add-credits',state.showAddCredits)}`)+
         group('features','Models & features',`${moduleToggle('features')}<div class="feature-settings"><div class="feature-settings-title">Individual counters</div><div class="feature-options" role="group" aria-label="Models & features to show"></div><div class="note">Selections are kept when the whole module is hidden. Counters appear when ChatGPT reports them.</div></div>`)
       }</div>
     </div><div class="settings-help"><details><summary>Keyboard & dragging</summary><div class="note">Drag the panel handle to float. Use section handles to reorder, or focus one and press ↑ / ↓.</div></details><button class="text-btn reset">Reset settings</button></div>`;
@@ -454,6 +463,7 @@
     const parsed=parseUsage(state.usage), plan=parsed.plan||state.plan;
     $('.badge').hidden=!plan; $('.badge').textContent=plan||'';
     $('.toggle').setAttribute('aria-expanded',String(!state.collapsed));
+    $('.toggle').title=state.collapsed?'Expand usage panel':'Collapse usage panel';$('.toggle').setAttribute('aria-label',$('.toggle').title);
     $('.body').hidden=!!state.collapsed;
     const pcts=parsed.rows.map(r=>r.pct).filter(p=>p!=null);
     $('.summary').hidden=!state.collapsed;
@@ -468,8 +478,17 @@
       return `<div class="row plan-row" ${state.compact?`tabindex="0" role="group" aria-label="${esc(full)}"`:''}><div class="rl"><span>${esc(r.label)}</span><span class="v ${r.reached&&!state.showRemainingPlan?'at-limit':''}">${displayed==null?'—':Math.round(displayed)+(state.showRemainingPlan?'% left':'%')}</span></div>${displayed==null?'':bar(displayed,r.label,state.showRemainingPlan)}<div class="sub">${esc(caption)}</div>${state.compact&&state.showPlanTooltips?`<div class="plan-tip" aria-hidden="true">${esc(full)}</div>`:''}</div>`;
     }).join('')}</div>`:`<div class="empty">${state.error?'Usage unavailable. Try refreshing.':state.usageAt?'No plan limits reported.':'Waiting for usage…'}</div>`;
     const balance=num(parsed.credits);
+    if(state.showCreditBar&&state.creditReferencePending&&balance>0){state.creditReference=Number(balance.toFixed(2))||balance;state.creditReferencePending=false;persist();syncCreditBarSettings();}
     const creditText=balance!=null?format(balance):parsed.credits??'—';
-    blocks.credits=`<div class="credit">${esc(creditText)}</div><div class="sub">${parsed.credits==null?'No credit balance reported':'Available balance'}</div>${state.showAddCredits?'<a class="add-credits" href="'+esc(creditPurchaseUrl())+'" target="_blank" rel="noopener noreferrer"><svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M3 8h10"/></svg>Add credits</a>':''}`;
+    let creditMeter='';
+    if(state.showCreditBar){
+      if(balance!=null&&state.creditReference>0){
+        const percentage=Math.max(0,balance/state.creditReference*100),text=new Intl.NumberFormat(undefined,{maximumFractionDigits:1}).format(percentage);
+        creditMeter=`<div class="credit-meter"><div class="rl"><span>Remaining</span><span class="v">${text}%</span></div>${bar(Math.min(100,percentage),'Credit balance',true)}<div class="sub">of ${format(state.creditReference)} credits</div></div>`;
+      }else if(balance!=null)creditMeter='<div class="sub credit-meter">Set a full balance in settings to show a percentage.</div>';
+      else if(parsed.credits!=='Unlimited')creditMeter='<div class="sub credit-meter">Balance unavailable.</div>';
+    }
+    blocks.credits=`<div class="credit">${esc(creditText)}</div><div class="sub">${parsed.credits==null?'No credit balance reported':'Available balance'}</div>${creditMeter}${state.showAddCredits?'<a class="add-credits" href="'+esc(creditPurchaseUrl())+'" target="_blank" rel="noopener noreferrer"><svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M3 8h10"/></svg>Add credits</a>':''}`;
     const models=Object.entries(state.models).filter(([name])=>state.hiddenFeatures[name]!==true).sort((a,b)=>(b[1].seenAt||0)-(a[1].seenAt||0)).slice(0,12);
     blocks.features=models.map(([name,m])=>{
       const expired=m.resetsAt&&m.resetsAt<=Date.now();
@@ -521,6 +540,16 @@
     if(e.target.closest('.raw')){state.showRaw=!state.showRaw;render();$('.raw').focus();}
     if(e.target.closest('.reset')){Object.assign(state,defaultPreferences());persist();closeSettings(true);render();place(true);}
   });
+  function syncCreditBarSettings(){
+    const controls=$('.credit-reference-controls');if(!controls)return;
+    controls.hidden=!state.showCreditBar;
+    const input=controls.querySelector('input');if(root.activeElement!==input)input.value=state.creditReference??'';
+  }
+  function changeCreditReference(event){
+    if(!event.target.hasAttribute?.('data-credit-reference'))return;
+    const value=Number(event.target.value);state.creditReference=Number.isFinite(value)&&value>0?value:null;state.creditReferencePending=false;persist();render();positionSettings();
+  }
+  root.addEventListener('input',changeCreditReference);
   function changeMargin(event){
     const key=event.target.dataset?.margin;if(!['marginTop','marginBottom'].includes(key))return;
     if(event.type==='input'&&(event.target.value===''||!event.target.validity.valid))return;
@@ -531,6 +560,12 @@
   root.addEventListener('input',changeMargin);
   root.addEventListener('change',changeMargin);
   root.addEventListener('change',e=>{
+    if(e.target.hasAttribute('data-credit-reference'))changeCreditReference(e);
+    if(e.target.hasAttribute('data-credit-bar')){
+      state.showCreditBar=e.target.checked;
+      if(state.showCreditBar&&!state.creditReference){const balance=num(parseUsage(state.usage).credits);if(balance>0){state.creditReference=Number(balance.toFixed(2))||balance;state.creditReferencePending=false;}else state.creditReferencePending=true;}
+      persist();syncCreditBarSettings();render();positionSettings();
+    }
     if(e.target.hasAttribute('data-show-update')){state.showUpdateTime=e.target.checked;persist();render();positionSettings();}
     if(e.target.hasAttribute('data-show-details')){state.showDetails=e.target.checked;if(!state.showDetails)state.showRaw=false;persist();render();positionSettings();}
     if(e.target.hasAttribute('data-footer-top')){state.footerPosition=e.target.checked?'top':'bottom';persist();render();positionSettings();}
