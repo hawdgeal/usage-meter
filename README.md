@@ -6,11 +6,12 @@ A browser extension that adds a **Usage** card to ChatGPT's left sidebar, showin
 - **Credits** — your pay-as-you-go usage-credit balance, or "Unlimited".
 - **Model & feature limits** — remaining messages/uses per model or feature (Deep Research, image generation…), captured whenever ChatGPT reports them.
 
-## Panel controls (0.3.2)
+## Panel controls (0.3.3)
 
 - The panel border and resize handle appear on hover or keyboard focus; touch devices keep the handle accessible.
 - Settings open as a separate popover without shifting the panel. Click outside or press Escape to dismiss it. Choosing a placement closes the popover.
-- Sidebar bottom docks above the account footer, outside the scrolling history when the footer is detectable.
+- Sidebar bottom pins the panel to the visible sidebar area above the account footer when detectable. It stays outside clipped history containers and reserves scroll space for chats.
+- When the panel is collapsed, its label, summary, and controls appear on hover or keyboard focus.
 - Drag the bottom-right corner to resize the height in the sidebar, or both width and height when floating. Focus that handle and use arrow keys for keyboard resizing. Double-click it to reset the size. Your dimensions are saved locally.
 - Dark mode uses a true black background.
 - Automatically follows ChatGPT's light or dark theme, with explicit readable colors. Use **Customize panel → Appearance** to override it.

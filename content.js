@@ -160,9 +160,17 @@
     .resize { opacity:0; pointer-events:none; }
     .card:hover .resize, .card:focus-within .resize { opacity:1; pointer-events:auto; }
     @media(hover:none) { .resize { opacity:1; pointer-events:auto; } }
-    :host([data-bottom]) { margin-top:auto; }
+    :host([data-bottom]) { position:fixed; z-index:2147482999; margin:0; }
+    :host([data-bottom]) .card { margin:0; }
+    .card.collapsed .grab, .card.collapsed .refresh, .card.collapsed .customize,
+    .card.collapsed .title, .card.collapsed .badge, .card.collapsed .summary, .card.collapsed .toggle .chev { opacity:0; pointer-events:none; }
+    .card.collapsed:hover .grab, .card.collapsed:hover .refresh, .card.collapsed:hover .customize,
+    .card.collapsed:hover .title, .card.collapsed:hover .badge, .card.collapsed:hover .summary, .card.collapsed:hover .toggle .chev,
+    .card.collapsed:focus-within .grab, .card.collapsed:focus-within .refresh, .card.collapsed:focus-within .customize,
+    .card.collapsed:focus-within .title, .card.collapsed:focus-within .badge, .card.collapsed:focus-within .summary, .card.collapsed:focus-within .toggle .chev { opacity:1; pointer-events:auto; }
+    @media(hover:none) { .card.collapsed .icon, .card.collapsed .toggle .chev { opacity:1; pointer-events:auto; } }
     :host([data-dark]) { color-scheme:dark; }
-    :host([data-dark]) .card, .settings { --fg:#ececec; --muted:#ababab; --line:#292929; --surface:#000000; --hover:#171717; --track:#292929; --ok:#57c7a6; --warn:#e9b55f; --bad:#ff7983; }
+    :host([data-dark]) .card, :host([data-dark]) .settings { --fg:#ececec; --muted:#ababab; --line:#292929; --surface:#000000; --hover:#171717; --track:#292929; --ok:#57c7a6; --warn:#e9b55f; --bad:#ff7983; }
     button,select { font:inherit; color:inherit; }
     button { border:0; background:none; cursor:pointer; padding:0; }
     button:hover { background:var(--hover); }
@@ -264,6 +272,7 @@
   }
   function render() {
     applyTheme();
+    card.classList.toggle('collapsed',!!state.collapsed);
     applySize();
     const parsed=parseUsage(state.usage), plan=parsed.plan||state.plan;
     $('.badge').hidden=!plan; $('.badge').textContent=plan||'';
@@ -290,6 +299,7 @@
     $('.body').innerHTML=state.sections.filter(k=>!state.hidden[k]).map(k=>`<section class="section" data-section="${k}"><div class="section-head"><button class="section-toggle" data-collapse="${k}" aria-expanded="${!state.closed[k]}" aria-controls="gptu-${k}">${icon(k)}<span>${labels[k]}</span>${icon('chevron')}</button><button class="icon section-handle" draggable="true" data-handle="${k}" aria-label="Reorder ${labels[k]}" title="Drag to reorder · ↑ / ↓">${icon('grip')}</button></div><div class="section-content" id="gptu-${k}" ${state.closed[k]?'hidden':''}>${blocks[k]}</div></section>`).join('')+
       `${state.error?`<div class="err" role="status">${esc(state.error)}</div>`:''}<div class="foot"><span>Updated ${fmtAgo(state.usageAt)}</span><button class="text-btn raw" aria-expanded="${state.showRaw}">${state.showRaw?'Hide data':'Details'}</button></div>${state.showRaw?`<pre>${esc(JSON.stringify({usage:state.usage,models:state.models},null,2))}</pre>`:''}`;
     $('.body').scrollTop=scroll;
+    if(host.hasAttribute('data-bottom')) layoutBottom();
     if(rawFocused) $('.raw')?.focus();
     else if(focused?.handle) root.querySelector(`[data-handle="${focused.handle}"]`)?.focus();
     else if(focused?.collapse) root.querySelector(`[data-collapse="${focused.collapse}"]`)?.focus();
@@ -327,7 +337,7 @@
   root.addEventListener('keydown',e=>{const k=e.target.dataset.handle;if(!k||!['ArrowUp','ArrowDown'].includes(e.key))return;e.preventDefault();const visible=state.sections.filter(x=>!state.hidden[x]), i=visible.indexOf(k)+(e.key==='ArrowUp'?-1:1);if(visible[i]){reorder(k,visible[i]);root.querySelector(`[data-handle="${k}"]`).focus();}});
   function applySize() {
     const floating=host.hasAttribute('data-floating');
-    host.style.width=floating?Math.max(Math.min(240,innerWidth-16),Math.min(state.size.width,innerWidth-16))+'px':'';
+    if(floating)host.style.width=Math.max(Math.min(240,innerWidth-16),Math.min(state.size.width,innerWidth-16))+'px';else if(!host.hasAttribute('data-bottom'))host.style.width='';
     const height=state.size.height==null||state.collapsed?null:Math.max(Math.min(140,innerHeight-16),Math.min(state.size.height,innerHeight-16));
     card.style.height=height==null?'':height+'px';
     card.classList.toggle('sized',height!=null);
@@ -337,13 +347,13 @@
   $('.resize').addEventListener('pointerdown',e=>{
     if(e.button!==0)return;
     const r=card.getBoundingClientRect();
-    resizing={x:e.clientX,y:e.clientY,width:r.width,height:r.height};
+    resizing={x:e.clientX,y:e.clientY,width:r.width,height:r.height,bottom:host.hasAttribute('data-bottom'),edge:r.bottom};
     e.preventDefault();
   });
   window.addEventListener('pointermove',e=>{
     if(!resizing)return;
     if(host.hasAttribute('data-floating')) state.size.width=Math.max(240,Math.min(resizing.width+e.clientX-resizing.x,innerWidth-host.getBoundingClientRect().left-8));
-    state.size.height=Math.max(140,Math.min(resizing.height+e.clientY-resizing.y,innerHeight-card.getBoundingClientRect().top-8));
+    state.size.height=Math.max(140,Math.min(resizing.height+(resizing.bottom?-1:1)*(e.clientY-resizing.y),resizing.bottom?resizing.edge-8:innerHeight-card.getBoundingClientRect().top-8));
     applySize();
   });
   const endResize=()=>{if(resizing){resizing=null;persist();}};
@@ -353,7 +363,7 @@
     if(!['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key))return;
     e.preventDefault();const r=card.getBoundingClientRect(),step=e.shiftKey?40:10;
     if(['ArrowLeft','ArrowRight'].includes(e.key)&&host.hasAttribute('data-floating'))state.size.width=Math.max(240,Math.min(r.width+(e.key==='ArrowRight'?step:-step),innerWidth-host.getBoundingClientRect().left-8));
-    if(['ArrowUp','ArrowDown'].includes(e.key))state.size.height=Math.max(140,Math.min(r.height+(e.key==='ArrowDown'?step:-step),innerHeight-r.top-8));
+    if(['ArrowUp','ArrowDown'].includes(e.key))state.size.height=Math.max(140,Math.min(r.height+(e.key==='ArrowDown'?step:-step),host.hasAttribute('data-bottom')?r.bottom-8:innerHeight-r.top-8));
     applySize();persist();
   });
   function clampFloat(){const rect=host.getBoundingClientRect();state.floating.x=Math.max(8,Math.min(state.floating.x,innerWidth-rect.width-8));state.floating.y=Math.max(8,Math.min(state.floating.y,innerHeight-Math.min(rect.height,innerHeight-16)-8));host.style.left=state.floating.x+'px';host.style.top=state.floating.y+'px';card.style.maxHeight='calc(100dvh - 16px)';}
@@ -363,6 +373,7 @@
   window.addEventListener('pointerup',endDrag);window.addEventListener('pointercancel',endDrag);window.addEventListener('blur',endDrag);
   $('.grab').addEventListener('keydown',e=>{if(e.key==='Escape'){state.position='top';persist();place(true);if(settingsOpen)renderSettings();return;}if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key))return;e.preventDefault();if(state.position!=='floating'){const r=host.getBoundingClientRect();state.floating={x:r.left,y:r.top};state.position='floating';}const step=e.shiftKey?30:10;state.floating.x+=e.key==='ArrowRight'?step:e.key==='ArrowLeft'?-step:0;state.floating.y+=e.key==='ArrowDown'?step:e.key==='ArrowUp'?-step:0;place(false);persist();if(settingsOpen)renderSettings();});
   function findSidebarNav(){for(const selector of ['#stage-slideover-sidebar nav','nav[aria-label="Chat history"]','[data-testid="sidebar"] nav','nav'])for(const el of document.querySelectorAll(selector)){const r=el.getBoundingClientRect();if(r.width>120&&r.height>200&&r.left>=0&&r.left<innerWidth/2&&r.right>100&&getComputedStyle(el).visibility!=='hidden')return el;}return null;}
+  let bottomSpacer=null;
   function bottomTarget(nav) {
     // The account footer can live outside the history nav, below its scroll area.
     let container=nav;
@@ -373,31 +384,50 @@
       if(container.matches('#stage-slideover-sidebar,[data-testid="sidebar"],aside'))break;
     }
     const account=container.querySelector('[data-testid="accounts-profile-button"], [data-testid="user-menu-button"], [data-testid="profile-button"], button[aria-label="Open profile menu"], footer');
-    if(account&&!host.contains(account)){
-      let parent=nav;
-      while(parent&&!parent.contains(account))parent=parent.parentElement;
-      if(parent&&parent!==document.body){
-        let before=account;
-        while(before.parentElement!==parent)before=before.parentElement;
-        return {parent,before};
-      }
-    }
-    return {parent:nav,before:null};
+    return {container,account};
+  }
+  function layoutBottom(nav=findSidebarNav()) {
+    if(!nav||!host.hasAttribute('data-bottom'))return;
+    const {container,account}=bottomTarget(nav), sidebar=container.getBoundingClientRect(), nr=nav.getBoundingClientRect();
+    const ar=account?.getBoundingClientRect();
+    const edge=Math.min(innerHeight-8,sidebar.bottom>0?sidebar.bottom-8:innerHeight-8);
+    const bottom=ar&&ar.width>0&&ar.top>Math.max(60,sidebar.top)&&ar.top<innerHeight?Math.min(edge,ar.top-8):edge;
+    const left=Math.max(8,sidebar.left+8), width=Math.min(sidebar.width-16,innerWidth-left-8);
+    host.style.width=Math.max(120,width)+'px';host.style.left=left+'px';
+    host.style.top='';host.style.bottom=Math.max(8,innerHeight-bottom)+'px';
+    card.style.maxHeight=Math.max(80,bottom-Math.max(8,nr.top)-8)+'px';
+    // Reserve scrollable space so the last history items can scroll above the dock.
+    if(!bottomSpacer){bottomSpacer=document.createElement('div');bottomSpacer.id='gptu-bottom-space';bottomSpacer.setAttribute('aria-hidden','true');}
+    const scrollers=[nav,...nav.querySelectorAll('*')].filter(el=>el!==bottomSpacer&&!host.contains(el)&&el.clientHeight>100&&/(auto|scroll)/.test(getComputedStyle(el).overflowY));
+    const scrollArea=scrollers.sort((a,b)=>b.clientHeight-a.clientHeight)[0]||nav;
+    if(bottomSpacer.parentElement!==scrollArea)scrollArea.appendChild(bottomSpacer);
+    const height=host.getBoundingClientRect().height+16+'px';
+    if(bottomSpacer.style.height!==height){bottomSpacer.style.height=height;bottomSpacer.style.minHeight=height;bottomSpacer.style.flexShrink='0';bottomSpacer.style.pointerEvents='none';}
   }
   function place(force){
-    const nav=findSidebarNav(), floating=state.position==='floating'||!nav;
-    host.toggleAttribute('data-floating',floating);
-    host.toggleAttribute('data-bottom',!floating&&state.position==='bottom');
+    const nav=findSidebarNav(), floating=state.position==='floating'||!nav, bottom=!floating&&state.position==='bottom';
+    if(nav&&observedSidebar!==nav){sidebarResizeObserver.disconnect();sidebarResizeObserver.observe(nav);const {container}=bottomTarget(nav);if(container!==nav)sidebarResizeObserver.observe(container);sidebarAttributes.disconnect();sidebarAttributes.observe(container,{attributes:true,attributeFilter:['class','style','hidden']});observedSidebar=nav;}
+    host.toggleAttribute('data-floating',floating);host.toggleAttribute('data-bottom',bottom);
     applySize();
+    if(!bottom){bottomSpacer?.remove();host.style.bottom='';}
     if(floating){if(host.parentElement!==document.body)document.body.appendChild(host);clampFloat();}
-    else{
+    else if(bottom){
+      if(host.parentElement!==document.body)document.body.appendChild(host);
+      layoutBottom(nav);
+    }else{
       host.style.left='';host.style.top='';card.style.maxHeight='';
-      const kids=[...nav.children].filter(c=>c!==host);
-      const target=state.position==='bottom'?bottomTarget(nav):{parent:nav,before:kids[1]||null};
-      if(host.parentElement!==target.parent||host.nextElementSibling!==target.before)target.parent.insertBefore(host,target.before);
+      const kids=[...nav.children].filter(c=>c!==host&&c!==bottomSpacer), before=kids[1]||null;
+      if(host.parentElement!==nav||host.nextElementSibling!==before)nav.insertBefore(host,before);
     }
     positionSettings();
   }
+  let bottomFrame=0;
+  function queueBottom(){if(state.position==='bottom'&&!bottomFrame)bottomFrame=requestAnimationFrame(()=>{bottomFrame=0;place(false);});}
+  document.addEventListener('scroll',queueBottom,true);
+  let observedSidebar=null;
+  const sidebarResizeObserver=new ResizeObserver(queueBottom);
+  const sidebarAttributes=new MutationObserver(queueBottom);
+  const panelResizeObserver=new ResizeObserver(queueBottom);panelResizeObserver.observe(card);
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyTheme);
 
   let placeQueued = false;
