@@ -385,7 +385,7 @@
     for(const selector of ['nav[aria-label="Chat history"]','#stage-slideover-sidebar nav','[data-testid="sidebar"] nav','nav']){
       for(const el of document.querySelectorAll(selector)){
         const r=el.getBoundingClientRect();
-        if(el.getAttribute('aria-label')!=='Show sidebar'&&r.width>120&&r.height>(selector==='nav'?160:40)&&r.left>=0&&r.left<innerWidth/2&&isVisibleElement(el))return el;
+        if(el.getAttribute('aria-label')!=='Show sidebar'&&r.width>120&&r.height>(selector==='nav'?160:0)&&r.left>=0&&r.left<innerWidth/2&&isVisibleElement(el))return el;
       }
     }
     return null;
@@ -424,17 +424,27 @@
     if(!nav||!host.hasAttribute('data-bottom'))return;
     const {parent,before}=bottomTarget(nav);
     if(host.parentElement!==parent||host.nextElementSibling!==before)parent.insertBefore(host,before);
-    const r=parent.getBoundingClientRect(), account=before?.getBoundingClientRect();
-    // Limit the panel's own height, leaving the account and history room in the layout.
-    const available=Math.max(100,Math.min(innerHeight,r.height||innerHeight)-(account?.height||0)-100);
+    // display:contents contributes no box; its children participate in the next
+    // ancestor's flex layout. Measure that box rather than the zero-sized wrapper.
+    let layout=parent;
+    while(layout.parentElement&&getComputedStyle(layout).display==='contents')layout=layout.parentElement;
+    const r=layout.getBoundingClientRect(),footer=before?.getBoundingClientRect();
+    const outOfFlow=before&&['absolute','fixed'].includes(getComputedStyle(before).position);
+    const reserve=outOfFlow&&footer?.height>0?Math.max(0,Math.min(r.height,r.bottom-footer.top)):0;
+    const margin=reserve?reserve+'px':'';
+    if(host.style.marginBottom!==margin)host.style.marginBottom=margin;
+    if(observedFooter!==before){footerResizeObserver.disconnect();if(before)footerResizeObserver.observe(before);observedFooter=before;}
+    const available=Math.max(80,Math.min(innerHeight,r.height||innerHeight)-(reserve||(footer?.height||0))-100);
     card.style.maxHeight=Math.min(available,innerHeight*.6)+'px';
   }
+
   function place(force){
     const nav=findSidebarNav(), floating=state.position==='floating'||!nav, bottom=!floating&&state.position==='bottom';
     if(nav&&observedSidebar!==nav){sidebarResizeObserver.disconnect();sidebarResizeObserver.observe(nav);const {container}=bottomTarget(nav);if(container!==nav)sidebarResizeObserver.observe(container);sidebarAttributes.disconnect();sidebarAttributes.observe(container,{attributes:true,subtree:true,attributeFilter:['class','style','hidden','aria-hidden','inert']});observedSidebar=nav;}
     host.toggleAttribute('data-floating',floating);host.toggleAttribute('data-bottom',bottom);
     applySize();
     host.style.bottom='';host.style.left='';host.style.top='';
+    if(!bottom){host.style.marginBottom='';footerResizeObserver.disconnect();observedFooter=null;}
     if(floating){if(host.parentElement!==document.body)document.body.appendChild(host);clampFloat();}
     else if(bottom){
       layoutBottom(nav);
@@ -448,7 +458,8 @@
   let bottomFrame=0;
   function queueBottom(){if(state.position==='bottom'&&!bottomFrame)bottomFrame=requestAnimationFrame(()=>{bottomFrame=0;place(false);});}
   document.addEventListener('scroll',queueBottom,true);
-  let observedSidebar=null;
+  let observedSidebar=null,observedFooter=null;
+  const footerResizeObserver=new ResizeObserver(queueBottom);
   const sidebarResizeObserver=new ResizeObserver(queueBottom);
   const sidebarAttributes=new MutationObserver(records=>{if(records.some(r=>r.target!==host&&!host.contains(r.target)))queueBottom();});
   const panelResizeObserver=new ResizeObserver(queueBottom);panelResizeObserver.observe(card);
