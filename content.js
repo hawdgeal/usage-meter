@@ -8,13 +8,53 @@
 
   const THEME_PRESETS=[{"id":"ayu-dark","family":"Ayu","type":"dark","surface":"#0d1017","hover":"#47526640","border":"#1b1f29","fg":"#bfbdb6","muted":"#5a6673","accent":"#e6b450"},{"id":"catppuccin-mocha","family":"Catppuccin","type":"dark","surface":"#181825","hover":"#31324480","border":"#585b70","fg":"#cdd6f4","muted":"#9399b2","accent":"#cba6f7"},{"id":"catppuccin-latte","family":"Catppuccin","type":"light","surface":"#e6e9ef","hover":"#ccd0da80","border":"#acb0be","fg":"#4c4f69","muted":"#7c7f93","accent":"#8839ef"},{"id":"absolutely-dark","family":"Absolutely","type":"dark","surface":"#373735","hover":"#373735","border":"#ffffff22","fg":"#f9f9f7","muted":"#b2b2b0","accent":"#cc7d5e"},{"id":"absolutely-light","family":"Absolutely","type":"light","surface":"#f4f4f2","hover":"#f4f4f2","border":"#00000022","fg":"#2d2d2b","muted":"#8e8e8c","accent":"#c27759"},{"id":"dracula","family":"Dracula","type":"dark","surface":"#21222C","hover":"#44475A75","border":"#BD93F9","fg":"#F8F8F2","muted":"#6272A4","accent":"#737583"},{"id":"everforest-dark","family":"Everforest","type":"dark","surface":"#2d353b","hover":"#2d353b00","border":"#2d353b","fg":"#d3c6aa","muted":"#859289","accent":"#a7c080"},{"id":"everforest-light","family":"Everforest","type":"light","surface":"#fdf6e3","hover":"#fdf6e300","border":"#fdf6e3","fg":"#5c6a72","muted":"#859289","accent":"#7d974c"},{"id":"github-dark","family":"GitHub","type":"dark","surface":"#010409","hover":"#6e76811a","border":"#30363d","fg":"#e6edf3","muted":"#8b949e","accent":"#238636"},{"id":"github-light","family":"GitHub","type":"light","surface":"#f6f8fa","hover":"#eaeef280","border":"#d0d7de","fg":"#1f2328","muted":"#6e7781","accent":"#1f883d"},{"id":"gruvbox-dark","family":"Gruvbox","type":"dark","surface":"#282828","hover":"#3c383680","border":"#3c3836","fg":"#ebdbb2","muted":"#928374","accent":"#458588"},{"id":"gruvbox-light","family":"Gruvbox","type":"light","surface":"#fbf1c7","hover":"#ebdbb280","border":"#ebdbb2","fg":"#3c3836","muted":"#928374","accent":"#458588"},{"id":"linear-dark","family":"Linear","type":"dark","surface":"#080a0f","hover":"#080a0f","border":"#ffffff22","fg":"#e6e9ef","muted":"#636b7b","accent":"#606acc"},{"id":"linear-light","family":"Linear","type":"light","surface":"#f2f4f8","hover":"#f2f4f8","border":"#00000022","fg":"#2a3140","muted":"#858ea1","accent":"#5e6ad2"},{"id":"lobster-dark","family":"Lobster","type":"dark","surface":"#111827","hover":"#111827","border":"#ffffff22","fg":"#e4e4e7","muted":"#71717a","accent":"#ff5c5c"},{"id":"material-dark","family":"Material","type":"dark","surface":"#212121","hover":"#212121","border":"#21212160","fg":"#EEFFFF","muted":"#6b6e6e","accent":"#717171"},{"id":"matrix-dark","family":"Matrix","type":"dark","surface":"#020402","hover":"#020402","border":"#ffffff22","fg":"#b8ffca","muted":"#3f8f52","accent":"#1eff5a"},{"id":"monokai","family":"Monokai","type":"dark","surface":"#1e1f1c","hover":"#3e3d32","border":"#414339","fg":"#f8f8f2","muted":"#88846f","accent":"#75715E"},{"id":"night-owl","family":"Night Owl","type":"dark","surface":"#011627","hover":"#011627","border":"#5f7e97","fg":"#d6deeb","muted":"#637777","accent":"#7e57c2"},{"id":"nord","family":"Nord","type":"dark","surface":"#2e3440","hover":"#3b4252","border":"#3b4252","fg":"#d8dee9","muted":"#737f97","accent":"#88c0d0"},{"id":"notion-dark","family":"Notion","type":"dark","surface":"#151515","hover":"#151515","border":"#ffffff22","fg":"#d9d9d8","muted":"#6a9955","accent":"#3183d8"},{"id":"notion-light","family":"Notion","type":"light","surface":"#f7f6f3","hover":"#f7f6f3","border":"#00000022","fg":"#37352f","muted":"#008000","accent":"#3183d8"},{"id":"oscurange","family":"Oscurange","type":"dark","surface":"#0B0B0F","hover":"#0B0B0F","border":"#ffffff22","fg":"#E6E6E6","muted":"#5e5f66","accent":"#F9B98C"},{"id":"one-dark","family":"One","type":"dark","surface":"#21252b","hover":"#2c313a","border":"#3e4452","fg":"#abb2bf","muted":"#abb2bf","accent":"#70757f"},{"id":"one-light","family":"One","type":"light","surface":"#EAEAEB","hover":"#DBDBDC66","border":"#E5E5E6","fg":"#383A42","muted":"#8b8c93","accent":"#5871EF"},{"id":"proof-light","family":"Proof","type":"light","surface":"#efede6","hover":"#efede6","border":"#00000022","fg":"#2f312d","muted":"#8b877c","accent":"#3d755d"},{"id":"raycast-dark","family":"Raycast","type":"dark","surface":"#101010","hover":"#FFFFFF14","border":"#FFFFFF14","fg":"#FFFFFF","muted":"#666666","accent":"#ff6363"},{"id":"raycast-light","family":"Raycast","type":"light","surface":"#fcfcfc","hover":"#0000000f","border":"#00000014","fg":"#000000","muted":"#919191","accent":"#f25e5e"},{"id":"rose-pine-dark","family":"Rose Pine","type":"dark","surface":"#232136","hover":"#817c9c14","border":"#00000000","fg":"#e0def4","muted":"#6e6a86","accent":"#ea9a97"},{"id":"rose-pine-light","family":"Rose Pine","type":"light","surface":"#faf4ed","hover":"#6e6a860d","border":"#00000000","fg":"#575279","muted":"#8e899e","accent":"#c27571"},{"id":"sentry-dark","family":"Sentry","type":"dark","surface":"#26222d","hover":"#26222d","border":"#ffffff22","fg":"#e6dff9","muted":"#8d849f","accent":"#775ef6"},{"id":"solarized-dark","family":"Solarized","type":"dark","surface":"#00212B","hover":"#004454AA","border":"#2b2b4a","fg":"#839496","muted":"#5e747a","accent":"#2AA198"},{"id":"solarized-light","family":"Solarized","type":"light","surface":"#EEE8D5","hover":"#DFCA8844","border":"#DDD6C1","fg":"#5b6f76","muted":"#829294","accent":"#9b8d4e"},{"id":"tokyo-night","family":"Tokyo Night","type":"dark","surface":"#16161e","hover":"#13131a","border":"#101014","fg":"#a9b1d6","muted":"#5e668a","accent":"#506aaa"},{"id":"temple-dark","family":"Temple","type":"dark","surface":"#1d2d0f","hover":"#1d2d0f","border":"#ffffff22","fg":"#c7e6da","muted":"#4e645c","accent":"#e4f222"},{"id":"vercel-dark","family":"Vercel","type":"dark","surface":"#000000","hover":"#000000","border":"#ffffff22","fg":"#ededed","muted":"#666666","accent":"#006efe"},{"id":"vercel-light","family":"Vercel","type":"light","surface":"#ffffff","hover":"#ffffff","border":"#00000022","fg":"#171717","muted":"#666666","accent":"#006aff"},{"id":"vscode-dark","family":"VS Code Plus","type":"dark","surface":"#1E1E1E","hover":"#1E1E1E","border":"#ffffff22","fg":"#D4D4D4","muted":"#6A9955","accent":"#58a6ff"},{"id":"vscode-light","family":"VS Code Plus","type":"light","surface":"#FFFFFF","hover":"#E8E8E8","border":"#00000022","fg":"#000000","muted":"#008000","accent":"#0969da"},{"id":"xcode-dark","family":"Xcode","type":"dark","surface":"#1f1f24","hover":"#1f1f24","border":"#ffffff22","fg":"#ffffff","muted":"#6c7986","accent":"#5482ff"},{"id":"xcode-light","family":"Xcode","type":"light","surface":"#ffffff","hover":"#ffffff","border":"#00000022","fg":"#000000","muted":"#5d6c79","accent":"#0e0eff"}];
   const THEME_FAMILIES=[...new Set(THEME_PRESETS.map(p=>p.family))].sort((a,b)=>a.localeCompare(b));
+  const SETTINGS_TABS={panel:'General',modules:'Modules',appearance:'Appearance',spacing:'Spacing'};
+  const SPACING_AREAS={
+    outer:{label:'Outside frame',selector:'.panel-layout',kind:'padding',normal:[6,0,6,0]},
+    frame:{label:'Inside frame',selector:'',kind:'padding',normal:[6,0,6,0]},
+    header:{label:'Usage header',selector:'.head',kind:'padding',normal:[5,6,5,6]},
+    status:{label:'Update time & Details',selector:'.foot',kind:'padding',normal:[7,24,9,12],compact:[4,22,5,9]},
+    statusButton:{label:'Details button',selector:'.foot .text-btn',kind:'padding',normal:[3,3,3,3]},
+    summary:{label:'Collapsed summary',selector:'.summary',kind:'padding',normal:[0,12,8,12],compact:[0,9,5,9]},
+    plan:{label:'Plan limits module',selector:'[data-section="plan"]',kind:'margin',normal:[0,10,0,10],compact:[0,8,0,8]},
+    credits:{label:'Credits module',selector:'[data-section="credits"]',kind:'margin',normal:[0,10,0,10],compact:[0,8,0,8]},
+    features:{label:'Models & features module',selector:'[data-section="features"]',kind:'margin',normal:[0,10,0,10],compact:[0,8,0,8]},
+    sectionHeader:{label:'Module headings',selector:'.section-head',kind:'padding',normal:[5,0,5,0],compact:[2,0,2,0]},
+    sectionContent:{label:'Module content',selector:'.section-content',kind:'padding',normal:[1,2,6,2],compact:[0,1,3,1]},
+    planRows:{label:'Plan limit items',selector:'.plan-row',kind:'padding',normal:[5,0,8,0],compact:[3,0,5,0]},
+    featureRows:{label:'Feature items',selector:'[data-counter]',kind:'padding',normal:[5,0,8,0],compact:[3,0,5,0]},
+    creditBalance:{label:'Available balance',selector:'.credit-balance',kind:'padding',normal:[0,0,0,0]},
+    creditMeter:{label:'Credit remaining meter',selector:'.credit-meter',kind:'margin',normal:[8,0,0,0],compact:[5,0,0,0]},
+    addCredits:{label:'Add credits button',selector:'.add-credits',kind:'margin',normal:[8,0,0,0],compact:[5,0,0,0]},
+    planBars:{label:'Plan bars',selector:'[data-section="plan"] .bar',kind:'margin',normal:[7,0,5,0],compact:[4,0,4,0]},
+    creditBars:{label:'Credit bar',selector:'.credit-meter .bar',kind:'margin',normal:[7,0,5,0],compact:[4,0,4,0]},
+    featureBars:{label:'Feature bars',selector:'[data-counter] .bar',kind:'margin',normal:[7,0,5,0],compact:[4,0,4,0]},
+    captions:{label:'Reset captions & descriptions',selector:'.sub',kind:'margin',normal:[0,0,0,0]},
+    details:{label:'Expanded Details',selector:'pre',kind:'margin',normal:[0,12,10,12]},
+    detailsContent:{label:'Inside Details',selector:'pre',kind:'padding',normal:[8,8,8,8]}
+  };
+  const SPACING_SIDES=['Top','Right','Bottom','Left'];
+  function spacingProfile(){return state.spacingMode==='auto'?(state.compact?'compact':'normal'):state.spacingMode;}
+  function spacingValues(profile,key){
+    const area=SPACING_AREAS[key],saved=state.spacing[profile]?.[key];
+    const values=[...(saved||area[profile]||area.normal)];
+    if(!saved&&key==='addCredits'&&profile==='compact'&&state.showCreditBar)values[0]=0;
+    return values;
+  }
+  function applySpacing(){
+    const profile=state.compact?'compact':'normal';
+    for(const key of Object.keys(SPACING_AREAS)){
+      const el=key==='outer'?$('.panel-layout'):card,values=spacingValues(profile,key).map(v=>v+'px').join(' '),prop='--gptu-space-'+key;
+      if(el.style.getPropertyValue(prop)!==values)el.style.setProperty(prop,values);
+    }
+  }
   function defaultPreferences(){return {
     collapsed:false,compact:false,compactHeight:null,hideCollapsed:false,hideWithSidebar:true,footerPosition:'top',showUpdateTime:true,showDetails:true,marginTop:6,marginBottom:6,
     showAddCredits:true,showPlanTooltips:false,showRemainingPlan:true,showCreditBar:false,showCreditBalance:true,creditReference:null,creditReferencePending:false,
     position:'bottom',sections:['plan','credits','features'],closed:{credits:true},
     hidden:{features:true},hiddenFeatures:{deep_research:true,file_upload:true,paste_text_to_file:true},
     theme:'auto',preset:'auto',accent:'auto',contrast:'auto',floating:{x:24,y:100},size:{width:300,height:null},
-    settingsTab:'panel',settingsClosed:{appearance:false,status:true,placement:false,plan:false,credits:true,features:true}
+    settingsTab:'panel',settingsPosition:null,spacingMode:'auto',spacing:{normal:{},compact:{}},settingsClosed:{appearance:false,colors:true,status:true,placement:false,visibility:true,plan:false,credits:true,features:true,spacePanel:false,spaceStatus:true,spaceModules:true,spaceItems:true,spaceBars:true,spaceDetails:true}
   };}
   const state = {
     usage:null,plan:null,usageAt:0,error:null,models:{},showRaw:false,
@@ -23,7 +63,7 @@
   let lastRefresh = 0;
 
   // ---------- persistence ----------
-  const saveKeys = ["usage", "plan", "usageAt", "models", "collapsed", "position", "sections", "closed", "hidden", "theme", "preset", "accent", "contrast", "floating", "size", "compact", "compactHeight", "hideCollapsed", "hideWithSidebar", "hiddenFeatures", "showAddCredits", "showPlanTooltips", "showRemainingPlan", "settingsClosed", "settingsTab", "footerPosition", "showUpdateTime", "showDetails", "marginTop", "marginBottom", "showCreditBar", "showCreditBalance", "creditReference", "creditReferencePending"];
+  const saveKeys = ["usage", "plan", "usageAt", "models", "collapsed", "position", "sections", "closed", "hidden", "theme", "preset", "accent", "contrast", "floating", "size", "compact", "compactHeight", "hideCollapsed", "hideWithSidebar", "hiddenFeatures", "showAddCredits", "showPlanTooltips", "showRemainingPlan", "settingsClosed", "settingsTab", "settingsPosition", "spacing", "spacingMode", "footerPosition", "showUpdateTime", "showDetails", "marginTop", "marginBottom", "showCreditBar", "showCreditBalance", "creditReference", "creditReferencePending"];
   function persist() {
     const o = {};
     for (const k of saveKeys) o[k] = state[k];
@@ -32,12 +72,19 @@
   async function load() {
     try {
       const r = await store.local.get("gptu");
-      if (r && r.gptu) for (const k of saveKeys) if (r.gptu[k] !== undefined) state[k] = r.gptu[k];
+      if (r && r.gptu) {
+        for (const k of saveKeys) if (r.gptu[k] !== undefined) state[k] = r.gptu[k];
+        if(!r.gptu.spacing)state.spacing={normal:{frame:[state.marginTop,0,state.marginBottom,0]},compact:{frame:[state.marginTop,0,state.marginBottom,0]}};
+      }
     } catch (_) {}
     if(!Number.isFinite(state.creditReference)||state.creditReference<=0)state.creditReference=null;
     for(const key of ['marginTop','marginBottom'])state[key]=Number.isFinite(state[key])?Math.max(0,Math.min(120,state[key])):6;
     if(!['top','bottom'].includes(state.footerPosition))state.footerPosition='top';
-    if(!['panel','modules'].includes(state.settingsTab))state.settingsTab='panel';
+    if(!Object.hasOwn(SETTINGS_TABS,state.settingsTab))state.settingsTab='panel';
+    if(!state.settingsPosition||!Number.isFinite(state.settingsPosition.x)||!Number.isFinite(state.settingsPosition.y))state.settingsPosition=null;
+    if(!['auto','normal','compact'].includes(state.spacingMode))state.spacingMode='auto';
+    const spacing=state.spacing;state.spacing={normal:{},compact:{}};
+    for(const profile of ['normal','compact'])for(const key of Object.keys(SPACING_AREAS)){const values=spacing?.[profile]?.[key];if(Array.isArray(values)&&values.length===4&&values.every(Number.isFinite))state.spacing[profile][key]=values.map(v=>Math.max(0,Math.min(120,v)));}
     if (!Array.isArray(state.sections)) state.sections = ["plan", "credits", "features"];
     for (const key of ["closed", "hidden", "models", "hiddenFeatures", "settingsClosed"]) if (!state[key] || typeof state[key] !== "object") state[key] = {};
     state.settingsClosed={...defaultPreferences().settingsClosed,...state.settingsClosed};
@@ -223,7 +270,7 @@
     .sub,.empty,.note { color:var(--muted); font-size:11px; line-height:1.5; }
     .empty { padding-bottom:8px; }
     .credit { font-size:23px; font-weight:600; letter-spacing:-.6px; font-variant-numeric:tabular-nums; }
-    .foot { flex-shrink:0; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:2px 22px 2px 12px; line-height:1.3; color:var(--muted); font-size:10px; }
+    .foot { flex-shrink:0; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:2px 22px 2px 12px; line-height:1.45; color:var(--muted); font-size:10px; }
     .text-btn { color:var(--muted); border-radius:4px; padding:3px; font-size:10px; }
     .err { margin:8px 12px; font-size:11px; color:var(--bad); overflow-wrap:anywhere; }
     pre { margin:0 12px 10px; padding:8px; background:var(--hover); border-radius:8px; max-height:160px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; font:10px/1.5 ui-monospace,monospace; }
@@ -480,26 +527,25 @@
   function renderSettings() {
     $('.customize').setAttribute('aria-expanded',String(settingsOpen));
     const toggle=(label,attr,checked)=>`<label class="setting"><span>${label}</span><input type="checkbox" role="switch" aria-label="${label}" ${attr} ${checked?'checked':''}></label>`;
+    const select=(label,key,choices)=>`<label class="setting"><span>${label}</span><select aria-label="${label}" data-setting="${key}">${Object.entries(choices).map(([value,text])=>`<option value="${value}" ${state[key]===value?'selected':''}>${text}</option>`).join('')}</select></label>`;
     const moduleToggle=key=>toggle('Show '+labels[key],`data-visible="${key}"`,!state.hidden[key]);
-    const group=(key,label,content)=>`<details class="settings-section" data-settings-section="${key}" ${!state.settingsClosed[key]?'open':''}><summary>${icon(['appearance','placement','status'].includes(key)?'settings':key==='features'?'features':key)}<span>${label}</span>${icon('chevron')}</summary><div class="settings-section-content">${content}</div></details>`;
-    const tabs=['panel','modules'].map(key=>`<button class="settings-tab" role="tab" id="gptu-tab-${key}" aria-controls="gptu-settings-${key}" aria-selected="${state.settingsTab===key}" tabindex="${state.settingsTab===key?0:-1}" data-settings-tab="${key}">${key==='panel'?'Panel':'Modules'}</button>`).join('');
-    $('.settings').innerHTML=`<div class="settings-header"><div class="settings-title"><span>Usage settings</span><button class="icon close-settings" aria-label="Close settings">✕</button></div><div class="settings-tabs" role="tablist" aria-label="Settings categories">${tabs}</div></div><div class="settings-body">
-      <div class="settings-panel" role="tabpanel" id="gptu-settings-panel" aria-labelledby="gptu-tab-panel" ${state.settingsTab==='panel'?'':'hidden'}>${
-        group('appearance','Appearance',`<div class="setting"><span>Theme preset</span><select aria-label="Theme preset" data-setting="preset"><option value="auto" ${state.preset==='auto'?'selected':''}>Match ChatGPT</option><option value="chatgpt" ${state.preset==='chatgpt'?'selected':''}>ChatGPT</option>${THEME_FAMILIES.map(name=>`<option value="${esc(name)}" ${state.preset===name?'selected':''}>${esc(name)}</option>`).join('')}</select></div><div class="setting"><span>Mode</span><select aria-label="Appearance" data-setting="theme">${['auto','system','light','dark'].map(k=>`<option value="${k}" ${state.theme===k?'selected':''}>${k==='auto'?'Match ChatGPT':k==='system'?'System':k==='light'?'Light':'Dark'}</option>`).join('')}</select></div><div class="setting"><span>Accent color</span><select aria-label="Accent color" data-setting="accent">${Object.entries(accentNames).map(([key,label])=>`<option value="${key}" ${state.accent===key?'selected':''}>${label}</option>`).join('')}</select></div><div class="setting"><span>Contrast</span><select aria-label="Contrast" data-setting="contrast">${['auto','system','medium','increased'].map(key=>`<option value="${key}" ${state.contrast===key?'selected':''}>${key==='auto'?'Match ChatGPT':key[0].toUpperCase()+key.slice(1)}</option>`).join('')}</select></div><div class="note">Match ChatGPT follows the active page palette, including custom colors. Presets use available light/dark variants; some have only one mode.</div>${toggle('Compact mode','data-compact',state.compact)}`)+
-        group('status','Status & details',`${toggle('Show update time','data-show-update',state.showUpdateTime)}${toggle('Show Details button','data-show-details',state.showDetails)}${toggle('Update time and Details at top','data-footer-top',state.footerPosition==='top')}`)+
-        group('placement','Placement & visibility',`<div class="setting"><span>Placement</span><select aria-label="Placement" data-setting="position">${['top','bottom','floating'].map(k=>`<option value="${k}" ${state.position===k?'selected':''}>${k==='top'?'Sidebar top':k==='bottom'?'Sidebar bottom':'Floating'}</option>`).join('')}</select></div>${toggle('Hide docked panel with sidebar','data-hide-with-sidebar',state.hideWithSidebar)}${toggle('Hide collapsed Usage until hover','data-hide-collapsed',state.hideCollapsed)}<label class="setting"><span>Top margin</span><span class="margin-input"><input type="number" aria-label="Top margin" min="0" max="120" step="1" data-margin="marginTop" value="${state.marginTop}">px</span></label><label class="setting"><span>Bottom margin</span><span class="margin-input"><input type="number" aria-label="Bottom margin" min="0" max="120" step="1" data-margin="marginBottom" value="${state.marginBottom}">px</span></label><div class="note">Space inside the frame, above the Usage header and below the last content.</div>`)
-      }</div>
-      <div class="settings-panel" role="tabpanel" id="gptu-settings-modules" aria-labelledby="gptu-tab-modules" ${state.settingsTab==='modules'?'':'hidden'}>${
-        group('plan','Plan limits',`${moduleToggle('plan')}<div class="module-hint">Choose how the allowance is displayed.</div>${toggle('Show remaining plan allowance','data-remaining-plan',state.showRemainingPlan)}${toggle('Plan limit tooltips','data-plan-tooltips',state.showPlanTooltips)}`)+
-        group('credits','Credits',`${moduleToggle('credits')}${toggle('Show credit balance bar','data-credit-bar',state.showCreditBar)}<div class="credit-reference-controls" ${state.showCreditBar?'':'hidden'}>${toggle('Show available balance','data-credit-balance',state.showCreditBalance)}<label class="setting"><span>Full balance</span><span class="margin-input"><input type="number" aria-label="Full credit balance" min="0.01" step="any" data-credit-reference value="${state.creditReference??''}" placeholder="e.g. 1000">credits</span></label><div class="note">This amount counts as 100%. Initially uses your balance when enabled; you can change it.</div></div>${toggle('Add credits button','data-add-credits',state.showAddCredits)}`)+
-        group('features','Models & features',`${moduleToggle('features')}<div class="feature-settings"><div class="feature-settings-title">Individual counters</div><div class="feature-options" role="group" aria-label="Models & features to show"></div><div class="note">Selections are kept when the whole module is hidden. Counters appear when ChatGPT reports them.</div></div>`)
-      }</div>
-    </div><div class="settings-help"><details><summary>Keyboard & dragging</summary><div class="note">Drag the panel handle to float. Use section handles to reorder, or focus one and press ↑ / ↓.</div></details><button class="text-btn reset">Reset settings</button></div>`;
-    renderFeatureSettings();
+    const group=(key,label,content)=>`<details class="settings-section" data-settings-section="${key}" ${!state.settingsClosed[key]?'open':''}><summary>${icon(['plan','credits','features'].includes(key)?key:'settings')}<span>${label}</span>${icon('chevron')}</summary><div class="settings-section-content">${content}</div></details>`;
+    const profile=spacingProfile();
+    const box=key=>`<div class="spacing-box"><span class="spacing-box-title">${SPACING_AREAS[key].label}</span><div class="spacing-grid">${spacingValues(profile,key).map((value,side)=>`<label><span>${SPACING_SIDES[side]}</span><input type="number" min="0" max="120" step="1" value="${value}" aria-label="${SPACING_AREAS[key].label} ${SPACING_SIDES[side].toLowerCase()} spacing" data-space-area="${key}" data-space-side="${side}" data-space-profile="${profile}"></label>`).join('')}</div></div>`;
+    const tab=(key,content)=>`<div class="settings-panel" role="tabpanel" id="gptu-settings-${key}" aria-labelledby="gptu-tab-${key}" ${state.settingsTab===key?'':'hidden'}>${content}</div>`;
+    const themeSelect=`<label class="setting"><span>Theme preset</span><select aria-label="Theme preset" data-setting="preset"><optgroup label="ChatGPT"><option value="auto" ${state.preset==='auto'?'selected':''}>Match ChatGPT</option><option value="chatgpt" ${state.preset==='chatgpt'?'selected':''}>ChatGPT</option></optgroup><optgroup label="Codex themes">${THEME_FAMILIES.map(name=>`<option value="${esc(name)}" ${state.preset===name?'selected':''}>${esc(name)}</option>`).join('')}</optgroup></select></label>`;
+    $('.settings').innerHTML=`<div class="settings-header"><div class="settings-title" title="Drag to move settings · Double-click to reset position"><button class="icon settings-grab" aria-label="Move settings" title="Drag or use arrow keys · Home resets position">${icon('grip')}</button><span>Usage settings</span><button class="icon close-settings" aria-label="Close settings">✕</button></div><div class="settings-tabs" role="tablist" aria-label="Settings categories">${Object.entries(SETTINGS_TABS).map(([key,label])=>`<button class="settings-tab" role="tab" id="gptu-tab-${key}" aria-controls="gptu-settings-${key}" aria-selected="${state.settingsTab===key}" tabindex="${state.settingsTab===key?0:-1}" data-settings-tab="${key}">${label}</button>`).join('')}</div></div><div class="settings-body">${
+      tab('panel',group('placement','Layout',select('Placement','position',{top:'Sidebar top',bottom:'Sidebar bottom',floating:'Floating'})+toggle('Compact mode','data-compact',state.compact))+group('visibility','Visibility',toggle('Hide docked panel with sidebar','data-hide-with-sidebar',state.hideWithSidebar)+toggle('Hide collapsed Usage until hover','data-hide-collapsed',state.hideCollapsed))+group('status','Update time & Details',toggle('Show update time','data-show-update',state.showUpdateTime)+toggle('Show Details button','data-show-details',state.showDetails)+toggle('Update time and Details at top','data-footer-top',state.footerPosition==='top')))+
+      tab('modules',group('plan','Plan limits',moduleToggle('plan')+toggle('Show remaining plan allowance','data-remaining-plan',state.showRemainingPlan)+toggle('Plan limit tooltips','data-plan-tooltips',state.showPlanTooltips))+group('credits','Credits',moduleToggle('credits')+toggle('Show credit balance bar','data-credit-bar',state.showCreditBar)+`<div class="credit-reference-controls" ${state.showCreditBar?'':'hidden'}>${toggle('Show available balance','data-credit-balance',state.showCreditBalance)}<label class="setting"><span>Full balance</span><span class="margin-input"><input type="number" aria-label="Full credit balance" min="0.01" step="any" data-credit-reference value="${state.creditReference??''}" placeholder="e.g. 1000">credits</span></label><div class="note">This amount counts as 100%. Initially uses your balance when enabled; you can change it.</div></div>`+toggle('Add credits button','data-add-credits',state.showAddCredits))+group('features','Models & features',moduleToggle('features')+`<div class="feature-settings"><div class="feature-settings-title">Individual counters</div><div class="feature-options" role="group" aria-label="Models & features to show"></div><div class="note">Selections are kept when the module is hidden.</div></div>`))+
+      tab('appearance',group('appearance','Theme & mode',themeSelect+select('Appearance','theme',{auto:'Match ChatGPT',system:'System',light:'Light',dark:'Dark'})+`<div class="note">Match ChatGPT follows the page palette and custom colors. Codex presets use available light/dark variants; some have only one mode.</div>`)+group('colors','Accent & contrast',select('Accent color','accent',accentNames)+select('Contrast','contrast',{auto:'Match ChatGPT',system:'System',medium:'Medium',increased:'Increased'})))+
+      tab('spacing',`${select('Editing spacing','spacingMode',{auto:'Current density',normal:'Normal',compact:'Compact'})}<div class="note">Editing ${profile==='normal'?'normal':'compact'} mode. All values are in pixels. Inside frame controls the space within the border; outside frame controls the surrounding gap.</div>`+group('spacePanel','Panel & header',['outer','frame','header'].map(box).join(''))+group('spaceStatus','Update time & summary',['status','statusButton','summary'].map(box).join(''))+group('spaceModules','Module spacing',['plan','credits','features','sectionHeader','sectionContent'].map(box).join(''))+group('spaceItems','Items & credits',['planRows','featureRows','creditBalance','creditMeter','addCredits'].map(box).join(''))+group('spaceBars','Bars & captions',['planBars','creditBars','featureBars','captions'].map(box).join(''))+group('spaceDetails','Expanded Details',['details','detailsContent'].map(box).join(''))+`<button class="text-btn reset-spacing" data-reset-spacing="${profile}">Reset ${profile} spacing</button>`)
+    }</div><div class="settings-help"><details><summary>Moving & keyboard controls</summary><div class="note">Drag this window by its title. Double-click the title to return it beside the panel. Use arrow keys on a move or reorder handle.</div></details><button class="text-btn reset">Reset all settings</button></div>`;
+    renderFeatureSettings();positionSettings();
   }
   function selectSettingsTab(key,focus=false){
-    if(!['panel','modules'].includes(key))return;
+    if(!Object.hasOwn(SETTINGS_TABS,key))return;
     state.settingsTab=key;persist();
+    if(key==='spacing')renderSettings();
     for(const el of root.querySelectorAll('[data-settings-tab]')){const selected=el.dataset.settingsTab===key;el.setAttribute('aria-selected',String(selected));el.tabIndex=selected?0:-1;if(selected&&focus)el.focus();}
     for(const el of root.querySelectorAll('.settings-panel'))el.hidden=el.id!=='gptu-settings-'+key;
     $('.settings').scrollTop=0;positionSettings();
@@ -572,6 +618,7 @@
   function positionSettings() {
     if(!settingsOpen)return;
     const menu=$('.settings'), anchor=$('.customize').getBoundingClientRect(), r=menu.getBoundingClientRect();
+    if(state.settingsPosition){menu.style.left=Math.max(8,Math.min(state.settingsPosition.x,innerWidth-r.width-8))+'px';menu.style.top=Math.max(8,Math.min(state.settingsPosition.y,innerHeight-r.height-8))+'px';return;}
     menu.style.left=Math.max(8,Math.min(anchor.right-r.width,innerWidth-r.width-8))+'px';
     const below=innerHeight-anchor.bottom-8;
     menu.style.top=Math.max(8,Math.min(below>=r.height?anchor.bottom+6:anchor.top-r.height-6,innerHeight-r.height-8))+'px';
@@ -582,7 +629,8 @@
   root.addEventListener('click',e=>{if(e.target.closest('.close-settings'))closeSettings(true);const tab=e.target.closest('[data-settings-tab]');if(tab)selectSettingsTab(tab.dataset.settingsTab);});
   root.addEventListener('keydown',e=>{
     const tab=e.target.closest('[data-settings-tab]');if(!tab||!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;
-    e.preventDefault();selectSettingsTab(e.key==='Home'?'panel':e.key==='End'?'modules':tab.dataset.settingsTab==='panel'?'modules':'panel',true);
+    const tabs=Object.keys(SETTINGS_TABS),index=tabs.indexOf(tab.dataset.settingsTab),next=e.key==='Home'?0:e.key==='End'?tabs.length-1:(index+(e.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;
+    e.preventDefault();selectSettingsTab(tabs[next],true);
   });
   root.addEventListener('toggle',e=>{
     const key=e.target.dataset?.settingsSection;if(!key)return;
@@ -590,6 +638,29 @@
     if(state.settingsClosed[key]!==closed){state.settingsClosed[key]=closed;persist();}
     positionSettings();
   },true);
+  let settingsDrag=null;
+  function resetSettingsPosition(){state.settingsPosition=null;persist();positionSettings();}
+  root.addEventListener('pointerdown',event=>{
+    const title=event.target.closest?.('.settings-title');
+    if(!title||event.button!==0||event.target.closest('button:not(.settings-grab)'))return;
+    const r=$('.settings').getBoundingClientRect();settingsDrag={x:event.clientX,y:event.clientY,left:r.left,top:r.top};
+    state.settingsPosition={x:r.left,y:r.top};title.setPointerCapture(event.pointerId);event.preventDefault();
+  });
+  window.addEventListener('pointermove',event=>{
+    if(!settingsDrag)return;
+    state.settingsPosition={x:settingsDrag.left+event.clientX-settingsDrag.x,y:settingsDrag.top+event.clientY-settingsDrag.y};positionSettings();
+  });
+  const endSettingsDrag=()=>{if(!settingsDrag)return;settingsDrag=null;if(!settingsOpen){persist();return;}const r=$('.settings').getBoundingClientRect();state.settingsPosition={x:r.left,y:r.top};persist();};
+  window.addEventListener('pointerup',endSettingsDrag);window.addEventListener('pointercancel',endSettingsDrag);window.addEventListener('blur',endSettingsDrag);
+  root.addEventListener('dblclick',event=>{if(event.target.closest?.('.settings-title')&&!event.target.closest('.close-settings'))resetSettingsPosition();});
+  root.addEventListener('keydown',event=>{
+    if(!event.target.closest?.('.settings-grab'))return;
+    if(event.key==='Home'){event.preventDefault();resetSettingsPosition();return;}
+    if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(event.key))return;
+    event.preventDefault();const r=$('.settings').getBoundingClientRect(),step=event.shiftKey?30:10;
+    state.settingsPosition={x:r.left+(event.key==='ArrowRight'?step:event.key==='ArrowLeft'?-step:0),y:r.top+(event.key==='ArrowDown'?step:event.key==='ArrowUp'?-step:0)};
+    positionSettings();persist();
+  });
   window.addEventListener('resize',positionSettings);
   document.addEventListener('scroll',positionSettings,true);
   root.addEventListener('click',e=>{
@@ -608,15 +679,16 @@
     const value=Number(event.target.value);state.creditReference=Number.isFinite(value)&&value>0?value:null;state.creditReferencePending=false;persist();render();positionSettings();
   }
   root.addEventListener('input',changeCreditReference);
-  function changeMargin(event){
-    const key=event.target.dataset?.margin;if(!['marginTop','marginBottom'].includes(key))return;
+  function changeSpacing(event){
+    const {spaceArea:key,spaceSide:side,spaceProfile:profile}=event.target.dataset||{};
+    if(!Object.hasOwn(SPACING_AREAS,key)||!['normal','compact'].includes(profile)||!['0','1','2','3'].includes(side))return;
     if(event.type==='input'&&(event.target.value===''||!event.target.validity.valid))return;
-    const value=Math.max(0,Math.min(120,Number(event.target.value)||0));
-    state[key]=value;if(event.type==='change')event.target.value=String(value);
+    const values=spacingValues(profile,key),value=Math.max(0,Math.min(120,Number(event.target.value)||0));values[Number(side)]=value;
+    state.spacing[profile][key]=values;if(event.type==='change')event.target.value=String(value);
     persist();render();place(true);positionSettings();
   }
-  root.addEventListener('input',changeMargin);
-  root.addEventListener('change',changeMargin);
+  root.addEventListener('input',changeSpacing);root.addEventListener('change',changeSpacing);
+  root.addEventListener('click',e=>{const profile=e.target.dataset?.resetSpacing;if(!['normal','compact'].includes(profile))return;state.spacing[profile]={};persist();render();place(true);renderSettings();});
   root.addEventListener('change',e=>{
     if(e.target.hasAttribute('data-credit-reference'))changeCreditReference(e);
     if(e.target.hasAttribute('data-credit-balance')){state.showCreditBalance=e.target.checked;persist();render();positionSettings();}
@@ -635,6 +707,7 @@
     if(e.target.hasAttribute('data-hide-with-sidebar')){state.hideWithSidebar=e.target.checked;persist();render();place(true);positionSettings();}
     if(e.target.hasAttribute('data-hide-collapsed')){state.hideCollapsed=e.target.checked;persist();render();positionSettings();}
     if(e.target.hasAttribute('data-compact')){state.compact=e.target.checked;persist();render();place(true);positionSettings();}
+    if(e.target.dataset.setting==='spacingMode'){state.spacingMode=e.target.value;persist();renderSettings();return;}
     if(e.target.dataset.setting){const placement=e.target.dataset.setting==='position';state[e.target.dataset.setting]=e.target.value;if(placement)closeSettings(true);persist();render();place(true);positionSettings();}
     if(e.target.dataset.visible){state.hidden[e.target.dataset.visible]=!e.target.checked;persist();render();}
   });
@@ -646,7 +719,7 @@
   root.addEventListener('keydown',e=>{const k=e.target.dataset.handle;if(!k||!['ArrowUp','ArrowDown'].includes(e.key))return;e.preventDefault();const visible=state.sections.filter(x=>!state.hidden[x]), i=visible.indexOf(k)+(e.key==='ArrowUp'?-1:1);if(visible[i]){reorder(k,visible[i]);root.querySelector(`[data-handle="${k}"]`).focus();}});
   function setPanelHeight(height){if(state.compact)state.compactHeight=height;else state.size.height=height;}
   function applySize() {
-    for(const key of ['marginTop','marginBottom']){const property=key==='marginTop'?'--gptu-margin-top':'--gptu-margin-bottom',value=state[key]+'px';if(card.style.getPropertyValue(property)!==value)card.style.setProperty(property,value);}
+    applySpacing();
     const floating=host.hasAttribute('data-floating');
     if(floating)host.style.width=Math.max(Math.min(240,innerWidth-16),Math.min(state.size.width,innerWidth-16))+'px';else host.style.width='';
     const requestedHeight=state.compact?state.compactHeight:state.size.height;
@@ -678,7 +751,7 @@
     if(['ArrowUp','ArrowDown'].includes(e.key))setPanelHeight(Math.max(140,Math.min(r.height+(e.key==='ArrowDown'?step:-step),host.hasAttribute('data-bottom')?r.bottom-8:innerHeight-r.top-8)));
     applySize();persist();
   });
-  function clampFloat(){const rect=host.getBoundingClientRect();state.floating.x=Math.max(8,Math.min(state.floating.x,innerWidth-rect.width-8));state.floating.y=Math.max(8,Math.min(state.floating.y,innerHeight-Math.min(rect.height,innerHeight-16)-8));host.style.left=state.floating.x+'px';host.style.top=state.floating.y+'px';card.style.maxHeight='calc(100dvh - 28px)';}
+  function clampFloat(){const rect=host.getBoundingClientRect();state.floating.x=Math.max(8,Math.min(state.floating.x,innerWidth-rect.width-8));state.floating.y=Math.max(8,Math.min(state.floating.y,innerHeight-Math.min(rect.height,innerHeight-16)-8));host.style.left=state.floating.x+'px';host.style.top=state.floating.y+'px';const outer=spacingValues(state.compact?'compact':'normal','outer');card.style.maxHeight=`calc(100dvh - ${16+outer[0]+outer[2]}px)`;}
   $('.grab').addEventListener('pointerdown',e=>{if(e.button!==0)return;const r=host.getBoundingClientRect();drag={x:e.clientX,y:e.clientY,left:r.left,top:r.top,started:false};$('.grab').setPointerCapture(e.pointerId);e.preventDefault();});
   function updateDockTargets(event){
     const nav=findSidebarNav();
@@ -807,7 +880,7 @@
     const margin=reserve?reserve+'px':'';
     if(host.style.marginBottom!==margin)host.style.marginBottom=margin;
     if(observedFooter!==before){footerResizeObserver.disconnect();if(before)footerResizeObserver.observe(before);observedFooter=before;}
-    const available=Math.max(80,Math.min(innerHeight,r.height||innerHeight)-(reserve||(footer?.height||0))-112);
+    const available=Math.max(80,Math.min(innerHeight,r.height||innerHeight)-(reserve||(footer?.height||0))-100-spacingValues(state.compact?'compact':'normal','outer')[0]-spacingValues(state.compact?'compact':'normal','outer')[2]);
     card.style.maxHeight=Math.min(available,innerHeight*.6)+'px';
   }
 
@@ -859,6 +932,13 @@
     placeQueued = true;
     requestAnimationFrame(() => { placeQueued = false; place(false); });
   });
+
+  const spacingStyle=document.createElement('style');
+  spacingStyle.textContent=Object.entries(SPACING_AREAS).map(([key,area])=>{
+    const selector=key==='outer'?'.panel-layout':'.card:is(.compact,:not(.compact))'+(area.selector?' '+area.selector:'');
+    return `${selector}{${area.kind}:var(--gptu-space-${key});}`;
+  }).join('')+`.settings-tabs{gap:2px;padding:0 8px 8px}.settings-tab{padding:6px 3px;font-size:11px;min-width:0}.spacing-box{padding:6px 0 10px;border-bottom:1px solid var(--line)}.spacing-box:last-child{border:0}.spacing-box-title{display:block;font-size:11px;margin-bottom:5px}.spacing-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.spacing-grid label{display:flex;flex-direction:column;gap:3px;font-size:10px;color:var(--muted)}.spacing-grid input{min-width:0;width:100%;padding:5px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--fg);font:inherit}.settings-title{cursor:grab;touch-action:none}.settings-title:active{cursor:grabbing}.settings-grab{flex:none;cursor:grab}.settings-grab svg{width:16px;height:16px}`;
+  root.appendChild(spacingStyle);
 
   // ---------- boot ----------
   load().then(() => {
