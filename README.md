@@ -6,8 +6,10 @@ A browser extension that adds a **Usage** card to ChatGPT's left sidebar, showin
 - **Credits** — your pay-as-you-go usage-credit balance, or "Unlimited".
 - **Model & feature limits** — remaining messages/uses per model or feature (Deep Research, image generation…), captured whenever ChatGPT reports them.
 
-## Panel controls (0.3.6)
+## Panel controls (0.3.7)
 
+- **Compact mode** in settings uses tighter spacing, smaller icons and a shorter credit display while retaining readable text. It fits the content automatically instead of retaining an oversized panel height, and remembers your preference. Turn it off to restore your previous size.
+- Bottom mode removes footer-sized padding or margins from the history scroll area to avoid leaving unused space above Usage. Those page styles are restored in other placements.
 - The panel border and resize handle appear on hover or keyboard focus; touch devices keep the handle accessible.
 - Settings open as a separate popover without shifting the panel. Click outside or press Escape to dismiss it. Choosing a placement closes the popover.
 - Sidebar bottom inserts the panel into the sidebar layout directly above the account footer, located using the visible Open profile menu button in the active Chat history navigation. Hidden controls in the collapsed sidebar rail are ignored. It does not use floating or fixed positioning. When the account footer is absolutely positioned, bottom mode reserves its measured height, including through display:contents wrappers.
@@ -19,7 +21,7 @@ A browser extension that adds a **Usage** card to ChatGPT's left sidebar, showin
 - Collapse **Plan limits**, **Credits**, and **Models & features** independently.
 - Drag the dotted handle beside a section to reorder it. Focus the handle and press **↑ / ↓** to reorder with a keyboard.
 - Drag the dotted handle beside **Usage** to detach and move the panel anywhere in the viewport. Arrow keys move it by 10 pixels (Shift for 30). Press **Escape** on that handle to dock it at the top of the sidebar.
-- **Customize panel → Placement** offers Sidebar top, Sidebar bottom, and Floating. The same menu lets you hide individual sections or reset the layout.
+- **Customize panel → Placement** offers Sidebar top, Sidebar bottom, and Floating. The same menu has **Visible modules** switches to show or hide Plan limits, Credits, and Models & features independently of their collapsed state, plus a layout reset.
 - Preferences and the floating position are saved locally. If the sidebar disappears, the panel temporarily floats and returns when the sidebar reappears, unless Floating was selected.
 - **Refresh usage** updates the data; **Details** shows the raw response for troubleshooting.
 

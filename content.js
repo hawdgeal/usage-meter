@@ -13,6 +13,8 @@
     error: null,
     models: {},         // name -> {remaining, limit, used, resetsAt, seenAt}
     collapsed: false,
+    compact: false,
+    compactHeight: null,
     position: "top", // "top" | "bottom" inside the sidebar
     showRaw: false,
     sections: ["plan", "credits", "features"],
@@ -25,7 +27,7 @@
   let lastRefresh = 0;
 
   // ---------- persistence ----------
-  const saveKeys = ["usage", "plan", "usageAt", "models", "collapsed", "position", "sections", "closed", "hidden", "theme", "floating", "size"];
+  const saveKeys = ["usage", "plan", "usageAt", "models", "collapsed", "position", "sections", "closed", "hidden", "theme", "floating", "size", "compact", "compactHeight"];
   function persist() {
     const o = {};
     for (const k of saveKeys) o[k] = state[k];
@@ -160,7 +162,7 @@
     .resize { opacity:0; pointer-events:none; }
     .card:hover .resize, .card:focus-within .resize { opacity:1; pointer-events:auto; }
     @media(hover:none) { .resize { opacity:1; pointer-events:auto; } }
-    :host([data-bottom]) { position:relative; margin-top:auto; width:auto; flex:0 0 auto; }
+    :host([data-bottom]) { position:relative; margin-top:0; width:auto; flex:0 0 auto; }
     :host([data-bottom]) .card { margin:6px 8px; }
     .card.collapsed .grab, .card.collapsed .refresh, .card.collapsed .customize,
     .card.collapsed .title, .card.collapsed .badge, .card.collapsed .summary, .card.collapsed .toggle .chev { opacity:0; pointer-events:none; }
@@ -211,7 +213,8 @@
     .settings::backdrop { background:transparent; }
     .settings-title { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; font-weight:600; }
     .checks { padding-top:10px; border-top:1px solid var(--line); }
-    .checks label { width:100%; padding:5px 0; }
+    .checks label { width:100%; padding:5px 0; justify-content:space-between; }
+    .modules-title { font-size:11px; font-weight:600; color:var(--muted); margin-top:6px; }
     .settings .reset { font-size:11px; margin-top:8px; }
     .settings .note { margin-top:8px; }
     .setting { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px; font-size:12px; }
@@ -228,6 +231,26 @@
     .card.sized .body { max-height:none; flex:1; }
     .drag-over { border-top:2px solid var(--ok); }
     .summary { padding:0 12px 8px; color:var(--muted); font-size:11px; }
+    .card.compact { font-size:12px; line-height:1.4; border-radius:10px; }
+    .compact .head { padding:4px 5px; }
+    .compact .icon { width:24px; height:24px; }
+    .compact svg { width:14px; height:14px; }
+    .compact .chev { width:11px; }
+    .compact .title { font-size:12px; }
+    .compact .badge { font-size:9px; }
+    .compact .section { margin:0 8px; }
+    .compact .section-head { padding:2px 0; }
+    .compact .section-toggle { padding:4px 1px; font-size:11px; gap:5px; }
+    .compact .section-content { padding:0 1px 3px; }
+    .compact .row { padding:3px 0 5px; }
+    .compact .v { font-size:11px; }
+    .compact .sub,.compact .empty { font-size:11px; line-height:1.35; }
+    .compact .bar { height:3px; margin:4px 0; }
+    .compact .credit { font-size:19px; line-height:1.3; }
+    .compact .foot { padding:4px 22px 5px 9px; }
+    .compact .summary { padding:0 9px 5px; }
+    .compact-toggle { padding-top:8px; border-top:1px solid var(--line); }
+    .compact-toggle input { width:16px; height:16px; cursor:pointer; }
     .live { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
     @media(prefers-reduced-motion:reduce) { * { animation:none !important; transition:none !important; } }
   `;
@@ -267,12 +290,14 @@
     $('.customize').setAttribute('aria-expanded',String(settingsOpen));
     $('.settings').innerHTML=`<div class="settings-title"><span>Usage settings</span><button class="icon close-settings" aria-label="Close settings">✕</button></div><div class="setting"><span>Appearance</span><select aria-label="Appearance" data-setting="theme">${['auto','light','dark'].map(k=>`<option value="${k}" ${state.theme===k?'selected':''}>${k==='auto'?'Match ChatGPT':k==='light'?'Light':'Dark'}</option>`).join('')}</select></div>
     <div class="setting"><span>Placement</span><select aria-label="Placement" data-setting="position">${['top','bottom','floating'].map(k=>`<option value="${k}" ${state.position===k?'selected':''}>${k==='top'?'Sidebar top':k==='bottom'?'Sidebar bottom':'Floating'}</option>`).join('')}</select></div>
-    <div class="checks">${Object.keys(labels).map(k=>`<label><input type="checkbox" data-visible="${k}" ${!state.hidden[k]?'checked':''}>${labels[k]}</label>`).join('')}</div>
+    <label class="setting compact-toggle"><span>Compact mode</span><input type="checkbox" role="switch" aria-label="Compact mode" data-compact ${state.compact?'checked':''}></label>
+    <div class="modules-title" id="gptu-modules-label">Visible modules</div><div class="checks" role="group" aria-labelledby="gptu-modules-label">${Object.keys(labels).map(k=>`<label><span>${labels[k]}</span><input type="checkbox" role="switch" aria-label="Show ${labels[k]}" data-visible="${k}" ${!state.hidden[k]?'checked':''}></label>`).join('')}</div>
     <div class="note">Drag section handles to reorder. Use ↑ / ↓ on a section handle for keyboard reordering.</div><button class="text-btn reset">Reset layout</button>`;
   }
   function render() {
     applyTheme();
     card.classList.toggle('collapsed',!!state.collapsed);
+    card.classList.toggle('compact',!!state.compact);
     applySize();
     const parsed=parseUsage(state.usage), plan=parsed.plan||state.plan;
     $('.badge').hidden=!plan; $('.badge').textContent=plan||'';
@@ -323,9 +348,10 @@
     const k=e.target.closest('[data-collapse]')?.dataset.collapse;
     if(k){state.closed[k]=!state.closed[k];persist();render();}
     if(e.target.closest('.raw')){state.showRaw=!state.showRaw;render();$('.raw').focus();}
-    if(e.target.closest('.reset')){Object.assign(state,{sections:['plan','credits','features'],closed:{},hidden:{},theme:'auto',position:'top',floating:{x:24,y:100},size:{width:300,height:null}});persist();closeSettings(true);render();place(true);}
+    if(e.target.closest('.reset')){Object.assign(state,{sections:['plan','credits','features'],closed:{},hidden:{},theme:'auto',position:'top',floating:{x:24,y:100},size:{width:300,height:null},compact:false,compactHeight:null});persist();closeSettings(true);render();place(true);}
   });
   root.addEventListener('change',e=>{
+    if(e.target.hasAttribute('data-compact')){state.compact=e.target.checked;persist();render();place(true);positionSettings();}
     if(e.target.dataset.setting){const placement=e.target.dataset.setting==='position';state[e.target.dataset.setting]=e.target.value;if(placement)closeSettings(true);persist();render();place(true);positionSettings();}
     if(e.target.dataset.visible){state.hidden[e.target.dataset.visible]=!e.target.checked;persist();render();}
   });
@@ -335,10 +361,12 @@
   root.addEventListener('drop',e=>{const to=e.target.closest('[data-section]')?.dataset.section;if(sectionDrag&&to){e.preventDefault();if(to!==sectionDrag)reorder(sectionDrag,to);}sectionDrag=null;root.querySelectorAll('.drag-over').forEach(n=>n.classList.remove('drag-over'));});
   root.addEventListener('dragend',()=>{sectionDrag=null;root.querySelectorAll('.drag-over').forEach(n=>n.classList.remove('drag-over'));});
   root.addEventListener('keydown',e=>{const k=e.target.dataset.handle;if(!k||!['ArrowUp','ArrowDown'].includes(e.key))return;e.preventDefault();const visible=state.sections.filter(x=>!state.hidden[x]), i=visible.indexOf(k)+(e.key==='ArrowUp'?-1:1);if(visible[i]){reorder(k,visible[i]);root.querySelector(`[data-handle="${k}"]`).focus();}});
+  function setPanelHeight(height){if(state.compact)state.compactHeight=height;else state.size.height=height;}
   function applySize() {
     const floating=host.hasAttribute('data-floating');
     if(floating)host.style.width=Math.max(Math.min(240,innerWidth-16),Math.min(state.size.width,innerWidth-16))+'px';else host.style.width='';
-    const height=state.size.height==null||state.collapsed?null:Math.max(Math.min(140,innerHeight-16),Math.min(state.size.height,innerHeight-16));
+    const requestedHeight=state.compact?state.compactHeight:state.size.height;
+    const height=requestedHeight==null||state.collapsed?null:Math.max(Math.min(140,innerHeight-16),Math.min(requestedHeight,innerHeight-16));
     card.style.height=height==null?'':height+'px';
     card.classList.toggle('sized',height!=null);
     $('.resize').hidden=!!state.collapsed;
@@ -353,17 +381,17 @@
   window.addEventListener('pointermove',e=>{
     if(!resizing)return;
     if(host.hasAttribute('data-floating')) state.size.width=Math.max(240,Math.min(resizing.width+e.clientX-resizing.x,innerWidth-host.getBoundingClientRect().left-8));
-    state.size.height=Math.max(140,Math.min(resizing.height+(resizing.bottom?-1:1)*(e.clientY-resizing.y),resizing.bottom?resizing.edge-8:innerHeight-card.getBoundingClientRect().top-8));
+    setPanelHeight(Math.max(140,Math.min(resizing.height+(resizing.bottom?-1:1)*(e.clientY-resizing.y),resizing.bottom?resizing.edge-8:innerHeight-card.getBoundingClientRect().top-8)));
     applySize();
   });
   const endResize=()=>{if(resizing){resizing=null;persist();}};
   window.addEventListener('pointerup',endResize);window.addEventListener('pointercancel',endResize);window.addEventListener('blur',endResize);
-  $('.resize').addEventListener('dblclick',()=>{state.size={width:300,height:null};applySize();if(host.hasAttribute('data-floating'))clampFloat();persist();});
+  $('.resize').addEventListener('dblclick',()=>{state.size={width:300,height:null};state.compactHeight=null;applySize();if(host.hasAttribute('data-floating'))clampFloat();persist();});
   $('.resize').addEventListener('keydown',e=>{
     if(!['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key))return;
     e.preventDefault();const r=card.getBoundingClientRect(),step=e.shiftKey?40:10;
     if(['ArrowLeft','ArrowRight'].includes(e.key)&&host.hasAttribute('data-floating'))state.size.width=Math.max(240,Math.min(r.width+(e.key==='ArrowRight'?step:-step),innerWidth-host.getBoundingClientRect().left-8));
-    if(['ArrowUp','ArrowDown'].includes(e.key))state.size.height=Math.max(140,Math.min(r.height+(e.key==='ArrowDown'?step:-step),host.hasAttribute('data-bottom')?r.bottom-8:innerHeight-r.top-8));
+    if(['ArrowUp','ArrowDown'].includes(e.key))setPanelHeight(Math.max(140,Math.min(r.height+(e.key==='ArrowDown'?step:-step),host.hasAttribute('data-bottom')?r.bottom-8:innerHeight-r.top-8)));
     applySize();persist();
   });
   function clampFloat(){const rect=host.getBoundingClientRect();state.floating.x=Math.max(8,Math.min(state.floating.x,innerWidth-rect.width-8));state.floating.y=Math.max(8,Math.min(state.floating.y,innerHeight-Math.min(rect.height,innerHeight-16)-8));host.style.left=state.floating.x+'px';host.style.top=state.floating.y+'px';card.style.maxHeight='calc(100dvh - 16px)';}
@@ -420,6 +448,40 @@
     }
     return {container,parent:nav,before:null,account:null};
   }
+  const trimmedStyles=new Map();
+  function restoreHistorySpace(){
+    for(const [el,props] of trimmedStyles)for(const [key,entry] of Object.entries(props)){
+      if(el.style.getPropertyValue(key)===entry.applied){
+        if(entry.original)el.style.setProperty(key,entry.original,entry.priority);else el.style.removeProperty(key);
+      }
+    }
+    trimmedStyles.clear();
+  }
+  function trimHistorySpace(nav,reserve){
+    if(!reserve){restoreHistorySpace();return;}
+    // History already reserves padding for the absolute profile footer. Once
+    // Usage sits outside history that reserve becomes the blank gap above it.
+    // Trim only footer-sized bottom spacing along the scroll-container path.
+    const scrollers=[...nav.querySelectorAll('*')].filter(el=>!host.contains(el)&&el.clientHeight>40&&/(auto|scroll)/.test(getComputedStyle(el).overflowY));
+    const paths=new Set([nav]);
+    for(const scroller of scrollers)for(let el=scroller;el&&nav.contains(el);el=el.parentElement){paths.add(el);if(el===nav)break;}
+    for(const el of [...trimmedStyles.keys()])if(!paths.has(el)){
+      const props=trimmedStyles.get(el);
+      for(const [key,entry] of Object.entries(props))if(el.style.getPropertyValue(key)===entry.applied){if(entry.original)el.style.setProperty(key,entry.original,entry.priority);else el.style.removeProperty(key);}
+      trimmedStyles.delete(el);
+    }
+    for(const el of paths){
+      const computed=getComputedStyle(el), props=trimmedStyles.get(el)||{};
+      for(const [key,field] of [['padding-bottom','paddingBottom'],['margin-bottom','marginBottom']]){
+        let entry=props[key];const base=entry?entry.base:parseFloat(computed[field]);
+        if(!entry&&!(base>=reserve-8&&base<=reserve+32))continue;
+        if(!entry)entry=props[key]={base,original:el.style.getPropertyValue(key),priority:el.style.getPropertyPriority(key)};
+        const value=Math.max(0,base-reserve)+'px';entry.applied=value;
+        if(el.style.getPropertyValue(key)!==value||el.style.getPropertyPriority(key)!=='important')el.style.setProperty(key,value,'important');
+      }
+      if(Object.keys(props).length)trimmedStyles.set(el,props);
+    }
+  }
   function layoutBottom(nav=findSidebarNav()) {
     if(!nav||!host.hasAttribute('data-bottom'))return;
     const {parent,before}=bottomTarget(nav);
@@ -431,6 +493,7 @@
     const r=layout.getBoundingClientRect(),footer=before?.getBoundingClientRect();
     const outOfFlow=before&&['absolute','fixed'].includes(getComputedStyle(before).position);
     const reserve=outOfFlow&&footer?.height>0?Math.max(0,Math.min(r.height,r.bottom-footer.top)):0;
+    trimHistorySpace(nav,reserve);
     const margin=reserve?reserve+'px':'';
     if(host.style.marginBottom!==margin)host.style.marginBottom=margin;
     if(observedFooter!==before){footerResizeObserver.disconnect();if(before)footerResizeObserver.observe(before);observedFooter=before;}
@@ -444,7 +507,7 @@
     host.toggleAttribute('data-floating',floating);host.toggleAttribute('data-bottom',bottom);
     applySize();
     host.style.bottom='';host.style.left='';host.style.top='';
-    if(!bottom){host.style.marginBottom='';footerResizeObserver.disconnect();observedFooter=null;}
+    if(!bottom){restoreHistorySpace();host.style.marginBottom='';footerResizeObserver.disconnect();observedFooter=null;}
     if(floating){if(host.parentElement!==document.body)document.body.appendChild(host);clampFloat();}
     else if(bottom){
       layoutBottom(nav);
