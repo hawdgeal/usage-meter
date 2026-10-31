@@ -873,7 +873,7 @@
   const accentNames={auto:'Match theme',default:'Default',blue:'Blue',green:'Green',yellow:'Yellow',pink:'Pink',orange:'Orange',purple:'Purple',neutral:'Black / White'};
   const themeProbe=document.createElement('span');themeProbe.hidden=true;root.appendChild(themeProbe);
   function applyTheme() {
-    const html=document.documentElement,body=document.body,nav=findSidebarNav();
+    const html=document.documentElement,body=document.body,nav=currentSidebar();
     const htmlStyle=getComputedStyle(html),bodyStyle=getComputedStyle(body),appStyle=getComputedStyle(document.getElementById('root')||body),navStyle=nav?getComputedStyle(nav):appStyle;
     const systemDark=matchMedia('(prefers-color-scheme: dark)').matches;
     let dark=state.theme==='dark'||state.theme==='system'&&systemDark||state.theme==='auto'&&(html.classList.contains('dark')||html.dataset.theme==='dark'||html.dataset.mode==='dark'||(!html.classList.contains('light')&&html.dataset.theme!=='light'&&html.dataset.mode!=='light'&&(htmlStyle.colorScheme==='dark'||htmlStyle.colorScheme!=='light'&&systemDark)));
@@ -1234,7 +1234,7 @@
   function clampFloat(){const rect=host.getBoundingClientRect();state.floating.x=Math.max(8,Math.min(state.floating.x,innerWidth-rect.width-8));state.floating.y=Math.max(8,Math.min(state.floating.y,innerHeight-Math.min(rect.height,innerHeight-16)-8));host.style.left=state.floating.x+'px';host.style.top=state.floating.y+'px';const outer=spacingValues(state.compact?'compact':'normal','outer');card.style.maxHeight=`calc(100dvh - ${16+outer[0]+outer[2]}px)`;}
   $('.grab').addEventListener('pointerdown',e=>{if(e.button!==0)return;const r=host.getBoundingClientRect();drag={x:e.clientX,y:e.clientY,left:r.left,top:r.top,started:false};$('.grab').setPointerCapture(e.pointerId);e.preventDefault();});
   function updateDockTargets(event){
-    const nav=findSidebarNav();
+    const nav=currentSidebar();
     if(!nav){$('.dock-targets').hidden=true;if(drag)drag.dockTarget=null;return;}
     const {container,before}=bottomTarget(nav),r=container.getBoundingClientRect(),nr=nav.getBoundingClientRect(),footer=before?.getBoundingClientRect();
     const top=Math.max(8,nr.top+8),bottom=Math.max(top+44,Math.min(innerHeight-44,footer&&footer.height>0?footer.top-44:r.bottom-44));
@@ -1286,6 +1286,12 @@
       if(r.width>120&&r.height>innerHeight*0.6&&(el.matches('nav,aside')||el.querySelector('a[href^="/chat/"],a[href^="/code/"],a[href="/new"],a[href^="/project"]')))return el;
     }
     return null;
+  }
+  // Menus (right-click, popovers) mark the rest of the page aria-hidden/inert while it stays on
+  // screen. Keep using the sidebar we already found as long as it is still laid out.
+  function currentSidebar(){
+    const nav=findSidebarNav();if(nav)return nav;
+    return observedSidebar?.isConnected&&isVisibleElement(observedSidebar,false,true)?observedSidebar:null;
   }
   function findSidebarNav(){
     if(IS_CLAUDE){const claude=claudeSidebar();if(claude)return claude;}
@@ -1361,7 +1367,7 @@
       if(Object.keys(props).length)trimmedStyles.set(el,props);
     }
   }
-  function layoutBottom(nav=findSidebarNav()) {
+  function layoutBottom(nav=currentSidebar()) {
     if(!nav||!host.hasAttribute('data-bottom'))return;
     const {parent,before}=bottomTarget(nav);
     if(host.parentElement!==parent||host.nextElementSibling!==before)parent.insertBefore(host,before);
@@ -1388,9 +1394,7 @@
   }
   let sawSidebar=false;
   function place(force){
-    let nav=findSidebarNav();
-    // Keep the sidebar we already use while it is still on screen, even if a menu marked it hidden.
-    if(!nav&&observedSidebar?.isConnected&&isVisibleElement(observedSidebar,false,true))nav=observedSidebar;
+    const nav=currentSidebar();
     if(nav)sawSidebar=true;
     const hidden=state.position!=='floating'&&!nav&&(sawSidebar||!IS_CLAUDE)&&state.hideWithSidebar;
     host.toggleAttribute('data-sidebar-hidden',hidden);
