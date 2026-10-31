@@ -152,11 +152,17 @@
     :host { all:initial; display:block; min-width:0; flex-shrink:0; color-scheme:light; }
     * { box-sizing:border-box; }
     [hidden] { display:none !important; }
-    .card { position:relative; --fg:#202123; --muted:#656565; --line:#e3e3e3; --surface:#f9f9f9; --hover:#ededed; --track:#e5e5e5; --ok:#087f65; --warn:#966000; --bad:#c53240;
+    .card, .settings { --fg:#202123; --muted:#656565; --line:#e3e3e3; --surface:#f9f9f9; --hover:#ededed; --track:#e5e5e5; --ok:#087f65; --warn:#966000; --bad:#c53240;
       color:var(--fg); background:var(--surface); font:13px/1.45 ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
       margin:6px 8px; border:1px solid var(--line); border-radius:14px; overflow:hidden; text-align:left; display:flex; flex-direction:column; }
+    .card { position:relative; border-color:transparent; }
+    .card:hover, .card:focus-within { border-color:var(--line); }
+    .resize { opacity:0; pointer-events:none; }
+    .card:hover .resize, .card:focus-within .resize { opacity:1; pointer-events:auto; }
+    @media(hover:none) { .resize { opacity:1; pointer-events:auto; } }
+    :host([data-bottom]) { margin-top:auto; }
     :host([data-dark]) { color-scheme:dark; }
-    :host([data-dark]) .card { position:relative; --fg:#ececec; --muted:#ababab; --line:#292929; --surface:#000000; --hover:#171717; --track:#292929; --ok:#57c7a6; --warn:#e9b55f; --bad:#ff7983; }
+    :host([data-dark]) .card, .settings { --fg:#ececec; --muted:#ababab; --line:#292929; --surface:#000000; --hover:#171717; --track:#292929; --ok:#57c7a6; --warn:#e9b55f; --bad:#ff7983; }
     button,select { font:inherit; color:inherit; }
     button { border:0; background:none; cursor:pointer; padding:0; }
     button:hover { background:var(--hover); }
@@ -192,14 +198,22 @@
     .text-btn { color:var(--muted); border-radius:4px; padding:3px; font-size:10px; }
     .err { margin:8px 12px; font-size:11px; color:var(--bad); overflow-wrap:anywhere; }
     pre { margin:0 12px 10px; padding:8px; background:var(--hover); border-radius:8px; max-height:160px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; font:10px/1.5 ui-monospace,monospace; }
-    .settings { margin:0 10px 8px; padding:10px 2px; border-top:1px solid var(--line); }
+    .settings { position:fixed; inset:auto; margin:0; padding:14px; width:min(300px,calc(100vw - 16px)); max-height:calc(100dvh - 16px); overflow:auto; border:1px solid var(--line); border-radius:14px; box-shadow:0 10px 40px #0004; }
+    .settings:not(:popover-open) { display:none; }
+    .settings::backdrop { background:transparent; }
+    .settings-title { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; font-weight:600; }
+    .checks { padding-top:10px; border-top:1px solid var(--line); }
+    .checks label { width:100%; padding:5px 0; }
+    .settings .reset { font-size:11px; margin-top:8px; }
+    .settings .note { margin-top:8px; }
     .setting { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px; font-size:12px; }
     select { background:var(--surface); border:1px solid var(--line); border-radius:6px; padding:4px; max-width:145px; font-size:11px; }
     .checks { display:flex; flex-wrap:wrap; gap:8px; font-size:11px; margin-bottom:10px; }
     .checks label { display:flex; align-items:center; gap:4px; } input { accent-color:var(--ok); margin:0; }
     .busy .refresh svg { animation:spin 1s linear infinite; } @keyframes spin { to { transform:rotate(360deg); } }
     :host([data-floating]) { position:fixed; width:min(300px,calc(100vw - 16px)); z-index:2147483000; }
-    :host([data-floating]) .card { margin:0; box-shadow:0 8px 32px #0003; }
+    :host([data-floating]) .card { margin:0; }
+    :host([data-floating]) .card:hover, :host([data-floating]) .card:focus-within { box-shadow:0 8px 32px #0003; }
     .resize { position:absolute; bottom:2px; right:2px; width:22px; height:22px; color:var(--muted); cursor:ns-resize; touch-action:none; border-radius:5px; display:grid; place-items:center; }
     .resize svg { width:12px; height:12px; }
     :host([data-floating]) .resize { cursor:nwse-resize; }
@@ -226,7 +240,7 @@
     <button class="toggle" aria-expanded="true">${icon('chevron')}<span class="title">Usage</span><span class="badge" hidden></span></button>
     <button class="icon refresh" title="Refresh usage" aria-label="Refresh usage">${icon('refresh')}</button>
     <button class="icon customize" title="Customize panel" aria-label="Customize panel" aria-expanded="false">${icon('settings')}</button></div>
-    <div class="settings" hidden></div><div class="summary" hidden></div><div class="body"></div><button class="resize" aria-label="Resize panel" title="Drag to resize · Arrow keys to resize · Double-click to reset size"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m5 13 8-8m-3 8 3-3"/></svg></button><div class="live" aria-live="polite"></div></div>`;
+    <div class="summary" hidden></div><div class="body"></div><button class="resize" aria-label="Resize panel" title="Drag to resize · Arrow keys to resize · Double-click to reset size"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m5 13 8-8m-3 8 3-3"/></svg></button><div class="live" aria-live="polite"></div></div><div class="settings" popover="auto" role="dialog" aria-label="Usage settings"></div>`;
   const $=s=>root.querySelector(s), card=$('.card');
   let busyTimer, settingsOpen=false, drag=null, resizing=null, sectionDrag=null;
   const ui={ setBusy(b) { card.classList.toggle('busy',b); $('.refresh').disabled=b; $('.refresh').setAttribute('aria-busy',String(b)); clearTimeout(busyTimer); if(b) busyTimer=setTimeout(()=>{ui.setBusy(false); state.error='Refresh timed out. Try again.'; render();},20000); } };
@@ -241,9 +255,9 @@
     host.toggleAttribute('data-dark',dark);
   }
   function renderSettings() {
-    $('.settings').hidden=!settingsOpen;
+
     $('.customize').setAttribute('aria-expanded',String(settingsOpen));
-    $('.settings').innerHTML=`<div class="setting"><span>Appearance</span><select aria-label="Appearance" data-setting="theme">${['auto','light','dark'].map(k=>`<option value="${k}" ${state.theme===k?'selected':''}>${k==='auto'?'Match ChatGPT':k==='light'?'Light':'Dark'}</option>`).join('')}</select></div>
+    $('.settings').innerHTML=`<div class="settings-title"><span>Usage settings</span><button class="icon close-settings" aria-label="Close settings">✕</button></div><div class="setting"><span>Appearance</span><select aria-label="Appearance" data-setting="theme">${['auto','light','dark'].map(k=>`<option value="${k}" ${state.theme===k?'selected':''}>${k==='auto'?'Match ChatGPT':k==='light'?'Light':'Dark'}</option>`).join('')}</select></div>
     <div class="setting"><span>Placement</span><select aria-label="Placement" data-setting="position">${['top','bottom','floating'].map(k=>`<option value="${k}" ${state.position===k?'selected':''}>${k==='top'?'Sidebar top':k==='bottom'?'Sidebar bottom':'Floating'}</option>`).join('')}</select></div>
     <div class="checks">${Object.keys(labels).map(k=>`<label><input type="checkbox" data-visible="${k}" ${!state.hidden[k]?'checked':''}>${labels[k]}</label>`).join('')}</div>
     <div class="note">Drag section handles to reorder. Use ↑ / ↓ on a section handle for keyboard reordering.</div><button class="text-btn reset">Reset layout</button>`;
@@ -282,15 +296,27 @@
   }
   $('.toggle').onclick=()=>{state.collapsed=!state.collapsed; persist(); render();};
   $('.refresh').onclick=()=>requestRefresh(true);
-  $('.customize').onclick=()=>{settingsOpen=!settingsOpen; renderSettings();};
+  function positionSettings() {
+    if(!settingsOpen)return;
+    const menu=$('.settings'), anchor=$('.customize').getBoundingClientRect(), r=menu.getBoundingClientRect();
+    menu.style.left=Math.max(8,Math.min(anchor.right-r.width,innerWidth-r.width-8))+'px';
+    const below=innerHeight-anchor.bottom-8;
+    menu.style.top=Math.max(8,Math.min(below>=r.height?anchor.bottom+6:anchor.top-r.height-6,innerHeight-r.height-8))+'px';
+  }
+  function closeSettings(focus=false) { $('.settings').hidePopover(); settingsOpen=false;$('.customize').setAttribute('aria-expanded','false');if(focus)$('.customize').focus(); }
+  $('.customize').onclick=()=>{if(settingsOpen){closeSettings();return;}settingsOpen=true;renderSettings();$('.settings').showPopover();positionSettings();$('.settings').querySelector('select').focus();};
+  $('.settings').addEventListener('toggle',e=>{settingsOpen=e.newState==='open';$('.customize').setAttribute('aria-expanded',String(settingsOpen));});
+  root.addEventListener('click',e=>{if(e.target.closest('.close-settings'))closeSettings(true);});
+  window.addEventListener('resize',positionSettings);
+  document.addEventListener('scroll',positionSettings,true);
   root.addEventListener('click',e=>{
     const k=e.target.closest('[data-collapse]')?.dataset.collapse;
     if(k){state.closed[k]=!state.closed[k];persist();render();}
     if(e.target.closest('.raw')){state.showRaw=!state.showRaw;render();$('.raw').focus();}
-    if(e.target.closest('.reset')){Object.assign(state,{sections:['plan','credits','features'],closed:{},hidden:{},theme:'auto',position:'top',floating:{x:24,y:100},size:{width:300,height:null}});persist();renderSettings();render();place(true);}
+    if(e.target.closest('.reset')){Object.assign(state,{sections:['plan','credits','features'],closed:{},hidden:{},theme:'auto',position:'top',floating:{x:24,y:100},size:{width:300,height:null}});persist();closeSettings(true);render();place(true);}
   });
   root.addEventListener('change',e=>{
-    if(e.target.dataset.setting){state[e.target.dataset.setting]=e.target.value;persist();render();place(true);}
+    if(e.target.dataset.setting){const placement=e.target.dataset.setting==='position';state[e.target.dataset.setting]=e.target.value;if(placement)closeSettings(true);persist();render();place(true);positionSettings();}
     if(e.target.dataset.visible){state.hidden[e.target.dataset.visible]=!e.target.checked;persist();render();}
   });
   function reorder(from,to){const list=state.sections, target=list.indexOf(to);list.splice(list.indexOf(from),1);list.splice(target,0,from);persist();render();$('.live').textContent=`${labels[from]} moved`;}
@@ -337,7 +363,41 @@
   window.addEventListener('pointerup',endDrag);window.addEventListener('pointercancel',endDrag);window.addEventListener('blur',endDrag);
   $('.grab').addEventListener('keydown',e=>{if(e.key==='Escape'){state.position='top';persist();place(true);if(settingsOpen)renderSettings();return;}if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key))return;e.preventDefault();if(state.position!=='floating'){const r=host.getBoundingClientRect();state.floating={x:r.left,y:r.top};state.position='floating';}const step=e.shiftKey?30:10;state.floating.x+=e.key==='ArrowRight'?step:e.key==='ArrowLeft'?-step:0;state.floating.y+=e.key==='ArrowDown'?step:e.key==='ArrowUp'?-step:0;place(false);persist();if(settingsOpen)renderSettings();});
   function findSidebarNav(){for(const selector of ['#stage-slideover-sidebar nav','nav[aria-label="Chat history"]','[data-testid="sidebar"] nav','nav'])for(const el of document.querySelectorAll(selector)){const r=el.getBoundingClientRect();if(r.width>120&&r.height>200&&r.left>=0&&r.left<innerWidth/2&&r.right>100&&getComputedStyle(el).visibility!=='hidden')return el;}return null;}
-  function place(force){const nav=findSidebarNav();const floating=state.position==='floating'||!nav;host.toggleAttribute('data-floating',floating);applySize();if(floating){if(host.parentElement!==document.body)document.body.appendChild(host);clampFloat();}else{host.style.left='';host.style.top='';card.style.maxHeight='';const kids=[...nav.children].filter(c=>c!==host);const before=state.position==='top'?(kids[1]||null):(kids.at(-1)||null);if(host.parentElement!==nav||host.nextElementSibling!==before)nav.insertBefore(host,before);}}
+  function bottomTarget(nav) {
+    // The account footer can live outside the history nav, below its scroll area.
+    let container=nav;
+    for(let i=0;i<6&&container.parentElement&&container.parentElement!==document.body;i++){
+      const parent=container.parentElement, r=parent.getBoundingClientRect();
+      if(r.width>520||r.left>innerWidth/2)break;
+      container=parent;
+      if(container.matches('#stage-slideover-sidebar,[data-testid="sidebar"],aside'))break;
+    }
+    const account=container.querySelector('[data-testid="accounts-profile-button"], [data-testid="user-menu-button"], [data-testid="profile-button"], button[aria-label="Open profile menu"], footer');
+    if(account&&!host.contains(account)){
+      let parent=nav;
+      while(parent&&!parent.contains(account))parent=parent.parentElement;
+      if(parent&&parent!==document.body){
+        let before=account;
+        while(before.parentElement!==parent)before=before.parentElement;
+        return {parent,before};
+      }
+    }
+    return {parent:nav,before:null};
+  }
+  function place(force){
+    const nav=findSidebarNav(), floating=state.position==='floating'||!nav;
+    host.toggleAttribute('data-floating',floating);
+    host.toggleAttribute('data-bottom',!floating&&state.position==='bottom');
+    applySize();
+    if(floating){if(host.parentElement!==document.body)document.body.appendChild(host);clampFloat();}
+    else{
+      host.style.left='';host.style.top='';card.style.maxHeight='';
+      const kids=[...nav.children].filter(c=>c!==host);
+      const target=state.position==='bottom'?bottomTarget(nav):{parent:nav,before:kids[1]||null};
+      if(host.parentElement!==target.parent||host.nextElementSibling!==target.before)target.parent.insertBefore(host,target.before);
+    }
+    positionSettings();
+  }
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyTheme);
 
   let placeQueued = false;
