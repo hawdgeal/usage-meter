@@ -45,6 +45,8 @@ Privacy: the only requests go to claude.ai, using your existing login. Nothing i
 - **Manage** and the Usage title open `claude.ai/settings/usage` in a dialog, with an **Open in tab** fallback.
 - **Match Claude** reads Claude's page colors (`data-mode`, `--accent-brand`, `--text-300`), so bars use Claude's orange by default.
 - If no sidebar is found (for example a full-width Claude Code page), the panel floats instead of hiding. It still hides when you collapse a sidebar it was docked in, if **Hide docked panel with sidebar** is on.
+- **Usage** and **Manage** open Claude's usage settings inside the panel's dialog, showing only the usage content. Claude's own Settings window, its settings sidebar and the app sidebar are hidden. If Claude changes that page and the content can't be isolated, the full page shows after a few seconds, and **Open in tab** always works.
+- **Header order** (Layout → Update time & Details) defaults to *Usage · Refresh · update time · Customize · Drag*, with the update time in the header. Choose *Drag · Usage · time · Refresh · Customize* for the original layout. **Status position** can still move the update time above or below the modules.
 - **Models & features** is hidden by default. Claude rarely sends per-feature counters, but the passive scanner is kept in case it does.
 
 ## Caveats

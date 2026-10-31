@@ -65,7 +65,7 @@
     scrollbar:{label:'Scrollbar on hover only'}
   };
   function defaultPreferences(){return {
-    hideFrame:false,hover:Object.fromEntries(Object.keys(HOVER_OPTIONS).map(key=>[key,true])),collapsed:false,compact:false,compactHeight:null,hideCollapsed:false,hideWithSidebar:true,footerPosition:'top',showUpdateTime:true,showDetails:true,marginTop:6,marginBottom:6,
+    hideFrame:false,hover:Object.fromEntries(Object.keys(HOVER_OPTIONS).map(key=>[key,true])),collapsed:false,compact:false,compactHeight:null,hideCollapsed:false,hideWithSidebar:true,footerPosition:'header',headerOrder:'trailing',showUpdateTime:true,showDetails:true,marginTop:6,marginBottom:6,
     showUsageResets:false,showPaidReset:false,showAddCredits:true,showPlanTooltips:false,showRemainingPlan:true,showCreditBar:true,showCreditBalance:true,creditBalanceInTitle:false,creditReference:null,creditReferencePending:false,
     position:'bottom',sections:['plan','credits','features'],closed:{credits:true},
     hidden:{features:true},hiddenFeatures:{},
@@ -79,7 +79,7 @@
   let lastRefresh = 0;
 
   // ---------- persistence ----------
-  const saveKeys = ["creditBalanceInTitle", "showUsageResets", "barGradientVisible", "showPaidReset", "barMode", "barColor", "barStart", "barEnd", "gradientStops", "barGradient", "hideFrame", "hover", "usage", "plan", "usageAt", "models", "collapsed", "position", "sections", "closed", "hidden", "theme", "preset", "accent", "contrast", "floating", "size", "compact", "compactHeight", "hideCollapsed", "hideWithSidebar", "hiddenFeatures", "showAddCredits", "showPlanTooltips", "showRemainingPlan", "settingsClosed", "settingsTab", "settingsPosition", "settingsSize", "spacing", "spacingMode", "footerPosition", "showUpdateTime", "showDetails", "marginTop", "marginBottom", "showCreditBar", "showCreditBalance", "creditReference", "creditReferencePending"];
+  const saveKeys = ["headerOrder", "creditBalanceInTitle", "showUsageResets", "barGradientVisible", "showPaidReset", "barMode", "barColor", "barStart", "barEnd", "gradientStops", "barGradient", "hideFrame", "hover", "usage", "plan", "usageAt", "models", "collapsed", "position", "sections", "closed", "hidden", "theme", "preset", "accent", "contrast", "floating", "size", "compact", "compactHeight", "hideCollapsed", "hideWithSidebar", "hiddenFeatures", "showAddCredits", "showPlanTooltips", "showRemainingPlan", "settingsClosed", "settingsTab", "settingsPosition", "settingsSize", "spacing", "spacingMode", "footerPosition", "showUpdateTime", "showDetails", "marginTop", "marginBottom", "showCreditBar", "showCreditBalance", "creditReference", "creditReferencePending"];
   const historyKeys=Object.keys(defaultPreferences()).filter(key=>!['settingsTab','settingsClosed','spacingMode','creditReferencePending'].includes(key));
   const undoChanges=[],redoChanges=[];
   let historyReady=false,historyCurrent=null,historyGroup='',historyEpoch=0;
@@ -130,7 +130,8 @@
     } catch (_) {}
     if(!Number.isFinite(state.creditReference)||state.creditReference<=0)state.creditReference=null;
     for(const key of ['marginTop','marginBottom'])state[key]=Number.isFinite(state[key])?Math.max(0,Math.min(120,state[key])):6;
-    if(!['top','bottom','header'].includes(state.footerPosition))state.footerPosition='top';
+    if(!['top','bottom','header'].includes(state.footerPosition))state.footerPosition='header';
+    if(!['trailing','classic'].includes(state.headerOrder))state.headerOrder='trailing';
     if(!Object.hasOwn(SETTINGS_TABS,state.settingsTab))state.settingsTab='panel';
     if(!state.settingsPosition||!Number.isFinite(state.settingsPosition.x)||!Number.isFinite(state.settingsPosition.y))state.settingsPosition=null;
     if(!state.settingsSize||!Number.isFinite(state.settingsSize.width)||!Number.isFinite(state.settingsSize.height))state.settingsSize=null;
@@ -306,6 +307,8 @@
     .head-status.foot { flex:1 1 0; min-width:0; margin-left:2px; gap:0; font-size:9px; line-height:1.25; flex-wrap:nowrap; overflow:hidden; }
     .head-status .updated-at { display:block; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .head { flex-shrink:0; display:flex; align-items:center; gap:3px; padding:5px 6px; min-height:38px; }
+    .head.order-trailing>.head-status-slot>.head-status.foot { flex:0 1 auto; min-width:0; overflow:hidden; white-space:nowrap; }
+    .head.order-trailing>.head-status-slot>.head-status.foot .updated-at { overflow:hidden; text-overflow:ellipsis; }
     .icon { width:28px; height:28px; display:inline-flex; align-items:center; justify-content:center; border-radius:7px; flex-shrink:0; color:var(--muted); }
     .grab { cursor:grab; touch-action:none; }
     .grab:active { cursor:grabbing; }
@@ -619,7 +622,7 @@
   root.addEventListener('change',event=>{if(event.target.matches('.reset-dialog select')&&resetFlow&&!resetFlow.busy){resetFlow.creditId=event.target.value;renderResetDialog();}});
   $('.reset-dialog').addEventListener('close',()=>{resetFlow=null;const target=resetFocus?.isConnected?resetFocus:$('.usage-open');target?.focus();resetFocus=null;});
   let creditReturnFocus=null,creditReturnPath='',creditWatch=null,creditLoadTimeout=null;
-  function openCreditDialog(link){openPageDialog(creditPurchaseUrl(),'Extra usage',link,false);}
+  function openCreditDialog(link){openPageDialog(creditPurchaseUrl(),'Usage',link,false);}
   function openPageDialog(url,title,returnFocus,closeOnReturn=false){
     const dialog=$('.credits-modal');
     if(dialog.open){$('.credits-close').focus();return;}
@@ -629,7 +632,7 @@
     dialog.setAttribute('aria-busy','true');
     frame.addEventListener('load',()=>creditFrameLoaded(frame));
     creditReturnFocus=returnFocus;creditReturnPath=location.pathname+location.search+location.hash;
-    $('#gptu-page-heading').textContent=title;frame.title=title==='Extra usage'?'Claude extra usage settings':'Claude usage overview';
+    $('#gptu-page-heading').textContent=title;frame.title='Claude usage';
     $('.credit-external').href=url;$('.credits-status').textContent='Loading…';$('.credits-status').hidden=false;
     frame.src=url;$('.credits-content').appendChild(frame);dialog.showModal();$('.credits-close').focus();
     creditLoadTimeout=setTimeout(()=>{if(dialog.open){$('.credits-status').textContent='If the page stays blank, choose Open in tab.';$('.credits-status').hidden=false;}},12000);
@@ -659,20 +662,72 @@
         button[aria-label="Open sidebar"], button[aria-label="Close sidebar"], button[aria-label="Show sidebar"],
         nav[aria-label="Sidebar"], [data-testid="menu-sidebar"], nav:has([data-testid="user-menu-button"]) { display:none !important; }
       `;
+      style.textContent+=`
+        [data-gptu-hidden] { display:none !important; }
+        html[data-gptu-isolated], html[data-gptu-isolated] body { height:100% !important; overflow:hidden !important; margin:0 !important; }
+        [data-gptu-path] { position:static !important; inset:auto !important; transform:none !important; translate:none !important; width:100% !important; height:100% !important;
+          max-width:none !important; max-height:none !important; min-width:0 !important; min-height:0 !important; margin:0 !important; padding:0 !important;
+          border:0 !important; border-radius:0 !important; box-shadow:none !important; outline:0 !important; display:flex !important; flex-direction:column !important; opacity:1 !important; }
+        [data-gptu-content] { flex:1 1 auto !important; width:100% !important; max-width:none !important; height:100% !important; max-height:none !important;
+          min-height:0 !important; overflow:auto !important; margin:0 !important; border:0 !important; border-radius:0 !important; }
+      `;
       doc.head.appendChild(style);return true;
     }catch(_){return false;}
+  }
+  // Claude opens settings as its own modal with a settings sidebar. Inside our dialog, keep only
+  // the settings content pane: hide everything that is not on the path from it to <html>.
+  function isolateEmbeddedContent(doc){
+    try{
+      const links=[...doc.querySelectorAll('a[href*="/settings/"]')];
+      if(!links.length||!doc.body)return false;
+      const scope=links[0].closest('[role="dialog"],dialog')||doc.body;
+      const hasNav=el=>links.some(a=>el.contains(a));
+      const sr=scope.getBoundingClientRect(),minArea=sr.width*sr.height*0.2;
+      let best=null,bestArea=0;
+      for(const el of scope.querySelectorAll('div,main,section,article')){
+        if(hasNav(el))continue;
+        const r=el.getBoundingClientRect(),area=r.width*r.height;
+        if(area>bestArea&&area>=minArea&&(el.textContent||'').trim().length>20){best=el;bestArea=area;}
+      }
+      if(!best)return false;
+      for(const el of doc.querySelectorAll('[data-gptu-hidden],[data-gptu-path],[data-gptu-content]'))for(const a of ['data-gptu-hidden','data-gptu-path','data-gptu-content'])el.removeAttribute(a);
+      for(let el=best;el&&el!==doc.documentElement;el=el.parentElement){
+        for(const sib of el.parentElement?.children||[])if(sib!==el&&!['SCRIPT','STYLE','LINK','META','TEMPLATE'].includes(sib.tagName))sib.setAttribute('data-gptu-hidden','');
+        if(el!==best&&el!==doc.body)el.setAttribute('data-gptu-path','');
+      }
+      best.setAttribute('data-gptu-content','');doc.documentElement.setAttribute('data-gptu-isolated','');
+      return true;
+    }catch(_){return false;}
+  }
+  function keepEmbeddedIsolated(frame){
+    try{
+      const doc=frame.contentDocument;let timer=null;
+      const observer=new MutationObserver(()=>{clearTimeout(timer);timer=setTimeout(()=>isolateEmbeddedContent(doc),80);});
+      observer.observe(doc.body,{childList:true,subtree:true});
+      $('.credits-modal').addEventListener('close',()=>observer.disconnect(),{once:true});
+    }catch(_){}
   }
   function creditFrameLoaded(frame){
     if(!$('.credits-modal').open||frame!==$('.credits-frame'))return;
     const prepared=prepareEmbeddedPage(frame);
     // Cross-origin checkout pages cannot be styled, but must remain usable.
     if(!prepared&&frame.contentDocument){$('.credits-status').textContent='Unable to prepare the page. Choose Open in tab.';return;}
-    requestAnimationFrame(()=>{
+    // Wait for the settings content to render and be isolated before revealing the frame.
+    const started=Date.now();
+    const attempt=()=>{
+      if(!$('.credits-modal').open||frame!==$('.credits-frame'))return;
+      let doc=null;try{doc=frame.contentDocument;}catch(_){}
+      if(doc&&isolateEmbeddedContent(doc)){keepEmbeddedIsolated(frame);reveal();}
+      else if(!doc||Date.now()-started>6000)reveal();
+      else setTimeout(attempt,100);
+    };
+    attempt();
+    function reveal(){requestAnimationFrame(()=>{
       if(!$('.credits-modal').open||frame!==$('.credits-frame'))return;
       frame.removeAttribute('data-loading');frame.removeAttribute('aria-hidden');frame.removeAttribute('tabindex');
       $('.credits-modal').removeAttribute('aria-busy');
       clearTimeout(creditLoadTimeout);$('.credits-status').hidden=true;
-    });
+    });}
     try{frame.contentDocument?.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();$('.credits-modal').close();}});}catch(_){}
   }
   const accentNames={auto:'Match theme',default:'Default',blue:'Blue',green:'Green',yellow:'Yellow',pink:'Pink',orange:'Orange',purple:'Purple',neutral:'Black / White'};
@@ -733,7 +788,7 @@
       (state.barMode==='custom'&&state.barGradient?group('barDisplay','Meter display',toggle('Show gradient across meters','data-visible-gradient',state.barGradientVisible)+`<div class="note">Off: one color for the current percentage. On: show the color scale across the fill.</div>`)+group('barEnds','End colors',colorInput('Color at 0%','barStart')+colorInput('Color at 100%','barEnd'))+group('barMiddle','Middle colors & transitions',middleControls):'');
     const themeSelect=`<label class="setting"><span>Theme preset</span><select aria-label="Theme preset" data-setting="preset"><optgroup label="Claude"><option value="auto" ${state.preset==='auto'?'selected':''}>Match Claude</option><option value="claude" ${state.preset==='claude'?'selected':''}>Claude (page colors, Claude accent)</option></optgroup><optgroup label="Palette presets">${THEME_FAMILIES.map(name=>`<option value="${esc(name)}" ${state.preset===name?'selected':''}>${esc(name)}</option>`).join('')}</optgroup></select></label>`;
     $('.settings').innerHTML=`<div class="settings-header"><div class="settings-title" title="Drag to move settings · Double-click to reset position"><button class="icon settings-grab" aria-label="Move settings" title="Drag or use arrow keys · Home resets position">${icon('grip')}</button><span>Usage settings</span><div class="history-buttons"><button class="icon undo-changes" aria-label="Undo changes" title="Undo changes" ${undoChanges.length?'':'disabled'}>${icon('undo')}</button><button class="icon redo-changes" aria-label="Redo changes" title="Redo changes" ${redoChanges.length?'':'disabled'}>${icon('redo')}</button></div><button class="icon close-settings" aria-label="Close settings">✕</button></div><div class="settings-tabs" role="tablist" aria-label="Settings categories">${Object.entries(SETTINGS_TABS).map(([key,label])=>`<button class="settings-tab" role="tab" id="gptu-tab-${key}" aria-controls="gptu-settings-${key}" aria-selected="${state.settingsTab===key}" tabindex="${state.settingsTab===key?0:-1}" data-settings-tab="${key}">${label}</button>`).join('')}</div></div><div class="settings-body">${
-      tab('panel',group('placement','Docking & size',select('Placement','position',{top:'Sidebar top',bottom:'Sidebar bottom',floating:'Floating'})+toggle('Compact mode','data-compact',state.compact))+group('visibility','Visibility',toggle('Hide docked panel with sidebar','data-hide-with-sidebar',state.hideWithSidebar)+toggle('Hide frame completely','data-hide-frame',state.hideFrame))+group('hover','Hover behavior',`<div class="note">Turn a switch off to keep that element visible. Keyboard focus also reveals hover-only controls.</div>`+Object.entries(HOVER_OPTIONS).map(([key,item])=>toggle(item.label,`data-hover="${key}" ${key==='frame'&&state.hideFrame?'disabled':''}`,state.hover[key])).join('')+toggle('Hide collapsed Usage until hover','data-hide-collapsed',state.hideCollapsed))+group('status','Update time & Details',toggle('Show update time','data-show-update',state.showUpdateTime)+toggle('Show Details button','data-show-details',state.showDetails)+select('Status position','footerPosition',{header:'Next to Usage',top:'Above modules',bottom:'Below modules'})))+
+      tab('panel',group('placement','Docking & size',select('Placement','position',{top:'Sidebar top',bottom:'Sidebar bottom',floating:'Floating'})+toggle('Compact mode','data-compact',state.compact))+group('visibility','Visibility',toggle('Hide docked panel with sidebar','data-hide-with-sidebar',state.hideWithSidebar)+toggle('Hide frame completely','data-hide-frame',state.hideFrame))+group('hover','Hover behavior',`<div class="note">Turn a switch off to keep that element visible. Keyboard focus also reveals hover-only controls.</div>`+Object.entries(HOVER_OPTIONS).map(([key,item])=>toggle(item.label,`data-hover="${key}" ${key==='frame'&&state.hideFrame?'disabled':''}`,state.hover[key])).join('')+toggle('Hide collapsed Usage until hover','data-hide-collapsed',state.hideCollapsed))+group('status','Update time & Details',toggle('Show update time','data-show-update',state.showUpdateTime)+toggle('Show Details button','data-show-details',state.showDetails)+select('Status position','footerPosition',{header:'In header',top:'Above modules',bottom:'Below modules'})+select('Header order','headerOrder',{trailing:'Usage · Refresh · time · Customize · Drag',classic:'Drag · Usage · time · Refresh · Customize'})+`<div class="note">Places the drag-to-float handle and the header update time.</div>`))+
       tab('modules',group('plan','Plan limits',moduleToggle('plan')+toggle('Show remaining plan allowance','data-remaining-plan',state.showRemainingPlan)+`<div class="note">Also applies to the extra usage bar: remaining when enabled, used when disabled.</div>`+toggle('Plan limit tooltips','data-plan-tooltips',state.showPlanTooltips))+group('credits','Extra usage',moduleToggle('credits')+toggle('Show extra usage bar','data-credit-bar',state.showCreditBar)+`<div class="credit-reference-controls" ${state.showCreditBar?'':'hidden'}>${toggle('Show amount left','data-credit-balance',state.showCreditBalance)}${toggle('Amount beside Extra usage title',`data-credit-title ${state.showCreditBalance?'disabled':''}`,state.creditBalanceInTitle)}<div class="note">When the large balance is hidden, move its amount from the percentage row to the Extra usage title.</div><label class="setting"><span>Fallback limit</span><span class="margin-input"><input type="number" aria-label="Full credit balance" min="0.01" step="any" data-credit-reference value="${state.creditReference??''}" placeholder="e.g. 50"></span></label><div class="note">Claude normally reports your monthly extra-usage limit, which counts as 100%. This value is used only when it does not.</div></div>`+toggle('Manage extra usage button','data-add-credits',state.showAddCredits))+group('features','Models & features',moduleToggle('features')+`<div class="feature-settings"><div class="feature-settings-title">Individual counters</div><div class="feature-options" role="group" aria-label="Models & features to show"></div><div class="note">Selections are kept when the module is hidden.</div></div>`))+
       tab('appearance',group('appearance','Theme & mode',themeSelect+select('Appearance','theme',{auto:'Match Claude',system:'System',light:'Light',dark:'Dark'})+`<div class="note">Match Claude follows the page palette. Palette presets use available light/dark variants; some have only one mode.</div>`)+group('colors','Accent & contrast',select('Accent color','accent',accentNames)+select('Contrast','contrast',{auto:'Match Claude',system:'System',medium:'Medium',increased:'Increased'})))+
       tab('bars',barControls+`<button class="text-btn" data-reset-bar-colors>Reset bar colors</button>`)+
@@ -813,6 +868,7 @@
     const footer=state.showUpdateTime||(!inHeader&&state.showDetails)?`<div class="foot ${inHeader?'head-status':''}">${state.showUpdateTime?`<span class="updated-at" title="Updated ${esc(fmtAgo(state.usageAt))}">${inHeader?'':'Updated '}${fmtAgo(state.usageAt)}</span>`:''}${!inHeader&&state.showDetails?`<button class="text-btn raw" aria-expanded="${state.showRaw}">${state.showRaw?'Hide data':'Details'}</button>`:''}</div>`:'';
     $('.head-status-slot').innerHTML=state.footerPosition==='header'?footer:'';
     $('.head').classList.toggle('has-header-status',state.footerPosition==='header'&&!!footer);
+    applyHeaderOrder();
     $('.body').innerHTML=(state.footerPosition==='top'?footer:'')+state.sections.filter(k=>!state.hidden[k]).map(k=>`<section class="section" data-section="${k}"><div class="section-head"><button class="section-toggle" data-collapse="${k}" aria-expanded="${!state.closed[k]}" aria-controls="gptu-${k}">${icon(k)}<span>${labels[k]}</span>${k==='credits'&&(state.closed.credits||balanceInTitle)?`<span class="credit-inline" role="group" aria-label="Amount left">${esc(creditText)}</span>`:''}${icon('chevron')}</button>${k==='plan'&&state.showUsageResets&&resetCount()!=null?`<span class="reset-tools" title="Available usage limit resets"><span>${resetCount()} ${resetCount()===1?'reset':'resets'}</span>${resetCount()>0?`<button class="use-reset" aria-label="Use usage limit reset" ${resetPending?'disabled':''}>Use</button>`:''}</span>`:''}<button class="icon section-handle" draggable="true" data-handle="${k}" aria-label="Reorder ${labels[k]}" title="Drag to reorder · ↑ / ↓">${icon('grip')}</button></div><div class="section-content" id="gptu-${k}" ${state.closed[k]?'hidden':''}>${blocks[k]}</div></section>`).join('')+
       `${state.error?`<div class="err" role="status">${esc(state.error)}</div>`:''}${state.footerPosition==='bottom'?footer:''}${state.showRaw?`<pre>${esc(JSON.stringify({claude:state.rawUsage??null,usage:state.usage,models:state.models},null,2))}</pre>`:''}`;
     $('.body').scrollTop=scroll;
@@ -820,6 +876,19 @@
     if(rawFocused) $('.raw')?.focus();
     else if(focused?.handle) root.querySelector(`[data-handle="${focused.handle}"]`)?.focus();
     else if(focused?.collapse) root.querySelector(`[data-collapse="${focused.collapse}"]`)?.focus();
+  }
+  // Header order: moves the drag handle and the header update time without rebuilding the header.
+  function applyHeaderOrder(){
+    const head=$('.head'),titleRow=$('.head-title-row'),slot=$('.head-status-slot'),grab=$('.grab'),refresh=$('.refresh'),customize=$('.customize');
+    const trailing=state.headerOrder!=='classic';
+    head.classList.toggle('order-trailing',trailing);
+    if(trailing){
+      if(refresh.nextElementSibling!==slot)refresh.after(slot);
+      if(customize.nextElementSibling!==grab)customize.after(grab);
+    }else{
+      if(head.firstElementChild!==grab)head.prepend(grab);
+      if(slot.parentElement!==titleRow)titleRow.appendChild(slot);
+    }
   }
   $('.toggle').onclick=()=>{state.collapsed=!state.collapsed; persist(); render();};
   $('.refresh').onclick=()=>requestRefresh(true);
@@ -1247,6 +1316,7 @@
       ${hoverHidden}
       .card[data-hover-frame]:not(:hover):not(:has(:focus-visible)){border-color:transparent;box-shadow:none;}
       .card[data-hover-float]:not(:hover):not(:has(:focus-visible)) .head .grab{width:0;min-width:0;margin-right:-3px;overflow:hidden;}
+      .card[data-hover-float]:not(:hover):not(:has(:focus-visible)) .head.order-trailing .grab{margin-right:0;margin-left:-3px;}
       .card[data-hover-updated]:not(:hover):not(:has(:focus-visible)) .head-status.foot{flex:0 0 0;width:0;margin:0;padding:0;}
       .card[data-hover-collapse]:not(:hover):not(:has(:focus-visible)) .head .collapse-panel{width:0;min-width:0;margin-right:-2px;overflow:hidden;}
       .card[data-hover-refresh]:not(:hover):not(:has(:focus-visible)) .head>.refresh,
