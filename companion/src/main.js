@@ -51,9 +51,11 @@ const miniWins = () => [...minis.values()].map((m) => m.win).filter((w) => w && 
 const entryOf = (win) => [...minis.values()].find((m) => m.win === win) || null;
 // Separate cards each have their own pin; otherwise one setting covers the mini panel.
 const pinFor = (key) => (key !== "main" && s().cardOnTop && typeof s().cardOnTop[key] === "boolean" ? s().cardOnTop[key] : !!s().miniOnTop);
-// "On top of its app" (attachToApp) puts each card just above its app's window instead; the tray's
-// "Show usage" floats them above everything until one of the apps next comes to the front.
+// "On top of its app" (attachToApp) puts each pinned card just above its app's window instead, and
+// an unpinned card is then an ordinary window. The tray's "Show usage" floats them above everything
+// until one of the apps next comes to the front.
 const attached = () => !!s().attachToApp && foreground.available() && !forceShow;
+const cardAttached = (m) => attached() && pinFor(m.key);
 const onTopFor = (key) => (attached() ? false : pinFor(key));
 const siteOf = (id) => UsageView.APPS[id].site;
 const extOf = (site) => store.ext[site] || {};
@@ -73,8 +75,8 @@ function snapshot() {
     local: store.local,
     prefsVersion,
     app: currentApp(),
-    onTop: { main: onTopFor("main"), claude: onTopFor("claude"), chatgpt: onTopFor("chatgpt") },
-    attached: attached(),
+    // The pin's state: on top of everything, or of its own app with "On top of its app only".
+    onTop: { main: pinFor("main"), claude: pinFor("claude"), chatgpt: pinFor("chatgpt") },
     followApp,
     frontMatched,
     hosts: bridge ? bridge.list() : [],
@@ -141,6 +143,8 @@ function pollForeground() {
     dirty = true;
   }
   lastFrontTitle = win.title;
+  // A card that stepped aside comes back once you switch away from its app.
+  for (const e of minis.values()) if (e.peek && !(m && e.peekApps.includes(m))) endPeek(e);
   if (!!m !== frontMatched) { frontMatched = !!m; dirty = true; }
   if (dirty) changed();
 }
@@ -160,13 +164,13 @@ function appsFor(m) {
 // window on screen (closed or minimized). Runs often, since clicking the app raises it over the card.
 let attachTimer = null;
 function attachTick() {
-  if (!attached() || !minis.size) { clearInterval(attachTimer); attachTimer = null; return; }
+  if (![...minis.values()].some(cardAttached)) { clearInterval(attachTimer); attachTimer = null; return; }
   if (!attachTimer) attachTimer = setInterval(attachTick, 150);
   const opts = { browsers: s().followBrowsers, terminals: s().followTerminals, selfExe: process.execPath };
   const wins = foreground.listWindows().map((w) => ({ ...w, app: matchApp(w, opts) }));
   for (const m of minis.values()) {
     const win = m.win;
-    if (!win || win.isDestroyed() || !m.ready) continue;
+    if (!win || win.isDestroyed() || !m.ready || m.peek || !cardAttached(m)) continue;
     const apps = appsFor(m);
     const target = wins.find((w) => apps.includes(w.app));
     if (!target || target.minimized) { if (win.isVisible() && !drags.has(win)) win.hide(); m.target = null; continue; }
@@ -175,6 +179,68 @@ function attachTick() {
     if (!win.isVisible()) { if (!s().attachMove) keepOnScreen(win); win.showInactive(); pollHover(); }
     foreground.placeAbove(win.getNativeWindowHandle(), target.hwnd);
   }
+}
+
+// ---------- getting out of the app's way ----------
+// The apps draw their menus (your name in Claude, your picture in ChatGPT) inside their own window,
+// where the companion can't see them. So a click in a card's app close to the card makes the card
+// fade and let clicks through ("peek"). It stays that way while the pointer is in that area (the
+// menu, its items, a dialog there) and comes back PEEK_BACK_MS after the pointer leaves it, or when
+// you switch to another app. Clicks on the card itself don't count.
+const PEEK_NEAR_X = 40, PEEK_NEAR_Y = 250, PEEK_BACK_MS = 1500; // physical pixels; ms
+const FADED_OPACITY = 0.12;
+let clickTimer = null, wasDown = false;
+const normalOpacity = () => Math.max(0.3, Math.min(1, Number(s().miniOpacity) || 1));
+const inRect = (p, r, mx = 0, my = 0) => p.x >= r.x - mx && p.x < r.x + r.w + mx && p.y >= r.y - my && p.y < r.y + r.h + my;
+
+function clickTick() {
+  const active = [...minis.values()].filter((m) => m.win && !m.win.isDestroyed() && (m.win.isVisible() || m.peek));
+  if (!active.length || !foreground.available()) { clearInterval(clickTimer); clickTimer = null; return; }
+  if (!clickTimer) clickTimer = setInterval(clickTick, 30);
+  const p = foreground.pointer();
+  if (!p) return;
+  const down = p.button && !wasDown;
+  wasDown = p.button;
+  const now = Date.now();
+
+  for (const m of active) {
+    if (!m.peek) continue;
+    // Back once the pointer has been away from the area for a moment.
+    if (inRect(p, m.peekZone)) m.peekOut = 0;
+    else if (!m.peekOut) m.peekOut = now;
+    else if (now - m.peekOut > PEEK_BACK_MS) endPeek(m);
+  }
+
+  if (!down) return;
+  const app = matchApp({ exe: p.exe, title: p.title }, { browsers: s().followBrowsers, terminals: s().followTerminals, selfExe: process.execPath });
+  if (!app || app === "self") return;
+  for (const m of active) {
+    if (m.peek || !m.win.isVisible() || !appsFor(m).includes(app)) continue;
+    const c = foreground.rectOf(m.win.getNativeWindowHandle(), true);
+    if (c && inRect(p, c, PEEK_NEAR_X, PEEK_NEAR_Y)) startPeek(m, c);
+  }
+}
+
+function setFaded(m, fade) {
+  if (!!m.faded === fade) return;
+  m.faded = fade;
+  m.win.setOpacity(fade ? FADED_OPACITY : normalOpacity());
+  m.win.setIgnoreMouseEvents(fade); // clicks go to the app underneath
+}
+
+function startPeek(m, c) {
+  m.peek = true;
+  m.peekApps = appsFor(m);
+  m.peekZone = { x: c.x - PEEK_NEAR_X, y: c.y - PEEK_NEAR_Y, w: c.w + 2 * PEEK_NEAR_X, h: c.h + 2 * PEEK_NEAR_Y };
+  m.peekOut = 0;
+  stopDrag(m.win);
+  setFaded(m, true);
+}
+function endPeek(m) {
+  if (!m.peek) return;
+  m.peek = false;
+  if (m.win && !m.win.isDestroyed()) setFaded(m, false);
+  updateMinis();
 }
 
 // "Move with its app": the card keeps its offset from the nearest corner of its app's window, so it
@@ -290,7 +356,7 @@ function miniMenu(key) {
   const m = minis.get(key) || minis.values().next().value;
   if (!m || !m.win || m.win.isDestroyed()) return;
   Menu.buildFromTemplate([
-    { label: "Keep on top", type: "checkbox", checked: !s().attachToApp && pinFor(m.key), click: () => togglePin(m.key) },
+    { label: s().attachToApp ? "Keep on top of its app" : "Keep on top", type: "checkbox", checked: pinFor(m.key), click: () => togglePin(m.key) },
     attachItem(),
     moveItem(),
     { label: "Only while Claude, ChatGPT or Codex is in front", type: "checkbox", checked: s().miniOnlyWithApp, enabled: !s().attachToApp, click: (i) => setSettings({ miniOnlyWithApp: i.checked }) },
@@ -313,10 +379,10 @@ function moveItem() {
   return { label: "Move with its app", type: "checkbox", checked: !!s().attachToApp && !!s().attachMove, enabled: s().miniPanel && !!s().attachToApp, click: (i) => setSettings({ attachMove: i.checked }) };
 }
 
+// The pin turns "on top" on or off for that card: on top of everything, or of its own app with
+// "On top of its app only".
 function togglePin(key) {
-  // While cards sit on their apps, the pin floats them above everything again.
-  if (s().attachToApp) { setSettings({ attachToApp: false, miniOnTop: true, cardOnTop: {} }); return; }
-  if (key !== "main" && s().cards === "separate") setSettings({ cardOnTop: { ...(s().cardOnTop || {}), [key]: !onTopFor(key) } });
+  if (key !== "main" && s().cards === "separate") setSettings({ cardOnTop: { ...(s().cardOnTop || {}), [key]: !pinFor(key) } });
   else setSettings({ miniOnTop: !s().miniOnTop, cardOnTop: {} });
 }
 
@@ -430,6 +496,7 @@ function applyTopmost(m) {
 // only: with separate cards, the card whose tray icon was clicked.
 function showMinis(only) {
   forceShow = true;
+  for (const m of minis.values()) endPeek(m);
   if (!s().miniPanel) { setSettings({ miniPanel: true }); return; } // created and shown once loaded
   updateMinis();
   for (const m of minis.values()) {
@@ -451,13 +518,16 @@ function updateMinis() {
     if (win.isDestroyed()) continue;
     // Redraw when it should show another view, or its settings or the Windows theme changed.
     if (m.view !== want.view || loadedWith.get(win) !== panelKey(want.view)) { m.view = want.view; loadPanel(win, want.view, m.key); }
-    win.setOpacity(Math.max(0.3, Math.min(1, Number(s().miniOpacity) || 1)));
-    if (attached()) continue; // attachTick shows, hides and places it
-    if (!minisVisible()) { if (win.isVisible()) { stopDrag(win); win.hide(); } }
+    if (!m.faded) win.setOpacity(normalOpacity());
+    if (m.peek) continue; // stepped aside for the app's menu; see clickTick
+    if (cardAttached(m)) continue; // attachTick shows, hides and places it
+    // Unpinned while "On top of its app only" is on: an ordinary window, always shown.
+    if (!minisVisible() && !attached()) { if (win.isVisible()) { stopDrag(win); win.hide(); } }
     else if (!win.isVisible() && m.ready) { keepOnScreen(win); win.showInactive(); applyTopmost(m); }
   }
-  if (attached()) attachTick();
+  attachTick();
   pollHover();
+  clickTick();
 }
 
 // Moves a mini panel back inside the work area of its display (above the taskbar) without

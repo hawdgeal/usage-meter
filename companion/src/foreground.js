@@ -33,6 +33,12 @@ function load() {
     };
     const RECT = koffi.struct("UMC_RECT", { left: "int32_t", top: "int32_t", right: "int32_t", bottom: "int32_t" });
     api.GetWindowRect = user32.func("int __stdcall GetWindowRect(intptr_t hWnd, _Out_ UMC_RECT *lpRect)");
+    // Mouse and keyboard state, and the window under the cursor (physical pixels).
+    koffi.struct("UMC_POINT", { x: "int32_t", y: "int32_t" });
+    api.GetCursorPos = user32.func("int __stdcall GetCursorPos(_Out_ UMC_POINT *lpPoint)");
+    api.WindowFromPoint = user32.func("intptr_t __stdcall WindowFromPoint(UMC_POINT Point)");
+    api.GetAncestor = user32.func("intptr_t __stdcall GetAncestor(intptr_t hwnd, uint32_t gaFlags)");
+    api.GetAsyncKeyState = user32.func("int16_t __stdcall GetAsyncKeyState(int vKey)");
     try {
       // Cloaked windows (other virtual desktops, suspended Store apps) count as visible but aren't shown.
       const dwm = koffi.load("dwmapi.dll");
@@ -192,8 +198,35 @@ function moveTo(handle, x, y) {
   }
 }
 
+const VK_LBUTTON = 0x01, VK_RBUTTON = 0x02, VK_ESCAPE = 0x1b, GA_ROOT = 2;
+const isDown = (vk) => (api.GetAsyncKeyState(vk) & 0x8000) !== 0;
+
+// Where the pointer is and what's held: { x, y (physical pixels), button, escape, hwnd (the
+// top-level window under the pointer), exe, title }.
+function pointer() {
+  if (!load()) return null;
+  try {
+    const p = {};
+    if (!api.GetCursorPos(p)) return null;
+    const child = api.WindowFromPoint(p);
+    const hwnd = child ? api.GetAncestor(child, GA_ROOT) : 0;
+    let exe = null, title = "";
+    if (hwnd) {
+      const pid = new Uint32Array(1);
+      api.GetWindowThreadProcessIdI(hwnd, pid);
+      exe = pid[0] ? exeOf(pid[0]) : null;
+      const tbuf = Buffer.alloc(1024);
+      const n = api.GetWindowTextWI(hwnd, tbuf, 512);
+      title = n > 0 ? tbuf.toString("utf16le", 0, n * 2) : "";
+    }
+    return { x: p.x, y: p.y, button: isDown(VK_LBUTTON) || isDown(VK_RBUTTON), escape: isDown(VK_ESCAPE), hwnd, exe, title };
+  } catch (_) {
+    return null;
+  }
+}
+
 function available() {
   return !!load();
 }
 
-module.exports = { get, available, setTopmost, handleValue, listWindows, placeAbove, rectOf, moveTo, error: () => (load(), loadError) };
+module.exports = { get, available, setTopmost, handleValue, listWindows, placeAbove, rectOf, moveTo, pointer, error: () => (load(), loadError) };
