@@ -36,6 +36,7 @@ test("host relays usage to the companion, refresh back, and replays after a comp
   const host = startHost();
   host.send({ type: "hello", extensionVersion: "0.5.0", browser: "Chrome" });
   host.send({ type: "usage", site: "claude", data: F.claude, plan: "Max 5x", at: F.now, source: "tab", browser: "Chrome" });
+  host.send({ type: "settings", site: "claude", settings: { preset: "Catppuccin" }, browser: "Chrome" });
   await new Promise((r) => setTimeout(r, 150));
 
   let bridge = new Bridge();
@@ -43,6 +44,8 @@ test("host relays usage to the companion, refresh back, and replays after a comp
   bridge.on("message", (m, info) => got.push({ m, info }));
   await bridge.start();
   const first = await waitFor(() => got.find((g) => g.m.type === "usage"));
+  assert.strictEqual(got[0].m.type, "settings"); // settings replay first, so the panel draws with them
+  assert.strictEqual(got[0].m.settings.preset, "Catppuccin");
   assert.strictEqual(first.m.site, "claude");
   assert.strictEqual(first.info.browser, "Chrome");
   assert.strictEqual(first.info.extensionVersion, "0.5.0");
@@ -64,8 +67,8 @@ test("host relays usage to the companion, refresh back, and replays after a comp
   got = [];
   bridge.on("message", (m) => got.push({ m }));
   await bridge.start();
-  await waitFor(() => got.length >= 2);
-  assert.deepStrictEqual(got.map((g) => g.m.type), ["usage", "usage-error"]);
+  await waitFor(() => got.length >= 3);
+  assert.deepStrictEqual(got.map((g) => g.m.type), ["settings", "usage", "usage-error"]);
 
   // Browser closes the port: the host exits.
   const exited = new Promise((r) => host.child.on("exit", r));

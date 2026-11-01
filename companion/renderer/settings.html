@@ -45,16 +45,18 @@
     <p id="followNote" class="muted small"></p>
     <label class="check"><input type="checkbox" id="followBrowsers"> Also follow browser windows (by tab title)</label>
     <label class="check"><input type="checkbox" id="followTerminals"> Also follow terminals running Claude Code or Codex (by window title)</label>
-    <label class="field"><span>Bars show</span>
-      <select id="show"><option value="left">What's left</option><option value="used">What's used</option></select>
-    </label>
-    <label class="check"><input type="checkbox" id="showModels"> Show per-model limits (for example Opus weekly)</label>
+  </section>
+
+  <section aria-labelledby="h-look">
+    <h2 id="h-look">Look and layout</h2>
+    <p class="muted">The panel looks and behaves like the one in your browser: theme, bar colors, spacing, compact mode, module order, hover options and width all come from the extension's settings for each site. Change them under <strong>Customize</strong> in the browser panel; the companion updates within a few seconds. Collapsing the panel or its sections here only affects the companion.</p>
+    <p id="lookStatus" class="muted small"></p>
   </section>
 
   <section aria-labelledby="h-mini">
     <h2 id="h-mini">Mini panel</h2>
     <label class="check"><input type="checkbox" id="miniPanel"> Show the mini panel</label>
-    <label class="check"><input type="checkbox" id="miniOnTop"> Keep it on top of other windows</label>
+    <label class="check"><input type="checkbox" id="miniOnTop"> Keep it on top of other windows (also the pin button on the panel)</label>
     <label class="check"><input type="checkbox" id="miniOnlyWithApp"> Only while Claude, ChatGPT or Codex is in front</label>
     <label class="field"><span>Opacity</span><input type="range" id="miniOpacity" min="0.3" max="1" step="0.05"></label>
     <div class="line"><button id="resetPos" class="btn">Move back to the corner</button><span class="muted small">Drag it by its header. Right-click it for options.</span></div>
@@ -63,9 +65,6 @@
   <section aria-labelledby="h-general">
     <h2 id="h-general">General</h2>
     <label class="check"><input type="checkbox" id="launchAtLogin"> Start with Windows</label>
-    <label class="field"><span>Theme</span>
-      <select id="theme"><option value="system">Match Windows</option><option value="light">Light</option><option value="dark">Dark</option></select>
-    </label>
   </section>
 </main>
 <script src="settings.js"></script>

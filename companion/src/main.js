@@ -1,10 +1,11 @@
 // Usage Meter Companion: a tray icon, a popup and an optional always-on-top mini panel that show
-// Claude or ChatGPT / Codex usage. Usage arrives from the Usage Meter browser extension through
-// native messaging (see host.js and bridge.js). The panel follows the app in front, or a fixed
-// app chosen in Settings.
+// Claude or ChatGPT / Codex usage. The panel is the extension's own (content.js, in its embedded
+// mode), drawn with your extension settings. Usage and settings arrive from the browser extension
+// through native messaging (see host.js and bridge.js). The panel follows the app in front, or a
+// fixed app chosen in Settings.
 "use strict";
 const path = require("path");
-const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, nativeTheme, screen } = require("electron");
+const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, nativeTheme, screen, shell } = require("electron");
 
 if (process.env.USAGE_METER_DATA) app.setPath("userData", process.env.USAGE_METER_DATA);
 if (!app.requestSingleInstanceLock()) {
@@ -24,25 +25,39 @@ const APP_IDS = ["claude", "chatgpt", "codex"];
 const APP_LABELS = { claude: "Claude", chatgpt: "ChatGPT", codex: "Codex" };
 const RENDERER = path.join(__dirname, "..", "renderer");
 const PRELOAD = path.join(__dirname, "preload.js");
-const POPUP_WIDTH = 340;
-const MINI_WIDTH = 270;
+const DEFAULT_WIDTH = 300; // the extension's default floating width
+const LINK_HOSTS = ["https://claude.ai/", "https://chatgpt.com/"];
 
 let store, bridge, tray;
 let popup = null, mini = null, settingsWin = null;
+let popupApp = null, miniApp = null; // which app each window is showing
+const loadedWith = new WeakMap(); // window -> settings version and theme it was drawn with
 let followApp = "claude"; // last matching app seen in front
 let frontMatched = false; // a matching app is in front right now
 let foregroundTimer = null;
 let reg = { state: "idle" }; // last browser registration result
 let quitting = false;
+const prefsVersion = { claude: 0, chatgpt: 0 }; // bumps when the extension's panel settings change
 
 const s = () => store.settings;
 const currentApp = () => (s().mode === "follow" ? followApp : APP_IDS.includes(s().mode) ? s().mode : "claude");
 const siteOf = (id) => UsageView.APPS[id].site;
+const extOf = (site) => store.ext[site] || {};
+const showLeft = (site) => extOf(site).showRemainingPlan !== false;
+
+// The width you gave the panel in the browser (its floating width).
+function panelWidth(site) {
+  const w = Number(extOf(site).size && extOf(site).size.width);
+  return Math.round(Math.max(240, Math.min(560, w || DEFAULT_WIDTH)));
+}
 
 function snapshot() {
   return {
     settings: s(),
     sites: store.usage,
+    ext: store.ext,
+    local: store.local,
+    prefsVersion,
     app: currentApp(),
     followApp,
     frontMatched,
@@ -67,12 +82,18 @@ function changed() {
     for (const w of [popup, mini, settingsWin]) if (w && !w.isDestroyed()) w.webContents.send("state", snap);
     updateTray();
     updateMini();
+    if (popup && !popup.isDestroyed() && popupApp && loadedWith.get(popup) !== panelKey(popupApp)) loadPanel(popup, "popup", popupApp);
   });
 }
 
 function onBridgeMessage(msg, host) {
   const site = msg.site;
   if (site !== "claude" && site !== "chatgpt") return;
+  if (msg.type === "settings") {
+    if (!msg.settings || typeof msg.settings !== "object") return;
+    if (store.setExt(site, msg.settings)) { prefsVersion[site]++; changed(); }
+    return;
+  }
   const prev = store.usage[site] || {};
   if (msg.type === "usage" && msg.data && typeof msg.data === "object") {
     const at = Number(msg.at) || Date.now();
@@ -87,8 +108,7 @@ function onBridgeMessage(msg, host) {
 }
 
 function refresh(appId) {
-  const asked = bridge.refresh(appId ? siteOf(appId) : undefined);
-  return { asked };
+  return { asked: bridge.refresh(appId ? siteOf(appId) : undefined) };
 }
 
 // ---------- foreground app ----------
@@ -109,8 +129,7 @@ function startForeground() {
 }
 
 // ---------- tray ----------
-function trayImage(view) {
-  const show = s().show;
+function trayImage(view, show) {
   const frac = trayFraction(view, show);
   const color = trayColor(view, show);
   const img = nativeImage.createFromBitmap(ringBitmap(16, frac, color), { width: 16, height: 16, scaleFactor: 1 });
@@ -124,10 +143,12 @@ let lastTrayKey = "";
 function updateTray() {
   if (!tray) return;
   const id = currentApp();
-  const view = UsageView.build(id, store.usage[siteOf(id)], { showModels: s().showModels });
-  const key = `${id}|${view.head ? Math.round(view.head.left) : "-"}|${s().show}`;
-  if (key !== lastTrayKey) { tray.setImage(trayImage(view)); lastTrayKey = key; }
-  tray.setToolTip(UsageView.tooltip(view, { show: s().show }));
+  const site = siteOf(id);
+  const show = showLeft(site) ? "left" : "used";
+  const view = UsageView.build(id, store.usage[site]);
+  const key = `${id}|${view.head ? Math.round(view.head.left) : "-"}|${show}`;
+  if (key !== lastTrayKey) { tray.setImage(trayImage(view, show)); lastTrayKey = key; }
+  tray.setToolTip(UsageView.tooltip(view, { show }));
   tray.setContextMenu(trayMenu());
 }
 
@@ -142,6 +163,7 @@ function trayMenu() {
   return Menu.buildFromTemplate([
     { label: "Show usage", click: () => showPopup() },
     { label: "Mini panel", type: "checkbox", checked: s().miniPanel, click: (i) => setSettings({ miniPanel: i.checked }) },
+    { label: "Keep mini panel on top", type: "checkbox", checked: s().miniOnTop, enabled: s().miniPanel, click: (i) => setSettings({ miniOnTop: i.checked }) },
     { type: "separator" },
     ...modeItems(),
     { type: "separator" },
@@ -152,9 +174,30 @@ function trayMenu() {
   ]);
 }
 
+function miniMenu() {
+  if (!mini || mini.isDestroyed()) return;
+  Menu.buildFromTemplate([
+    { label: "Keep on top", type: "checkbox", checked: s().miniOnTop, click: (i) => setSettings({ miniOnTop: i.checked }) },
+    { label: "Only while Claude, ChatGPT or Codex is in front", type: "checkbox", checked: s().miniOnlyWithApp, click: (i) => setSettings({ miniOnlyWithApp: i.checked }) },
+    { type: "separator" },
+    ...modeItems(),
+    { type: "separator" },
+    { label: "Refresh", click: () => refresh() },
+    { label: "Settings…", click: () => openSettings() },
+    { label: "Hide mini panel", click: () => setSettings({ miniPanel: false }) },
+  ]).popup({ window: mini });
+}
+
 // ---------- windows ----------
-function baseWindow(extra) {
-  return new BrowserWindow({
+function guard(win) {
+  // Pages never navigate away; links go to your browser (see the open-url handler).
+  win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  win.webContents.on("will-navigate", (e) => e.preventDefault());
+  return win;
+}
+
+function panelWindow(extra) {
+  return guard(new BrowserWindow({
     show: false,
     frame: false,
     resizable: false,
@@ -162,28 +205,33 @@ function baseWindow(extra) {
     maximizable: false,
     fullscreenable: false,
     skipTaskbar: true,
-    backgroundColor: nativeTheme.shouldUseDarkColors ? "#1f1f1f" : "#ffffff",
     webPreferences: { preload: PRELOAD, contextIsolation: true, sandbox: true, nodeIntegration: false, spellcheck: false },
     ...extra,
-  });
+  }));
 }
 
-function guard(win) {
-  // Links and navigation never leave the app's own pages.
-  win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
-  win.webContents.on("will-navigate", (e) => e.preventDefault());
-  return win;
+function panelKey(appId) {
+  return `${appId}|${prefsVersion[siteOf(appId)]}|${nativeTheme.shouldUseDarkColors}`;
 }
 
-function showPopup() {
+function loadPanel(win, mode, appId) {
+  loadedWith.set(win, panelKey(appId));
+  win.setContentSize(panelWidth(siteOf(appId)), win.getContentSize()[1]);
+  win.loadFile(path.join(RENDERER, "panel.html"), { query: { mode, app: appId } });
+}
+
+function showPopup(appId) {
+  const want = appId || currentApp();
   if (!popup || popup.isDestroyed()) {
-    popup = guard(baseWindow({ width: POPUP_WIDTH, height: 260, alwaysOnTop: true }));
-    popup.loadFile(path.join(RENDERER, "panel.html"), { query: { mode: "popup" } });
+    popup = panelWindow({ width: panelWidth(siteOf(want)), height: 260, alwaysOnTop: true, backgroundColor: nativeTheme.shouldUseDarkColors ? "#202020" : "#ffffff" });
     popup.on("blur", () => { if (!popup.webContents.isDevToolsOpened()) popup.hide(); });
-    popup.once("ready-to-show", () => placePopup(true));
+    popup.on("closed", () => { popup = null; popupApp = null; });
+    popup.webContents.once("did-finish-load", () => placePopup(true));
+    popupApp = want;
+    loadPanel(popup, "popup", want);
     return;
   }
-  popup.webContents.send("popup-shown");
+  if (popupApp !== want || loadedWith.get(popup) !== panelKey(want)) { popupApp = want; loadPanel(popup, "popup", want); popup.webContents.once("did-finish-load", () => placePopup(true)); return; }
   placePopup(true);
 }
 
@@ -200,7 +248,7 @@ function placePopup(show) {
   const anchor = tb && tb.width ? { x: tb.x + tb.width / 2, y: tb.y } : screen.getCursorScreenPoint();
   const area = screen.getDisplayNearestPoint({ x: Math.round(anchor.x), y: Math.round(anchor.y) }).workArea;
   let x = Math.round(anchor.x - w / 2);
-  let y = anchor.y > area.y + area.height / 2 ? area.y + area.height - h - 8 : area.y + 8;
+  const y = anchor.y > area.y + area.height / 2 ? area.y + area.height - h - 8 : area.y + 8;
   x = Math.max(area.x + 8, Math.min(x, area.x + area.width - w - 8));
   popup.setPosition(x, y);
   if (show) { popup.show(); popup.focus(); }
@@ -212,9 +260,9 @@ function miniShouldShow() {
   return frontMatched || (mini && !mini.isDestroyed() && mini.isFocused());
 }
 
-function defaultMiniBounds(h) {
+function defaultMiniBounds(w, h) {
   const area = screen.getPrimaryDisplay().workArea;
-  return { x: area.x + area.width - MINI_WIDTH - 16, y: area.y + area.height - h - 16 };
+  return { x: area.x + area.width - w - 16, y: area.y + area.height - h - 16 };
 }
 
 function onScreen(b) {
@@ -225,32 +273,39 @@ function onScreen(b) {
 }
 
 function createMini() {
-  mini = guard(baseWindow({ width: MINI_WIDTH, height: 120, alwaysOnTop: s().miniOnTop, focusable: true }));
-  mini.loadFile(path.join(RENDERER, "panel.html"), { query: { mode: "mini" } });
+  miniApp = currentApp();
+  const width = panelWidth(siteOf(miniApp));
+  // Transparent, so the panel's own rounded frame (and hover-only frame) shows as in the browser.
+  mini = panelWindow({ width, height: 120, transparent: true, backgroundColor: "#00000000", hasShadow: false, alwaysOnTop: s().miniOnTop });
   const saved = s().miniBounds;
-  const pos = saved && onScreen(saved) ? saved : defaultMiniBounds(120);
+  const pos = saved && onScreen(saved) ? saved : defaultMiniBounds(width, 120);
   mini.setPosition(Math.round(pos.x), Math.round(pos.y));
   mini.on("moved", () => { const [x, y] = mini.getPosition(); setSettings({ miniBounds: { x, y } }, true); });
-  mini.on("closed", () => { mini = null; });
-  mini.once("ready-to-show", () => updateMini());
+  mini.on("closed", () => { mini = null; miniApp = null; });
+  // Right-clicking the header (a drag area) would open Windows' own window menu.
+  mini.on("system-context-menu", (e) => { e.preventDefault(); miniMenu(); });
+  mini.webContents.once("did-finish-load", () => updateMini());
+  loadPanel(mini, "mini", miniApp);
 }
 
 function updateMini() {
   const want = miniShouldShow();
   if (want && !mini) return createMini();
   if (!mini || mini.isDestroyed()) return;
+  // Redraw when it should show another app, or its settings or the Windows theme changed.
+  if (miniApp !== currentApp() || loadedWith.get(mini) !== panelKey(currentApp())) { miniApp = currentApp(); loadPanel(mini, "mini", miniApp); }
   mini.setAlwaysOnTop(!!s().miniOnTop, "floating");
   mini.setOpacity(Math.max(0.3, Math.min(1, Number(s().miniOpacity) || 1)));
-  if (want && !mini.isVisible() && mini.webContents.getURL()) mini.showInactive();
+  if (want && !mini.isVisible() && !mini.webContents.isLoading()) mini.showInactive();
   else if (!want && mini.isVisible()) mini.hide();
 }
 
 function openSettings() {
   if (settingsWin && !settingsWin.isDestroyed()) { settingsWin.show(); settingsWin.focus(); return; }
   settingsWin = guard(new BrowserWindow({
-    width: 560, height: 720, minWidth: 460, minHeight: 480, title: "Usage Meter Companion settings",
+    width: 560, height: 680, minWidth: 460, minHeight: 480, title: "Usage Meter Companion settings",
     autoHideMenuBar: true, show: false,
-    backgroundColor: nativeTheme.shouldUseDarkColors ? "#1f1f1f" : "#ffffff",
+    backgroundColor: nativeTheme.shouldUseDarkColors ? "#202020" : "#ffffff",
     webPreferences: { preload: PRELOAD, contextIsolation: true, sandbox: true, nodeIntegration: false },
   }));
   settingsWin.setMenu(null);
@@ -263,10 +318,10 @@ function openSettings() {
 function setSettings(patch, quiet) {
   const before = { ...s() };
   store.set(patch);
-  if ("theme" in patch) nativeTheme.themeSource = ["light", "dark"].includes(s().theme) ? s().theme : "system";
   if ("launchAtLogin" in patch && process.platform === "win32") app.setLoginItemSettings({ openAtLogin: !!s().launchAtLogin, args: ["--hidden"] });
   if ("miniBounds" in patch && patch.miniBounds === null && mini && !mini.isDestroyed()) {
-    const p = defaultMiniBounds(mini.getSize()[1]);
+    const [w, h] = mini.getSize();
+    const p = defaultMiniBounds(w, h);
     mini.setPosition(p.x, p.y);
   }
   if ("extensionIds" in patch && JSON.stringify(before.extensionIds) !== JSON.stringify(s().extensionIds)) connectBrowsers();
@@ -298,35 +353,41 @@ function handle(name, fn) {
   ipcMain.handle(name, (e, ...args) => (fromOurWindow(e) ? fn(e, ...args) : null));
 }
 
+function cleanSettings(patch) {
+  const clean = {};
+  const D = Store.DEFAULTS;
+  for (const [k, v] of Object.entries(patch)) {
+    if (!(k in D) || k === "onboarded" || k === "lastApp") continue;
+    if (k === "mode" && !["follow", ...APP_IDS].includes(v)) continue;
+    if (k === "miniOpacity") { const n = Number(v); if (n >= 0.3 && n <= 1) clean[k] = n; continue; }
+    if (k === "miniBounds") { if (v === null) clean[k] = null; continue; }
+    if (k === "extensionIds") { if (Array.isArray(v)) clean[k] = [...new Set(v.map(String).filter((id) => registration.ID_RE.test(id)))].slice(0, 20); continue; }
+    if (typeof D[k] === "boolean") { clean[k] = !!v; continue; }
+  }
+  return clean;
+}
+
 function setupIpc() {
   handle("state", () => snapshot());
   handle("refresh", (_e, appId) => refresh(APP_IDS.includes(appId) ? appId : undefined));
   handle("settings", (_e, patch) => {
-    if (!patch || typeof patch !== "object") return snapshot();
-    const clean = {};
-    const D = Store.DEFAULTS;
-    for (const [k, v] of Object.entries(patch)) {
-      if (!(k in D) || k === "onboarded" || k === "lastApp") continue;
-      if (k === "mode" && !["follow", ...APP_IDS].includes(v)) continue;
-      if (k === "show" && !["left", "used"].includes(v)) continue;
-      if (k === "theme" && !["system", "light", "dark"].includes(v)) continue;
-      if (k === "miniOpacity") { const n = Number(v); if (n >= 0.3 && n <= 1) clean[k] = n; continue; }
-      if (k === "miniBounds") { if (v === null) clean[k] = null; continue; }
-      if (k === "extensionIds") { if (Array.isArray(v)) clean[k] = [...new Set(v.map(String).filter((id) => registration.ID_RE.test(id)))].slice(0, 20); continue; }
-      if (typeof D[k] === "boolean") { clean[k] = !!v; continue; }
-      clean[k] = v;
-    }
-    setSettings(clean);
+    if (patch && typeof patch === "object") setSettings(cleanSettings(patch));
     return snapshot();
+  });
+  handle("panel-state", (_e, site, patch) => {
+    if ((site === "claude" || site === "chatgpt") && patch && typeof patch === "object") store.setLocal(site, patch);
+  });
+  handle("open-url", (_e, url) => {
+    if (typeof url === "string" && LINK_HOSTS.some((h) => url.startsWith(h))) shell.openExternal(url);
   });
   handle("resize", (e, height) => {
     const win = BrowserWindow.fromWebContents(e.sender);
-    const h = Math.max(60, Math.min(900, Math.round(Number(height) || 0)));
+    const h = Math.max(40, Math.min(1000, Math.round(Number(height) || 0)));
     if (!win || win === settingsWin || !h) return;
     const [w, cur] = win.getContentSize();
     if (cur === h) return;
     if (win === mini) {
-      // Grow or shrink from the bottom edge when docked near the bottom of the screen.
+      // Grow or shrink from the bottom edge when it sits near the bottom of the screen.
       const [x, y] = win.getPosition();
       const area = screen.getDisplayMatching(win.getBounds()).workArea;
       const nearBottom = y + cur > area.y + area.height - 40;
@@ -337,22 +398,11 @@ function setupIpc() {
       if (win === popup) placePopup(false);
     }
   });
+  handle("popup-app", (_e, appId) => { if (APP_IDS.includes(appId)) showPopup(appId); });
   handle("open-settings", () => { if (popup && !popup.isDestroyed()) popup.hide(); openSettings(); });
   handle("hide", (e) => { const w = BrowserWindow.fromWebContents(e.sender); if (w && w !== settingsWin) w.hide(); });
   handle("connect-browsers", () => connectBrowsers());
-  handle("mini-menu", () => {
-    if (!mini || mini.isDestroyed()) return;
-    Menu.buildFromTemplate([
-      ...modeItems(),
-      { type: "separator" },
-      { label: "Keep on top", type: "checkbox", checked: s().miniOnTop, click: (i) => setSettings({ miniOnTop: i.checked }) },
-      { label: "Only while Claude, ChatGPT or Codex is in front", type: "checkbox", checked: s().miniOnlyWithApp, click: (i) => setSettings({ miniOnlyWithApp: i.checked }) },
-      { label: "Hide mini panel", click: () => setSettings({ miniPanel: false }) },
-      { type: "separator" },
-      { label: "Refresh", click: () => refresh() },
-      { label: "Settings…", click: () => openSettings() },
-    ]).popup({ window: mini });
-  });
+  handle("mini-menu", () => miniMenu());
 }
 
 // ---------- start ----------
@@ -364,7 +414,6 @@ app.whenReady().then(async () => {
   if (process.platform === "win32") app.setAppUserModelId("fr.alencar.usage-meter-companion");
   store = Store.create(app.getPath("userData"));
   followApp = APP_IDS.includes(s().lastApp) ? s().lastApp : "claude";
-  nativeTheme.themeSource = ["light", "dark"].includes(s().theme) ? s().theme : "system";
   nativeTheme.on("updated", () => changed());
 
   bridge = new Bridge();
@@ -373,7 +422,7 @@ app.whenReady().then(async () => {
   try { await bridge.start(); } catch (e) { console.error("pipe:", e.message); }
 
   setupIpc();
-  tray = new Tray(trayImage(UsageView.build(currentApp(), store.usage[siteOf(currentApp())])));
+  tray = new Tray(trayImage(UsageView.build(currentApp(), store.usage[siteOf(currentApp())]), "left"));
   tray.on("click", () => togglePopup());
   updateTray();
   updateMini();
@@ -383,6 +432,6 @@ app.whenReady().then(async () => {
   await connectBrowsers();
   if (!s().onboarded) { store.set({ onboarded: true }); if (!process.argv.includes("--hidden")) openSettings(); }
 
-  // Keep "Updated … ago" and reset countdowns current in the tooltip.
+  // Keep reset countdowns current in the tooltip.
   setInterval(() => updateTray(), 30 * 1000);
 });

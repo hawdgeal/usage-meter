@@ -34,6 +34,7 @@ const companion = (() => {
   const MIN_GAP_MS = 10 * 1000; // never fetch one site more often than this
   const ERROR_BACKOFF_MS = 10 * 60 * 1000; // after "not signed in" and similar errors
   const SITES = ["claude", "chatgpt"];
+  const SETTINGS_KEYS = { claude: "gptu-claude", chatgpt: "gptu" }; // content.js storage keys
 
   let port = null;
   let companionUp = false; // the host reports whether the companion app is running
@@ -77,6 +78,18 @@ const companion = (() => {
     });
     send({ type: "hello", extensionVersion: version });
     for (const site of SITES) if (latest[site]) send({ type: "usage", site, ...latest[site] });
+    sendSettings();
+  }
+
+  // The companion draws the same panel, so it gets each site's panel settings too.
+  async function sendSettings() {
+    try {
+      const saved = await api.storage.local.get(Object.values(SETTINGS_KEYS));
+      for (const site of SITES) {
+        const value = saved && saved[SETTINGS_KEYS[site]];
+        if (value && typeof value === "object") send({ type: "settings", site, settings: value });
+      }
+    } catch (_) { /* storage unavailable */ }
   }
 
   function fromTab(msg) {
@@ -144,6 +157,16 @@ const companion = (() => {
       fetchSite(site);
     }
   }
+
+  try {
+    api.storage.onChanged.addListener((changes, area) => {
+      if (area !== "local" || !port) return;
+      for (const site of SITES) {
+        const change = changes[SETTINGS_KEYS[site]];
+        if (change && change.newValue && typeof change.newValue === "object") send({ type: "settings", site, settings: change.newValue });
+      }
+    });
+  } catch (_) {}
 
   function tick() {
     if (!port) connect();

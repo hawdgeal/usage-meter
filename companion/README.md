@@ -3,8 +3,10 @@
 A small Windows app that shows your **Claude** and **ChatGPT / Codex** plan usage next to the desktop apps:
 
 - **Tray icon:** a ring showing how much of your tightest limit is left, in Claude orange or ChatGPT green. It turns red at 10% or less. Hover it for a one-line summary.
-- **Popup:** click the tray icon. It shows every limit with its reset time, extra usage or credits, and a switch to look at the other app.
-- **Mini panel:** an optional always-on-top panel you can drag anywhere. Right-click it for options.
+- **Popup:** click the tray icon. It shows the usage panel, with a switch to look at another app.
+- **Mini panel:** an optional panel you can drag anywhere by its header. The **pin** button in its header turns always on top on or off. Right-click it for more options.
+
+**The panel is the extension's own**, drawn with your extension settings for that site: theme and preset, bar colors and gradients, spacing, compact mode, module order and visibility, hover options, update-time position, and the panel's floating width. Change them under **Customize** in the browser panel; the companion redraws within seconds. Collapsing the panel or a module in the companion only affects the companion. Controls that only make sense in the browser are hidden: drag-to-float, resize, Customize, and module reordering. Links such as **Usage** and **Manage** open in your browser.
 
 It **follows the app in front**: Claude desktop, ChatGPT desktop, Codex, and (optionally) browser windows and terminals whose title shows Claude, ChatGPT or Codex, such as Claude Code. You can pin one app instead in Settings or from the tray menu.
 
@@ -42,13 +44,12 @@ The connection is registered again every time the companion starts, so moving th
 | --- | --- |
 | Show usage for | Follow the app in front (default), or always Claude, ChatGPT or Codex. Codex and ChatGPT share the same account limits. |
 | Also follow browser windows / terminals | Match those windows by title. Turn off if, for example, a document called "Claude notes" switches the panel. |
-| Bars show | What's left (default) or what's used. Also applies to the tray ring. |
-| Per-model limits | Show limits such as Opus weekly. |
-| Mini panel | Show it, keep it on top, show it only while Claude, ChatGPT or Codex is in front, opacity, and move it back to the corner. |
+| Mini panel | Show it, keep it on top (also the pin button and the tray menu), show it only while Claude, ChatGPT or Codex is in front, opacity, and move it back to the corner. |
 | Start with Windows | Starts in the tray at sign-in. |
-| Theme | Match Windows, light or dark. |
 
-Settings and the last usage received are stored in `%APPDATA%\Usage Meter Companion`.
+The look comes from the extension, as above. The tray ring follows the extension's **Show remaining plan allowance** setting. "Match site" themes follow Windows' light or dark mode.
+
+Settings, the last usage and extension settings received, and the companion's panel state are stored in `%APPDATA%\Usage Meter Companion`.
 
 ## Uninstall
 
@@ -80,7 +81,8 @@ On Linux or macOS, `npm run dist:cross` builds the zip. The installer needs Wind
 | `src/app-match.js` | Maps that window to Claude, ChatGPT or Codex. |
 | `src/usage.js` | Turns usage into rows, headline and tooltip. Shared with the pages. |
 | `src/icon.js` | Draws the tray ring. |
-| `renderer/` | Popup / mini panel page and the settings page. |
+| `renderer/panel.html`, `embed.js`, `embed-after.js` | Popup and mini panel: run the extension's `content.js` in its embedded mode, feed it settings and usage, and add the pin and the app switch. The packaged app ships `content.js` next to `app.asar`. |
+| `renderer/settings.*` | The companion's Settings window. |
 | `test/` | Unit tests, including an end-to-end host ↔ app test and the extension's background script with a mocked browser. |
 
 ## Caveats

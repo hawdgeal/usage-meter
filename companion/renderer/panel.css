@@ -1,56 +1,13 @@
-body { overflow: hidden; user-select: none; }
-.card { --accent: #D97757; display: flex; flex-direction: column; gap: 10px; padding: 12px 14px 12px; border: 1px solid var(--line); }
-.head { display: flex; align-items: center; gap: 8px; -webkit-app-region: drag; min-height: 24px; }
-.head button, .switch, .actions { -webkit-app-region: no-drag; }
-.logo { width: 20px; height: 20px; border-radius: 5px; flex: none; }
-.title { display: flex; align-items: baseline; gap: 6px; min-width: 0; flex: 1; }
-.name { font-weight: 600; font-size: 14px; white-space: nowrap; }
-.plan { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 0 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.icon { width: 28px; height: 28px; border: 0; background: transparent; border-radius: 6px; display: inline-grid; place-items: center; color: var(--muted); cursor: pointer; flex: none; }
-.icon:hover { background: var(--hover); color: var(--fg); }
-.icon svg { width: 16px; height: 16px; }
-.icon.busy svg { animation: spin .9s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .icon.busy svg { animation: none; } }
-
-.switch { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; padding: 2px; background: var(--surface); border-radius: 8px; }
-.switch button { border: 0; background: transparent; padding: 4px 6px; border-radius: 6px; cursor: pointer; color: var(--muted); }
-.switch button[aria-pressed="true"] { background: var(--bg); color: var(--fg); font-weight: 600; box-shadow: 0 0 0 1px var(--line); }
-
-.rows { display: flex; flex-direction: column; gap: 10px; }
-.row-top { display: flex; justify-content: space-between; gap: 8px; }
-.label { color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.value { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
-.bar { height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; margin-top: 4px; }
-.bar i { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
-.row.warn .bar i { background: var(--warn); }
-.row.bad .bar i { background: var(--bad); }
-.row.bad .value { color: var(--bad); }
-.sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
-.models { border-top: 1px solid var(--line); padding-top: 10px; }
-
-.credits { display: flex; justify-content: space-between; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; }
-.credits .k { color: var(--muted); }
-.foot { color: var(--muted); font-size: 12px; display: flex; justify-content: space-between; gap: 2px 8px; flex-wrap: wrap; }
-body.popup .foot { flex-direction: column; }
-.foot .err { color: var(--bad); }
-.empty { color: var(--muted); }
-.empty strong { color: var(--fg); display: block; margin-bottom: 2px; font-weight: 600; }
-.actions { display: flex; gap: 6px; flex-wrap: wrap; }
-.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
-.btn:hover { background: var(--hover); }
-
-/* Mini panel: one line per limit. */
-.mini .card, body.mini .card { padding: 9px 11px; gap: 7px; }
-body.mini .rows { gap: 6px; }
-body.mini .row { display: grid; grid-template-columns: minmax(58px, auto) 1fr auto; align-items: center; gap: 8px; }
-body.mini .row-top { display: contents; }
-body.mini .row .label { grid-column: 1; font-size: 12px; color: var(--muted); }
-body.mini .row .bar { grid-column: 2; grid-row: 1; margin: 0; }
-body.mini .row .value { grid-column: 3; grid-row: 1; font-size: 12px; }
-body.mini .sub { display: none; }
-body.mini .name { font-size: 13px; }
-body.mini .logo { width: 18px; height: 18px; }
-body.mini .icon { width: 24px; height: 24px; }
-body.mini .credits, body.mini .models { padding-top: 6px; font-size: 12px; }
-body.mini .foot { font-size: 11px; }
+html, body { margin: 0; padding: 0; background: transparent; overflow: hidden; }
+body { font: 12px/1.4 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
+html.popup body { padding-bottom: 6px; }
+/* Popup only: which app to show, and the companion's settings. Colors follow the panel's theme. */
+.bar { display: flex; align-items: center; gap: 4px; padding: 8px 8px 0; -webkit-app-region: drag; }
+.bar .apps { display: flex; flex: 1; gap: 2px; padding: 2px; border-radius: 8px; background: var(--bar-hover, #8882); -webkit-app-region: no-drag; }
+.bar button { font: inherit; color: var(--bar-muted, #777); background: transparent; border: 0; border-radius: 6px; padding: 3px 6px; cursor: pointer; -webkit-app-region: no-drag; }
+.bar .apps button { flex: 1; }
+.bar .apps button[aria-pressed="true"] { color: var(--bar-fg, #222); background: var(--bar-surface, #fff); font-weight: 600; box-shadow: 0 0 0 1px var(--bar-line, #8884); }
+.bar .gear { display: inline-grid; place-items: center; width: 26px; height: 26px; padding: 0; }
+.bar .gear:hover { background: var(--bar-hover, #8882); color: var(--bar-fg, #222); }
+.bar .gear svg { width: 16px; height: 16px; }
+.bar button:focus-visible { outline: 2px solid var(--bar-accent, #2563eb); outline-offset: 1px; }

@@ -4,15 +4,21 @@
   const TAG_OUT = "gptu-ui";
   const AUTO_REFRESH_MS = 2 * 60 * 1000;
   const MIN_GAP_MS = 15 * 1000;
-  const store = (globalThis.browser && browser.storage) || chrome.storage;
+  // Set by the Windows desktop companion when it shows this panel in its own window (companion/renderer/embed.js).
+  // It supplies the site, the settings (read from the extension), usage updates and links. Unset in the browser.
+  const EMBED = globalThis.__usageMeterEmbed || null;
+  const store = EMBED ? EMBED.storage : (globalThis.browser && browser.storage) || chrome.storage;
   // One extension, two sites. Each site keeps its own settings under its own storage key.
   const SITES={
     chatgpt:{id:'chatgpt',name:'ChatGPT',key:'gptu',preset:'chatgpt',usagePath:'/settings/usage?tab=overview'},
     claude:{id:'claude',name:'Claude',key:'gptu-claude',preset:'claude',usagePath:'/settings/usage'}
   };
-  const IS_CLAUDE=location.hostname==='claude.ai'||location.hostname.endsWith('.claude.ai');
+  const IS_CLAUDE=EMBED?EMBED.site==='claude':location.hostname==='claude.ai'||location.hostname.endsWith('.claude.ai');
   const SITE=IS_CLAUDE?SITES.claude:SITES.chatgpt,OTHER=IS_CLAUDE?SITES.chatgpt:SITES.claude;
   const T=(chatgpt,claude)=>IS_CLAUDE?claude:chatgpt;
+  const ORIGIN=EMBED?(IS_CLAUDE?'https://claude.ai':'https://chatgpt.com'):location.origin;
+  // Requests for page-hook-*.js; the companion answers them itself.
+  function toHook(message){if(EMBED){EMBED.send(message);return;}window.postMessage(message,location.origin);}
 
   const THEME_PRESETS=[{"id":"ayu-dark","family":"Ayu","type":"dark","surface":"#0d1017","hover":"#47526640","border":"#1b1f29","fg":"#bfbdb6","muted":"#5a6673","accent":"#e6b450"},{"id":"catppuccin-mocha","family":"Catppuccin","type":"dark","surface":"#181825","hover":"#31324480","border":"#585b70","fg":"#cdd6f4","muted":"#9399b2","accent":"#cba6f7"},{"id":"catppuccin-latte","family":"Catppuccin","type":"light","surface":"#e6e9ef","hover":"#ccd0da80","border":"#acb0be","fg":"#4c4f69","muted":"#7c7f93","accent":"#8839ef"},{"id":"absolutely-dark","family":"Absolutely","type":"dark","surface":"#373735","hover":"#373735","border":"#ffffff22","fg":"#f9f9f7","muted":"#b2b2b0","accent":"#cc7d5e"},{"id":"absolutely-light","family":"Absolutely","type":"light","surface":"#f4f4f2","hover":"#f4f4f2","border":"#00000022","fg":"#2d2d2b","muted":"#8e8e8c","accent":"#c27759"},{"id":"dracula","family":"Dracula","type":"dark","surface":"#21222C","hover":"#44475A75","border":"#BD93F9","fg":"#F8F8F2","muted":"#6272A4","accent":"#737583"},{"id":"everforest-dark","family":"Everforest","type":"dark","surface":"#2d353b","hover":"#2d353b00","border":"#2d353b","fg":"#d3c6aa","muted":"#859289","accent":"#a7c080"},{"id":"everforest-light","family":"Everforest","type":"light","surface":"#fdf6e3","hover":"#fdf6e300","border":"#fdf6e3","fg":"#5c6a72","muted":"#859289","accent":"#7d974c"},{"id":"github-dark","family":"GitHub","type":"dark","surface":"#010409","hover":"#6e76811a","border":"#30363d","fg":"#e6edf3","muted":"#8b949e","accent":"#238636"},{"id":"github-light","family":"GitHub","type":"light","surface":"#f6f8fa","hover":"#eaeef280","border":"#d0d7de","fg":"#1f2328","muted":"#6e7781","accent":"#1f883d"},{"id":"gruvbox-dark","family":"Gruvbox","type":"dark","surface":"#282828","hover":"#3c383680","border":"#3c3836","fg":"#ebdbb2","muted":"#928374","accent":"#458588"},{"id":"gruvbox-light","family":"Gruvbox","type":"light","surface":"#fbf1c7","hover":"#ebdbb280","border":"#ebdbb2","fg":"#3c3836","muted":"#928374","accent":"#458588"},{"id":"linear-dark","family":"Linear","type":"dark","surface":"#080a0f","hover":"#080a0f","border":"#ffffff22","fg":"#e6e9ef","muted":"#636b7b","accent":"#606acc"},{"id":"linear-light","family":"Linear","type":"light","surface":"#f2f4f8","hover":"#f2f4f8","border":"#00000022","fg":"#2a3140","muted":"#858ea1","accent":"#5e6ad2"},{"id":"lobster-dark","family":"Lobster","type":"dark","surface":"#111827","hover":"#111827","border":"#ffffff22","fg":"#e4e4e7","muted":"#71717a","accent":"#ff5c5c"},{"id":"material-dark","family":"Material","type":"dark","surface":"#212121","hover":"#212121","border":"#21212160","fg":"#EEFFFF","muted":"#6b6e6e","accent":"#717171"},{"id":"matrix-dark","family":"Matrix","type":"dark","surface":"#020402","hover":"#020402","border":"#ffffff22","fg":"#b8ffca","muted":"#3f8f52","accent":"#1eff5a"},{"id":"monokai","family":"Monokai","type":"dark","surface":"#1e1f1c","hover":"#3e3d32","border":"#414339","fg":"#f8f8f2","muted":"#88846f","accent":"#75715E"},{"id":"night-owl","family":"Night Owl","type":"dark","surface":"#011627","hover":"#011627","border":"#5f7e97","fg":"#d6deeb","muted":"#637777","accent":"#7e57c2"},{"id":"nord","family":"Nord","type":"dark","surface":"#2e3440","hover":"#3b4252","border":"#3b4252","fg":"#d8dee9","muted":"#737f97","accent":"#88c0d0"},{"id":"notion-dark","family":"Notion","type":"dark","surface":"#151515","hover":"#151515","border":"#ffffff22","fg":"#d9d9d8","muted":"#6a9955","accent":"#3183d8"},{"id":"notion-light","family":"Notion","type":"light","surface":"#f7f6f3","hover":"#f7f6f3","border":"#00000022","fg":"#37352f","muted":"#008000","accent":"#3183d8"},{"id":"oscurange","family":"Oscurange","type":"dark","surface":"#0B0B0F","hover":"#0B0B0F","border":"#ffffff22","fg":"#E6E6E6","muted":"#5e5f66","accent":"#F9B98C"},{"id":"one-dark","family":"One","type":"dark","surface":"#21252b","hover":"#2c313a","border":"#3e4452","fg":"#abb2bf","muted":"#abb2bf","accent":"#70757f"},{"id":"one-light","family":"One","type":"light","surface":"#EAEAEB","hover":"#DBDBDC66","border":"#E5E5E6","fg":"#383A42","muted":"#8b8c93","accent":"#5871EF"},{"id":"proof-light","family":"Proof","type":"light","surface":"#efede6","hover":"#efede6","border":"#00000022","fg":"#2f312d","muted":"#8b877c","accent":"#3d755d"},{"id":"raycast-dark","family":"Raycast","type":"dark","surface":"#101010","hover":"#FFFFFF14","border":"#FFFFFF14","fg":"#FFFFFF","muted":"#666666","accent":"#ff6363"},{"id":"raycast-light","family":"Raycast","type":"light","surface":"#fcfcfc","hover":"#0000000f","border":"#00000014","fg":"#000000","muted":"#919191","accent":"#f25e5e"},{"id":"rose-pine-dark","family":"Rose Pine","type":"dark","surface":"#232136","hover":"#817c9c14","border":"#00000000","fg":"#e0def4","muted":"#6e6a86","accent":"#ea9a97"},{"id":"rose-pine-light","family":"Rose Pine","type":"light","surface":"#faf4ed","hover":"#6e6a860d","border":"#00000000","fg":"#575279","muted":"#8e899e","accent":"#c27571"},{"id":"sentry-dark","family":"Sentry","type":"dark","surface":"#26222d","hover":"#26222d","border":"#ffffff22","fg":"#e6dff9","muted":"#8d849f","accent":"#775ef6"},{"id":"solarized-dark","family":"Solarized","type":"dark","surface":"#00212B","hover":"#004454AA","border":"#2b2b4a","fg":"#839496","muted":"#5e747a","accent":"#2AA198"},{"id":"solarized-light","family":"Solarized","type":"light","surface":"#EEE8D5","hover":"#DFCA8844","border":"#DDD6C1","fg":"#5b6f76","muted":"#829294","accent":"#9b8d4e"},{"id":"tokyo-night","family":"Tokyo Night","type":"dark","surface":"#16161e","hover":"#13131a","border":"#101014","fg":"#a9b1d6","muted":"#5e668a","accent":"#506aaa"},{"id":"temple-dark","family":"Temple","type":"dark","surface":"#1d2d0f","hover":"#1d2d0f","border":"#ffffff22","fg":"#c7e6da","muted":"#4e645c","accent":"#e4f222"},{"id":"vercel-dark","family":"Vercel","type":"dark","surface":"#000000","hover":"#000000","border":"#ffffff22","fg":"#ededed","muted":"#666666","accent":"#006efe"},{"id":"vercel-light","family":"Vercel","type":"light","surface":"#ffffff","hover":"#ffffff","border":"#00000022","fg":"#171717","muted":"#666666","accent":"#006aff"},{"id":"vscode-dark","family":"VS Code Plus","type":"dark","surface":"#1E1E1E","hover":"#1E1E1E","border":"#ffffff22","fg":"#D4D4D4","muted":"#6A9955","accent":"#58a6ff"},{"id":"vscode-light","family":"VS Code Plus","type":"light","surface":"#FFFFFF","hover":"#E8E8E8","border":"#00000022","fg":"#000000","muted":"#008000","accent":"#0969da"},{"id":"xcode-dark","family":"Xcode","type":"dark","surface":"#1f1f24","hover":"#1f1f24","border":"#ffffff22","fg":"#ffffff","muted":"#6c7986","accent":"#5482ff"},{"id":"xcode-light","family":"Xcode","type":"light","surface":"#ffffff","hover":"#ffffff","border":"#00000022","fg":"#000000","muted":"#5d6c79","accent":"#0e0eff"}];
   const THEME_FAMILIES=[...new Set(THEME_PRESETS.map(p=>p.family))].sort((a,b)=>a.localeCompare(b));
@@ -258,7 +264,7 @@
     if (!force && Date.now() - lastRefresh < MIN_GAP_MS) return;
     lastRefresh = Date.now();
     ui.setBusy(true);
-    window.postMessage({ source: TAG_OUT, type: "refresh" }, location.origin);
+    toHook({ source: TAG_OUT, type: "refresh" });
   }
 
   window.addEventListener("message", (ev) => {
@@ -272,7 +278,7 @@
       state.error = null;
       persist(false); ui.setBusy(false); render();
       // Hand the update to background.js for the desktop companion (ignored when it isn't installed).
-      try{(globalThis.browser??chrome).runtime.sendMessage({type:'usage-meter-usage',site:SITE.id,data:payload.data,plan:state.plan,at:payload.at})?.catch?.(()=>{});}catch(_){}
+      if(!EMBED)try{(globalThis.browser??chrome).runtime.sendMessage({type:'usage-meter-usage',site:SITE.id,data:payload.data,plan:state.plan,at:payload.at})?.catch?.(()=>{});}catch(_){}
     } else if (type === "usage-error") {
       state.error = payload.message;
       ui.setBusy(false); render();
@@ -736,10 +742,10 @@
   const bar=(p,label,remaining=false)=>`<div class="bar" role="progressbar" aria-label="${esc(label)} ${remaining?'remaining':'used'}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${p}"><i class="${remaining?'remaining':level(p)}" style="width:${p}%;--meter-scale:${p>0?10000/p:100}%;${state.barMode==='custom'&&state.barGradient&&!state.barGradientVisible?'background-color:'+percentageColor(p):''}"></i></div>`;
 
   function creditPurchaseUrl(){
-    if(IS_CLAUDE)return new URL(SITE.usagePath,location.origin).href;
-    const url=new URL('/pricing/credits',location.origin);
+    if(IS_CLAUDE)return new URL(SITE.usagePath,ORIGIN).href;
+    const url=new URL('/pricing/credits',ORIGIN);
     url.searchParams.set('source','chatgpt_web_merged');
-    url.searchParams.set('return_to',location.pathname+location.search+location.hash);
+    url.searchParams.set('return_to',EMBED?'/':location.pathname+location.search+location.hash);
     return url.href;
   }
   function updateCreditLink(event){
@@ -765,16 +771,16 @@
   }
   root.addEventListener('click',event=>{
     const target=event.target;
-    if(target.closest('.paid-reset'))openPageDialog(new URL(SITE.usagePath,location.origin).href,'Usage',target);
+    if(target.closest('.paid-reset'))openPageDialog(new URL(SITE.usagePath,ORIGIN).href,'Usage',target);
     else if(target.closest('.use-reset')&&!resetPending){
       if(settingsOpen)closeSettings();resetFocus=target;resetFlow={id:crypto.randomUUID(),loading:true};renderResetDialog();$('.reset-dialog').showModal();
-      window.postMessage({source:TAG_OUT,type:'reset-details',payload:{flowId:resetFlow.id}},location.origin);
+      toHook({source:TAG_OUT,type:'reset-details',payload:{flowId:resetFlow.id}});
     }else if(target.closest('.cancel-reset'))$('.reset-dialog').close();
-    else if(target.closest('.reset-native')){$('.reset-dialog').close();openPageDialog(new URL(SITE.usagePath,location.origin).href,'Usage',$('.usage-open'));}
+    else if(target.closest('.reset-native')){$('.reset-dialog').close();openPageDialog(new URL(SITE.usagePath,ORIGIN).href,'Usage',$('.usage-open'));}
     else if(target.closest('.confirm-reset')&&resetFlow&&!resetFlow.busy&&!resetFlow.finished){
       const selected=availableResets().find(c=>c.id===resetFlow.creditId);if(!selected)return;
       resetFlow.busy=true;resetPending=true;resetFlow.requestId=crypto.randomUUID();renderResetDialog();render();
-      window.postMessage({source:TAG_OUT,type:'use-reset',payload:{flowId:resetFlow.id,creditId:selected.id,requestId:resetFlow.requestId}},location.origin);
+      toHook({source:TAG_OUT,type:'use-reset',payload:{flowId:resetFlow.id,creditId:selected.id,requestId:resetFlow.requestId}});
     }
   });
   root.addEventListener('change',event=>{if(event.target.matches('.reset-dialog select')&&resetFlow&&!resetFlow.busy){resetFlow.creditId=event.target.value;renderResetDialog();}});
@@ -782,6 +788,7 @@
   let creditReturnFocus=null,creditReturnPath='',creditWatch=null,creditLoadTimeout=null;
   function openCreditDialog(link){openPageDialog(creditPurchaseUrl(),T('Add credits','Usage'),link,!IS_CLAUDE);}
   function openPageDialog(url,title,returnFocus,closeOnReturn=false){
+    if(EMBED){EMBED.openUrl(url);return;} // the companion opens it in your browser
     // Optional fallback: open the page in a new tab instead of the dialog.
     if(state.usagePageMode==='tab'){window.open(url,'_blank','noopener');return;}
     const dialog=$('.credits-modal');
@@ -800,7 +807,7 @@
       try{const destination=new URL(frame.contentWindow.location.href);if(destination.origin===location.origin&&destination.pathname+destination.search+destination.hash===creditReturnPath){dialog.close();requestRefresh(false);}}catch(_){}
     },1000);
   }
-  $('.usage-open').onclick=()=>openPageDialog(new URL(SITE.usagePath,location.origin).href,'Usage',$('.usage-open'));
+  $('.usage-open').onclick=()=>openPageDialog(new URL(SITE.usagePath,ORIGIN).href,'Usage',$('.usage-open'));
   $('.credits-close').onclick=()=>$('.credits-modal').close();
   $('.credits-modal').addEventListener('close',()=>{
     clearInterval(creditWatch);clearTimeout(creditLoadTimeout);creditWatch=null;
@@ -919,7 +926,7 @@
   const accentNames={auto:'Match theme',default:'Default',blue:'Blue',green:'Green',yellow:'Yellow',pink:'Pink',orange:'Orange',purple:'Purple',neutral:'Black / White'};
   const themeProbe=document.createElement('span');themeProbe.hidden=true;root.appendChild(themeProbe);
   function applyTheme() {
-    const html=document.documentElement,body=document.body,nav=currentSidebar();
+    const html=document.documentElement,body=document.body,nav=EMBED?(document.getElementById('gptu-embed-theme')||body):currentSidebar();
     const htmlStyle=getComputedStyle(html),bodyStyle=getComputedStyle(body),appStyle=getComputedStyle(document.getElementById('root')||body),navStyle=nav?getComputedStyle(nav):appStyle;
     const systemDark=matchMedia('(prefers-color-scheme: dark)').matches;
     let dark=state.theme==='dark'||state.theme==='system'&&systemDark||state.theme==='auto'&&(html.classList.contains('dark')||html.dataset.theme==='dark'||html.dataset.mode==='dark'||(!html.classList.contains('light')&&html.dataset.theme!=='light'&&html.dataset.mode!=='light'&&(htmlStyle.colorScheme==='dark'||htmlStyle.colorScheme!=='light'&&systemDark)));
@@ -1262,6 +1269,8 @@
   function setPanelHeight(height){if(state.compact)state.compactHeight=height;else state.size.height=height;}
   function applySize() {
     applySpacing();
+    // In the companion the window fits the panel; the width comes from the panel's floating width.
+    if(EMBED){host.style.width='';card.style.height='';card.classList.remove('sized');$('.resize').hidden=true;return;}
     const floating=host.hasAttribute('data-floating');
     if(floating)host.style.width=Math.max(Math.min(240,innerWidth-16),Math.min(state.size.width,innerWidth-16))+'px';else host.style.width='';
     const requestedHeight=state.compact?state.compactHeight:state.size.height;
@@ -1482,6 +1491,12 @@
   }
   let sawSidebar=false;
   function place(force){
+    if(EMBED){
+      for(const a of ['data-floating','data-bottom','data-sidebar-hidden'])host.removeAttribute(a);
+      host.setAttribute('data-embedded','');
+      if(host.parentElement!==document.body)document.body.appendChild(host);
+      applySize();return;
+    }
     const nav=currentSidebar();
     if(nav)sawSidebar=true;
     const hidden=state.position!=='floating'&&!nav&&(sawSidebar||!IS_CLAUDE)&&state.hideWithSidebar;
@@ -1559,12 +1574,16 @@
     :host([data-settings-open]) .card .customize{opacity:1;pointer-events:auto;}
     .card[data-hide-frame],.card[data-hide-frame]:hover,.card[data-hide-frame]:has(:focus-visible){border-color:transparent;box-shadow:none;}
     :host([data-floating]) .card[data-hide-frame]{border-color:transparent;box-shadow:none;}
+    :host([data-embedded]) .grab,:host([data-embedded]) .customize,:host([data-embedded]) .resize,:host([data-embedded]) .section-handle{display:none !important;}
+    :host([data-embedded]) .body{max-height:540px;}
+    :host([data-embedded]) .head{-webkit-app-region:drag;}
+    :host([data-embedded]) .head button,:host([data-embedded]) .head a{-webkit-app-region:no-drag;}
   `;
   root.appendChild(hoverStyle);
 
   // ---------- boot ----------
   // Toolbar icon follows the site (background.js sets it for this tab).
-  try{const runtime=(globalThis.browser??chrome).runtime;runtime.sendMessage({type:'usage-meter-site',site:SITE.id})?.catch?.(()=>{});}catch(_){}
+  if(!EMBED)try{const runtime=(globalThis.browser??chrome).runtime;runtime.sendMessage({type:'usage-meter-site',site:SITE.id})?.catch?.(()=>{});}catch(_){}
   load().then(() => {
     // drop model entries older than 7 days
     const cutoff = Date.now() - 7 * 864e5;

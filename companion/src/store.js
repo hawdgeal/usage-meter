@@ -1,52 +1,80 @@
-// Settings and the last usage received, kept as JSON in the app's data folder.
+// The companion's own settings, the last usage received, the extension's panel settings per site,
+// and panel state changed in the companion (collapsed panel and sections). JSON in the app's data folder.
 "use strict";
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 
 const DEFAULTS = {
   mode: "follow", // "follow" the app in front, or always "claude" / "chatgpt" / "codex"
   followBrowsers: true, // match browser windows by title (e.g. "… - Claude")
   followTerminals: true, // match terminals running Claude Code or Codex by title
-  show: "left", // "left" or "used"
-  showModels: true, // per-model limits (e.g. Opus weekly)
   miniPanel: true,
   miniOnTop: true,
   miniOnlyWithApp: false, // show the mini panel only while a matching app is in front
   miniOpacity: 1,
   miniBounds: null,
-  theme: "system",
   launchAtLogin: false,
   extensionIds: [], // extra Chromium extension IDs entered by hand
   lastApp: "claude",
   onboarded: false,
 };
 
+// Extension settings that change with every usage update, or that belong to where the panel is
+// shown rather than how it looks. Changes to these don't redraw the companion's panel.
+const VOLATILE = ["usage", "plan", "usageAt", "models", "creditReferencePending", "settingsTab", "settingsClosed", "settingsPosition", "settingsSize", "collapsed", "closed", "floating", "position"];
+// Panel state the companion keeps for itself.
+const LOCAL_STATE = ["collapsed", "closed"];
+
+function prefsKey(settings) {
+  if (!settings || typeof settings !== "object") return "";
+  const o = {};
+  for (const k of Object.keys(settings).sort()) if (!VOLATILE.includes(k)) o[k] = settings[k];
+  return crypto.createHash("sha1").update(JSON.stringify(o)).digest("hex").slice(0, 12);
+}
+
 function create(dir) {
-  const file = path.join(dir, "settings.json");
-  const usageFile = path.join(dir, "last-usage.json");
-  const read = (f, d) => { try { return JSON.parse(fs.readFileSync(f, "utf8")); } catch (_) { return d; } };
-  const settings = { ...DEFAULTS, ...read(file, {}) };
-  const usage = read(usageFile, {});
+  const files = { settings: "settings.json", usage: "last-usage.json", ext: "extension-settings.json", local: "panel-state.json" };
+  const read = (f, d) => { try { const v = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8")); return v && typeof v === "object" ? v : d; } catch (_) { return d; } };
+  const settings = { ...DEFAULTS, ...read(files.settings, {}) };
+  for (const k of Object.keys(settings)) if (!(k in DEFAULTS)) delete settings[k];
+  const data = { usage: read(files.usage, {}), ext: read(files.ext, {}), local: read(files.local, {}) };
   const timers = {};
-  const write = (f, data) => {
-    clearTimeout(timers[f]);
-    timers[f] = setTimeout(() => {
+  const write = (name, value) => {
+    clearTimeout(timers[name]);
+    timers[name] = setTimeout(() => {
       try {
+        const f = path.join(dir, files[name]);
         fs.mkdirSync(dir, { recursive: true });
-        fs.writeFileSync(f + ".tmp", JSON.stringify(data, null, 2));
+        fs.writeFileSync(f + ".tmp", JSON.stringify(value, null, 2));
         fs.renameSync(f + ".tmp", f);
       } catch (_) {}
     }, 300);
   };
   return {
     settings,
-    usage,
+    usage: data.usage,
+    ext: data.ext,
+    local: data.local,
     set(patch) {
       for (const [k, v] of Object.entries(patch || {})) if (k in DEFAULTS) settings[k] = v;
-      write(file, settings);
+      write("settings", settings);
     },
-    saveUsage() { write(usageFile, usage); },
+    saveUsage() { write("usage", data.usage); },
+    // Returns true when the panel's look changed (not just its data).
+    setExt(site, value) {
+      const before = prefsKey(data.ext[site]);
+      data.ext[site] = value;
+      write("ext", data.ext);
+      return prefsKey(value) !== before;
+    },
+    setLocal(site, patch) {
+      const cur = { ...(data.local[site] || {}) };
+      for (const k of LOCAL_STATE) if (patch && k in patch) cur[k] = patch[k];
+      data.local[site] = cur;
+      write("local", data.local);
+    },
   };
 }
 
-module.exports = { create, DEFAULTS };
+module.exports = { create, DEFAULTS, prefsKey, LOCAL_STATE };

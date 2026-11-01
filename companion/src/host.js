@@ -10,6 +10,7 @@ const { pipePath } = require("./pipe-path");
 
 const RETRY_MS = Number(process.env.USAGE_METER_RETRY_MS) || 3000;
 const latest = new Map(); // site -> last usage / usage-error message
+const settings = new Map(); // site -> last panel settings message
 let hello = null;
 let sock = null;
 let closing = false;
@@ -30,7 +31,8 @@ function fromBrowser(msg) {
     // Keep an error from hiding good data that arrived earlier: replay both, data first.
     const prev = latest.get(msg.site) || {};
     latest.set(msg.site, msg.type === "usage" ? { usage: msg } : { usage: prev.usage, error: msg });
-  } else return;
+  } else if (msg.type === "settings" && typeof msg.site === "string") settings.set(msg.site, msg);
+  else return;
   toCompanion(msg);
 }
 
@@ -40,6 +42,7 @@ function connect() {
   s.on("connect", () => {
     sock = s;
     toCompanion({ type: "host-hello", pid: process.pid, browser: hello && hello.browser, extensionVersion: hello && hello.extensionVersion });
+    for (const m of settings.values()) toCompanion(m);
     for (const { usage, error } of latest.values()) {
       if (usage) toCompanion(usage);
       if (error) toCompanion(error);

@@ -2,8 +2,8 @@
 "use strict";
 const $ = (id) => document.getElementById(id);
 let state = null;
-const CHECKS = ["followBrowsers", "followTerminals", "showModels", "miniPanel", "miniOnTop", "miniOnlyWithApp", "launchAtLogin"];
-const SELECTS = ["mode", "show", "theme"];
+const CHECKS = ["followBrowsers", "followTerminals", "miniPanel", "miniOnTop", "miniOnlyWithApp", "launchAtLogin"];
+const SELECTS = ["mode"];
 const NAMES = { claude: "Claude", chatgpt: "ChatGPT", codex: "Codex" };
 
 function item(cls, text, sub) {
@@ -34,6 +34,9 @@ function render() {
   $("followNote").textContent = s.mode !== "follow" ? "" :
     state.foreground.available ? `Showing ${NAMES[state.followApp]} now. When something else is in front, the last app stays.` :
     `Following isn't available here (${state.foreground.error || "unknown reason"}). Showing ${NAMES[state.followApp]}.`;
+
+  const got = ["claude", "chatgpt"].filter((k) => state.ext && state.ext[k]).map((k) => NAMES[k]);
+  $("lookStatus").textContent = got.length ? `Using your ${got.join(" and ")} panel settings from the extension.` : "No panel settings received yet; using the extension's defaults until the browser connects.";
 
   // Connected browsers
   const hosts = state.hosts || [];

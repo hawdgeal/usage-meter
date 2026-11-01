@@ -8,7 +8,7 @@ const vm = require("vm");
 
 const EXT = path.join(__dirname, "..", "..");
 
-function makeBrowser({ hostInstalled = true, responses = {} } = {}) {
+function makeBrowser({ hostInstalled = true, responses = {}, saved = {} } = {}) {
   const listeners = { message: [], alarm: [] };
   const ports = [];
   const fetches = [];
@@ -28,6 +28,10 @@ function makeBrowser({ hostInstalled = true, responses = {} } = {}) {
     },
     action: { setIcon: () => Promise.resolve(), setTitle: () => Promise.resolve() },
     alarms: { get: () => Promise.resolve(null), create: () => {}, onAlarm: { addListener: (f) => listeners.alarm.push(f) } },
+    storage: {
+      local: { get: async (keys) => Object.fromEntries([].concat(keys).filter((k) => k in saved).map((k) => [k, saved[k]])) },
+      onChanged: { addListener: (f) => listeners.storage = f },
+    },
   };
   const fetch = async (url, init) => {
     fetches.push({ url, init });
@@ -40,7 +44,7 @@ function makeBrowser({ hostInstalled = true, responses = {} } = {}) {
   ctx.importScripts = (f) => vm.runInContext(fs.readFileSync(path.join(EXT, f), "utf8"), ctx, { filename: f });
   vm.runInContext(fs.readFileSync(path.join(EXT, "background.js"), "utf8"), ctx, { filename: "background.js" });
   const tabMessage = (m) => listeners.message.forEach((f) => f(m, { tab: { id: 1 } }));
-  return { ctx, ports, fetches, tabMessage, alarm: () => listeners.alarm.forEach((f) => f({ name: "usage-meter-companion" })) };
+  return { ctx, ports, fetches, tabMessage, storageChange: (c) => listeners.storage(c, "local"), alarm: () => listeners.alarm.forEach((f) => f({ name: "usage-meter-companion" })) };
 }
 
 const tick = () => new Promise((r) => setTimeout(r, 20));
@@ -129,6 +133,15 @@ test("missing companion: quiet failure, retried on the next alarm", async () => 
   assert.strictEqual(b.ports.length, 2);
   // Not installed → no requests to claude.ai or chatgpt.com at all.
   assert.strictEqual(b.fetches.length, 0);
+});
+
+test("panel settings go to the companion on connect and when they change", async () => {
+  const b = makeBrowser({ saved: { "gptu-claude": { preset: "Catppuccin", compact: true }, other: 1 } });
+  await tick();
+  const port = b.ports[0];
+  assert.deepStrictEqual(port.sent.filter((m) => m.type === "settings"), [{ type: "settings", site: "claude", settings: { preset: "Catppuccin", compact: true }, browser: "Chrome" }]);
+  b.storageChange({ gptu: { newValue: { theme: "dark" } }, unrelated: { newValue: 1 } });
+  assert.deepStrictEqual(port.sent.at(-1), { type: "settings", site: "chatgpt", settings: { theme: "dark" }, browser: "Chrome" });
 });
 
 test("site icon messages still work", async () => {
