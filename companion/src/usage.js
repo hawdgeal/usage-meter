@@ -1,5 +1,5 @@
 // Turns the usage payload forwarded by the extension (the same generic shape the extension's
-// panel draws) into a small view model for the tray, popup and mini panel.
+// panel draws) into a small view model for the tray icon and its tooltip.
 // Loaded by the main process (require) and by the renderer (<script>, as window.UsageView).
 (function (root, factory) {
   if (typeof module === "object" && module.exports) module.exports = factory();

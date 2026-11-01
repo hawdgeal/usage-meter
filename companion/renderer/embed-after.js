@@ -1,6 +1,6 @@
 // Runs after content.js: keeps its panel fed with usage, sizes the window to it, and adds the
-// companion's own behavior: hover tracking, dragging the mini panel by any non-interactive part,
-// the pin (always on top) and the right-click menu in the mini panel, the app switch in the popup.
+// companion's own behavior: hover tracking, dragging the panel by any non-interactive part, the pin
+// (always on top) and the right-click menu.
 "use strict";
 (() => {
   const E = globalThis.__usageMeterCompanion;
@@ -35,7 +35,7 @@
   // Moving over the card shows hover controls right away, without waiting for the next poll.
   document.addEventListener("pointermove", () => { if (!windowHover || !frameHover) { windowHover = true; frameHover = true; applyHover(); } }, { passive: true });
 
-  // ---------- dragging (mini panel) ----------
+  // ---------- dragging ----------
   function startDrag(e) {
     if (e.button !== 0 || !e.isPrimary) return;
     const path = e.composedPath();
@@ -68,26 +68,23 @@
     const title = root.querySelector(".title");
     if (title) title.textContent = NAMES[E.app];
     root.addEventListener("click", (e) => { if (e.target.closest && e.target.closest(".refresh")) E.userRefreshUntil = Date.now() + 1500; }, true);
-    if (E.mode === "mini") {
-      const style = document.createElement("style");
-      // No text selection: dragging over text moves the panel. The pin is hover-only like Refresh.
-      style.textContent = `.card{-webkit-user-select:none;user-select:none;cursor:default}
-        .head>.pin[aria-pressed="false"]{opacity:.6}
-        @media(hover:hover){.card[data-hover-refresh]:not(.js-hover):not(:has(:focus-visible)) .head>.pin{width:0;min-width:0;margin-right:-3px;overflow:hidden;}}`;
-      root.appendChild(style);
-      if (E.pin) {
-        const pin = document.createElement("button");
-        pin.className = "icon pin";
-        pin.addEventListener("click", () => C.togglePin());
-        root.querySelector(".head").insertBefore(pin, root.querySelector(".head>.refresh"));
-        updatePin();
-      }
-      root.addEventListener("pointerdown", startDrag);
-      // Right-click anywhere opens the panel menu.
-      document.addEventListener("contextmenu", (e) => { e.preventDefault(); C.miniMenu(); });
+    const style = document.createElement("style");
+    // No text selection: dragging over text moves the panel. The pin is hover-only like Refresh.
+    style.textContent = `.card{-webkit-user-select:none;user-select:none;cursor:default}
+      .head>.pin[aria-pressed="false"]{opacity:.6}
+      @media(hover:hover){.card[data-hover-refresh]:not(.js-hover):not(:has(:focus-visible)) .head>.pin{width:0;min-width:0;margin-right:-3px;overflow:hidden;}}`;
+    root.appendChild(style);
+    if (E.pin) {
+      const pin = document.createElement("button");
+      pin.className = "icon pin";
+      pin.addEventListener("click", () => C.togglePin());
+      root.querySelector(".head").insertBefore(pin, root.querySelector(".head>.refresh"));
+      updatePin();
     }
+    root.addEventListener("pointerdown", startDrag);
+    // Right-click anywhere opens the panel menu.
+    document.addEventListener("contextmenu", (e) => { e.preventDefault(); C.miniMenu(); });
     new ResizeObserver(fit).observe(host);
-    if (E.mode === "popup" && !E.framed) { window.companionBar(E.app); barColors(); new MutationObserver(barColors).observe(card, { attributes: true, attributeFilter: ["style", "data-dark"] }); }
     fit();
     return true;
   }
@@ -106,21 +103,10 @@
     if (!host) return;
     if (E.framed) {
       const scheme = getComputedStyle(document.documentElement).colorScheme; // e.g. "dark", set by embed.js
-      parent.postMessage({ type: "umc-fit", height: Math.ceil(host.getBoundingClientRect().bottom), colors: cardColors(), scheme }, "*");
+      parent.postMessage({ type: "umc-fit", height: Math.ceil(host.getBoundingClientRect().bottom), scheme }, "*");
       return;
     }
-    C.resize(Math.ceil(host.getBoundingClientRect().bottom) + (E.mode === "popup" ? 6 : 0));
-  }
-
-  function cardColors() {
-    const cs = getComputedStyle(card);
-    const v = (k) => cs.getPropertyValue(`--${k}`).trim();
-    return { surface: cs.backgroundColor, fg: v("fg"), muted: v("muted"), line: v("line"), hover: v("hover"), accent: v("remaining") };
-  }
-
-  // The popup's background and switch use the panel's current colors.
-  function barColors() {
-    if (card && E.mode === "popup" && !E.framed) window.companionBarColors(cardColors());
+    C.resize(Math.ceil(host.getBoundingClientRect().bottom));
   }
 
   C.onState((s) => {

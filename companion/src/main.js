@@ -1,4 +1,4 @@
-// Usage Meter Companion: a tray icon, a popup and an optional always-on-top mini panel that show
+// Usage Meter Companion: a tray icon and always-on-top mini panels that show
 // Claude or ChatGPT / Codex usage. The panel is the extension's own (content.js, in its embedded
 // mode), drawn with your extension settings. Usage and settings arrive from the browser extension
 // through native messaging (see host.js and bridge.js). The panel follows the app in front, or a
@@ -30,8 +30,8 @@ const LINK_HOSTS = ["https://claude.ai/", "https://chatgpt.com/"];
 const GAP = 8; // between the two cards when both are shown
 
 let store, bridge, tray;
-let popup = null, settingsWin = null;
-let popupApp = null; // what the popup shows: an app, or "both"
+let settingsWin = null;
+let forceShow = false; // the tray asked to show the panels; see showMinis
 // Mini panels by key: "main" (one app, or both cards in one window), or "claude" and "chatgpt"
 // (separate cards). Each: { key, view, win }.
 const minis = new Map();
@@ -45,7 +45,7 @@ const prefsVersion = { claude: 0, chatgpt: 0 }; // bumps when the extension's pa
 
 const s = () => store.settings;
 const currentApp = () => (s().mode === "follow" ? followApp : APP_IDS.includes(s().mode) ? s().mode : "claude");
-// What the popup (and the single mini panel) shows: one app, or "both" (Claude and ChatGPT cards).
+// What the single mini panel shows: one app, or "both" (Claude and ChatGPT cards in one window).
 const currentView = () => (s().cards === "one" ? currentApp() : "both");
 const miniWins = () => [...minis.values()].map((m) => m.win).filter((w) => w && !w.isDestroyed());
 const entryOf = (win) => [...minis.values()].find((m) => m.win === win) || null;
@@ -90,10 +90,9 @@ function changed() {
   setImmediate(() => {
     broadcastQueued = false;
     const snap = snapshot();
-    for (const w of [popup, settingsWin, ...miniWins()]) if (w && !w.isDestroyed()) w.webContents.send("state", snap);
+    for (const w of [settingsWin, ...miniWins()]) if (w && !w.isDestroyed()) w.webContents.send("state", snap);
     updateTray();
     updateMinis();
-    if (popup && !popup.isDestroyed() && popupApp && loadedWith.get(popup) !== panelKey(popupApp)) loadPanel(popup, "popup", popupApp);
   });
 }
 
@@ -127,10 +126,10 @@ function pollForeground() {
   const win = foreground.get();
   if (!win) return;
   const m = matchApp(win, { browsers: s().followBrowsers, terminals: s().followTerminals, selfExe: process.execPath });
-  if (m === "self") return; // our own popup or mini panel: keep what we show
+  if (m === "self") return; // our own panels: keep what we show
   let dirty = false;
   if (m && m !== followApp) { followApp = m; store.set({ lastApp: m }); dirty = s().mode === "follow"; }
-  if (!!m !== frontMatched) { frontMatched = !!m; dirty = true; }
+  if (!!m !== frontMatched) { frontMatched = !!m; if (frontMatched) forceShow = false; dirty = true; }
   if (dirty) changed();
 }
 
@@ -186,7 +185,7 @@ function modeItems() {
 
 function trayMenu() {
   return Menu.buildFromTemplate([
-    { label: "Show usage", click: () => showPopup() },
+    { label: "Show usage", click: () => showMinis() },
     { label: "Mini panel", type: "checkbox", checked: s().miniPanel, click: (i) => setSettings({ miniPanel: i.checked }) },
     { label: "Keep mini panel on top", type: "checkbox", checked: s().miniOnTop, enabled: s().miniPanel, click: (i) => setSettings({ miniOnTop: i.checked, cardOnTop: {} }) },
     { type: "separator" },
@@ -259,49 +258,15 @@ function viewWidth(view) {
   return s().cardsLayout === "row" ? a + b + GAP : Math.max(a, b);
 }
 
-function loadPanel(win, mode, view, key) {
+function loadPanel(win, view, key) {
   loadedWith.set(win, panelKey(view));
   win.setContentSize(viewWidth(view), win.getContentSize()[1]);
   if (view === "both") {
     const row = s().cardsLayout === "row";
-    win.loadFile(path.join(RENDERER, "both.html"), { query: { mode, key: key || "main", layout: row ? "row" : "column", gap: String(GAP), w1: String(row ? panelWidth("claude") : viewWidth("both")), w2: String(row ? panelWidth("chatgpt") : viewWidth("both")) } });
+    win.loadFile(path.join(RENDERER, "both.html"), { query: { key: key || "main", layout: row ? "row" : "column", gap: String(GAP), w1: String(row ? panelWidth("claude") : viewWidth("both")), w2: String(row ? panelWidth("chatgpt") : viewWidth("both")) } });
   } else {
-    win.loadFile(path.join(RENDERER, "panel.html"), { query: { mode, app: view, key: key || "main" } });
+    win.loadFile(path.join(RENDERER, "panel.html"), { query: { app: view, key: key || "main" } });
   }
-}
-
-function showPopup(appId) {
-  const want = appId || currentView();
-  if (!popup || popup.isDestroyed()) {
-    popup = panelWindow({ width: viewWidth(want), height: 260, alwaysOnTop: true, backgroundColor: nativeTheme.shouldUseDarkColors ? "#202020" : "#ffffff" });
-    popup.on("blur", () => { if (!popup.webContents.isDevToolsOpened()) popup.hide(); });
-    popup.on("closed", () => { popup = null; popupApp = null; });
-    popup.webContents.once("did-finish-load", () => placePopup(true));
-    popupApp = want;
-    loadPanel(popup, "popup", want);
-    return;
-  }
-  if (popupApp !== want || loadedWith.get(popup) !== panelKey(want)) { popupApp = want; loadPanel(popup, "popup", want); popup.webContents.once("did-finish-load", () => placePopup(true)); return; }
-  placePopup(true);
-}
-
-function togglePopup() {
-  if (popup && !popup.isDestroyed() && popup.isVisible()) popup.hide();
-  else showPopup();
-}
-
-// Next to the tray icon, kept inside the screen's work area (above the taskbar).
-function placePopup(show) {
-  if (!popup || popup.isDestroyed()) return;
-  const [w, h] = popup.getSize();
-  const tb = tray ? tray.getBounds() : null;
-  const anchor = tb && tb.width ? { x: tb.x + tb.width / 2, y: tb.y } : screen.getCursorScreenPoint();
-  const area = screen.getDisplayNearestPoint({ x: Math.round(anchor.x), y: Math.round(anchor.y) }).workArea;
-  let x = Math.round(anchor.x - w / 2);
-  const y = anchor.y > area.y + area.height / 2 ? area.y + area.height - h - 8 : area.y + 8;
-  x = Math.max(area.x + 8, Math.min(x, area.x + area.width - w - 8));
-  popup.setPosition(x, y);
-  if (show) { popup.show(); popup.focus(); hoverSent.delete(popup); pollHover(); }
 }
 
 // Bottom-right corner; with separate cards the ChatGPT card starts to the left of the Claude card.
@@ -328,7 +293,7 @@ function onScreen(b) {
 }
 
 // Which mini panels should exist; minisVisible() says whether they show right now.
-const minisVisible = () => !s().miniOnlyWithApp || frontMatched;
+const minisVisible = () => forceShow || !s().miniOnlyWithApp || frontMatched;
 function wantedMinis() {
   if (!s().miniPanel) return [];
   if (s().cards === "separate") return [{ key: "claude", view: "claude" }, { key: "chatgpt", view: "chatgpt" }];
@@ -352,7 +317,7 @@ function createMini(key, view) {
   win.on("closed", () => { if (minis.get(key) === m) minis.delete(key); stopDrag(win); });
   win.webContents.on("did-start-loading", () => { m.ready = false; });
   win.webContents.on("did-finish-load", () => { m.ready = true; hoverSent.delete(win); updateMinis(); });
-  loadPanel(win, "mini", view, key);
+  loadPanel(win, view, key);
 }
 
 // Keeps a mini panel above other windows (or not). Electron's setAlwaysOnTop doesn't reliably set
@@ -362,6 +327,20 @@ function applyTopmost(m) {
   const on = onTopFor(m.key);
   m.win.setAlwaysOnTop(on, "floating");
   if (process.platform === "win32") foreground.setTopmost(m.win.getNativeWindowHandle(), on);
+}
+
+// Tray click and "Show usage": turn the mini panel on if it's off, show it if "only while … in
+// front" hid it (until a matching app next comes to the front), and bring it above other windows.
+function showMinis() {
+  forceShow = true;
+  if (!s().miniPanel) { setSettings({ miniPanel: true }); return; } // created and shown once loaded
+  updateMinis();
+  for (const m of minis.values()) {
+    if (m.win.isDestroyed() || !m.ready) continue;
+    if (!m.win.isVisible()) { keepOnScreen(m.win); m.win.showInactive(); }
+    m.win.moveTop();
+    applyTopmost(m);
+  }
 }
 
 function updateMinis() {
@@ -374,7 +353,7 @@ function updateMinis() {
     const win = m.win;
     if (win.isDestroyed()) continue;
     // Redraw when it should show another view, or its settings or the Windows theme changed.
-    if (m.view !== want.view || loadedWith.get(win) !== panelKey(want.view)) { m.view = want.view; loadPanel(win, "mini", want.view, m.key); }
+    if (m.view !== want.view || loadedWith.get(win) !== panelKey(want.view)) { m.view = want.view; loadPanel(win, want.view, m.key); }
     win.setOpacity(Math.max(0.3, Math.min(1, Number(s().miniOpacity) || 1)));
     if (!minisVisible()) { if (win.isVisible()) { stopDrag(win); win.hide(); } }
     else if (!win.isVisible() && m.ready) { keepOnScreen(win); win.showInactive(); applyTopmost(m); }
@@ -399,7 +378,7 @@ function keepOnScreen(win) {
 const hoverSent = new WeakMap();
 let hoverTimer = null;
 function pollHover() {
-  const wins = [...miniWins(), popup].filter((w) => w && !w.isDestroyed() && w.isVisible());
+  const wins = miniWins().filter((w) => w.isVisible());
   if (!wins.length) { clearInterval(hoverTimer); hoverTimer = null; return; }
   if (!hoverTimer) hoverTimer = setInterval(pollHover, 120);
   const p = screen.getCursorScreenPoint();
@@ -536,27 +515,19 @@ function setupIpc() {
     // Use the intended width: reading it back from this transparent frameless window returns a
     // slightly larger value, and setting that again made the width grow on every resize.
     const m = entryOf(win);
-    const view = m ? m.view : win === popup ? popupApp : null;
-    if (!view) return;
+    if (!m) return;
+    const view = m.view;
     const w = viewWidth(view);
     const cur = win.getContentSize()[1];
     if (cur === h && Math.abs(win.getContentSize()[0] - w) <= 2) return;
-    if (m) {
-      // Grow or shrink from the bottom edge when it sits near the bottom of the screen.
-      const [x, y] = win.getPosition();
-      const area = screen.getDisplayMatching(win.getBounds()).workArea;
-      const nearBottom = !drags.has(win) && y + cur > area.y + area.height - 40; // not while being dragged
-      win.setContentSize(w, h);
-      if (nearBottom) win.setPosition(x, Math.max(area.y, y + cur - h));
-      keepOnScreen(win); // a panel that grew past the bottom (or edge) of the screen moves back up
-    } else {
-      win.setContentSize(w, h);
-      if (win === popup) placePopup(false);
-    }
+    // Grow or shrink from the bottom edge when it sits near the bottom of the screen.
+    const [x, y] = win.getPosition();
+    const area = screen.getDisplayMatching(win.getBounds()).workArea;
+    const nearBottom = !drags.has(win) && y + cur > area.y + area.height - 40; // not while being dragged
+    win.setContentSize(w, h);
+    if (nearBottom) win.setPosition(x, Math.max(area.y, y + cur - h));
+    keepOnScreen(win); // a panel that grew past the bottom (or edge) of the screen moves back up
   });
-  handle("popup-app", (_e, view) => { if (APP_IDS.includes(view) || view === "both") showPopup(view); });
-  handle("open-settings", () => { if (popup && !popup.isDestroyed()) popup.hide(); openSettings(); });
-  handle("hide", (e) => { const w = BrowserWindow.fromWebContents(e.sender); if (w && w !== settingsWin) w.hide(); });
   handle("connect-browsers", () => connectBrowsers());
   const keyOf = (e) => { const m = entryOf(BrowserWindow.fromWebContents(e.sender)); return m && m.key; };
   handle("mini-menu", (e) => { const k = keyOf(e); if (k) miniMenu(k); });
@@ -566,7 +537,7 @@ function setupIpc() {
 }
 
 // ---------- start ----------
-app.on("second-instance", () => showPopup());
+app.on("second-instance", () => showMinis());
 app.on("window-all-closed", () => {}); // keep running in the tray when windows close
 app.on("before-quit", () => { quitting = true; if (bridge) bridge.stop(); });
 
@@ -583,7 +554,7 @@ app.whenReady().then(async () => {
 
   setupIpc();
   tray = new Tray(trayImage(UsageView.build(currentApp(), store.usage[siteOf(currentApp())]), "left"));
-  tray.on("click", () => togglePopup());
+  tray.on("click", () => showMinis());
   updateTray();
   updateMinis();
   startForeground();

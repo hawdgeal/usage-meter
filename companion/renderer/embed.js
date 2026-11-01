@@ -3,15 +3,13 @@
 "use strict";
 (() => {
   const q = new URLSearchParams(location.search);
-  const MODE = q.get("mode") === "mini" ? "mini" : "popup";
   const APP = ["claude", "chatgpt", "codex"].includes(q.get("app")) ? q.get("app") : "claude";
   const SITE = APP === "claude" ? "claude" : "chatgpt";
   const KEYS = { claude: "gptu-claude", chatgpt: "gptu" }; // content.js storage keys
   const C = window.companion;
-  document.documentElement.classList.add(MODE);
 
   const E = {
-    mode: MODE, app: APP, site: SITE, state: null,
+    app: APP, site: SITE, state: null,
     framed: q.get("framed") === "1", // one of two cards (both.html)
     key: q.get("key") || "main", // which mini panel this is: "main", or "claude"/"chatgpt" (separate cards)
     pin: q.get("pin") === "1" || q.get("framed") !== "1",

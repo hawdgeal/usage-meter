@@ -2,8 +2,7 @@
 
 A small Windows app that shows your **Claude** and **ChatGPT / Codex** plan usage next to the desktop apps:
 
-- **Tray icon:** a ring showing how much of your tightest limit is left, in Claude orange or ChatGPT green. It turns red at 10% or less. Hover it for a one-line summary.
-- **Popup:** click the tray icon. It shows the usage panel, with a switch for Claude, ChatGPT, Codex or Both.
+- **Tray icon:** a ring showing how much of your tightest limit is left, in Claude orange or ChatGPT green. It turns red at 10% or less. Hover it for a one-line summary. Click it (or **Show usage** in its menu) to bring up the mini panel: it turns the panel on if it was off, shows it if "only while … in front" had hidden it, and brings it above other windows.
 - **Both cards:** choose **Show Claude and ChatGPT** (tray menu, mini panel menu or Settings) to see both in one panel, stacked or side by side, or **Separate cards** for one panel per app, each with its own position and pin. Each card uses that site's settings.
 - **Mini panel:** an optional panel you can drag anywhere by any part that isn't a button or link (text isn't selectable, so dragging over text moves it; the mouse wheel still scrolls). The **pin** button turns always on top on or off. Right-click anywhere on it for more options. Hover-only controls follow the pointer, as in the browser.
 
@@ -45,7 +44,7 @@ The connection is registered again every time the companion starts, so moving th
 | --- | --- |
 | Show usage for | Follow the app in front (default), or always Claude, ChatGPT or Codex. Codex and ChatGPT share the same account limits. |
 | Also follow browser windows / terminals | Match those windows by title. Turn off if, for example, a document called "Claude notes" switches the panel. |
-| Cards | One app; both Claude and ChatGPT in one panel (stacked or side by side); or separate cards. Applies to the mini panel; the popup shows both for the last two. The tray tooltip then lists both. |
+| Cards | One app; both Claude and ChatGPT in one panel (stacked or side by side); or separate cards. The tray tooltip then lists both. |
 | Mini panel | Show it, keep it on top (also the pin button and the tray menu), show it only while Claude, ChatGPT or Codex is in front, opacity, and move it back to the corner. |
 | Start with Windows | Starts in the tray at sign-in. |
 
@@ -75,7 +74,7 @@ On Linux or macOS, `npm run dist:cross` builds the zip. The installer needs Wind
 
 | File | Role |
 | --- | --- |
-| `src/main.js` | App: tray, popup, mini panel, settings window, following the app in front. |
+| `src/main.js` | App: tray, mini panels, settings window, following the app in front. |
 | `src/bridge.js` | Named-pipe server that browser hosts connect to. |
 | `src/host.js` | Native-messaging host: relays between the extension (stdin/stdout) and the app (pipe). Keeps the latest usage while the app isn't running. |
 | `src/register.js` | Writes the host launcher and manifests, finds the extension's ID in browser profiles, and registers under `HKEY_CURRENT_USER`. |
@@ -83,8 +82,8 @@ On Linux or macOS, `npm run dist:cross` builds the zip. The installer needs Wind
 | `src/app-match.js` | Maps that window to Claude, ChatGPT or Codex. |
 | `src/usage.js` | Turns usage into rows, headline and tooltip. Shared with the pages. |
 | `src/icon.js` | Draws the tray ring. |
-| `renderer/panel.html`, `embed.js`, `embed-after.js` | Popup and mini panel: run the extension's `content.js` in its embedded mode, feed it settings and usage, and add the pin and the app switch. The packaged app ships `content.js` next to `app.asar`. |
-| `renderer/both.*`, `bar.js` | Both cards: one frame per card. The popup's app switch. |
+| `renderer/panel.html`, `embed.js`, `embed-after.js` | Mini panel: runs the extension's `content.js` in its embedded mode, feeds it settings and usage, and adds the pin. The packaged app ships `content.js` next to `app.asar`. |
+| `renderer/both.*` | Both cards in one panel: one frame per card. |
 | `renderer/settings.*` | The companion's Settings window. |
 | `test/` | Unit tests, including an end-to-end host ↔ app test and the extension's background script with a mocked browser. |
 
