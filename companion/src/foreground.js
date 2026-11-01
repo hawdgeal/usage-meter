@@ -20,6 +20,8 @@ function load() {
       OpenProcess: kernel32.func("void * __stdcall OpenProcess(uint32_t dwDesiredAccess, int bInheritHandle, uint32_t dwProcessId)"),
       QueryFullProcessImageNameW: kernel32.func("int __stdcall QueryFullProcessImageNameW(void *hProcess, uint32_t dwFlags, uint16_t *lpExeName, uint32_t *lpdwSize)"),
       CloseHandle: kernel32.func("int __stdcall CloseHandle(void *hObject)"),
+      // Window handles are passed as integers: HWND_TOPMOST and HWND_NOTOPMOST are -1 and -2.
+      SetWindowPos: user32.func("int __stdcall SetWindowPos(intptr_t hWnd, intptr_t hWndInsertAfter, int X, int Y, int cx, int cy, uint32_t uFlags)"),
     };
   } catch (e) {
     loadError = String((e && e.message) || e);
@@ -63,8 +65,32 @@ function get() {
   }
 }
 
+const HWND_TOPMOST = -1, HWND_NOTOPMOST = -2;
+const SWP_NOSIZE = 0x0001, SWP_NOMOVE = 0x0002, SWP_NOACTIVATE = 0x0010;
+
+// handle: the Buffer from BrowserWindow.getNativeWindowHandle(). Electron's own setAlwaysOnTop
+// doesn't take on the transparent mini panel, so the companion sets WS_EX_TOPMOST itself.
+// Returns true when Windows accepted the change.
+function handleValue(handle) {
+  if (!Buffer.isBuffer(handle)) return null;
+  if (handle.length >= 8) return handle.readBigInt64LE(0);
+  if (handle.length >= 4) return handle.readInt32LE(0);
+  return null;
+}
+
+function setTopmost(handle, on) {
+  if (!load()) return false;
+  const hwnd = handleValue(handle);
+  if (hwnd == null || hwnd === 0n || hwnd === 0) return false;
+  try {
+    return !!api.SetWindowPos(hwnd, on ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+  } catch (_) {
+    return false;
+  }
+}
+
 function available() {
   return !!load();
 }
 
-module.exports = { get, available, error: () => (load(), loadError) };
+module.exports = { get, available, setTopmost, handleValue, error: () => (load(), loadError) };

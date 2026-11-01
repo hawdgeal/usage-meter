@@ -322,16 +322,24 @@ function createMini() {
   loadPanel(mini, "mini", miniApp);
 }
 
+// Keeps the mini panel above other windows (or not), following the miniOnTop setting.
+function applyTopmost() {
+  if (!mini || mini.isDestroyed()) return;
+  const on = !!s().miniOnTop;
+  mini.setAlwaysOnTop(on, "floating");
+  if (process.platform === "win32") foreground.setTopmost(mini.getNativeWindowHandle(), on);
+}
+
 function updateMini() {
   const want = miniShouldShow();
   if (want && !mini) return createMini();
   if (!mini || mini.isDestroyed()) return;
   // Redraw when it should show another app, or its settings or the Windows theme changed.
   if (miniApp !== currentView() || loadedWith.get(mini) !== panelKey(currentView())) { miniApp = currentView(); loadPanel(mini, "mini", miniApp); }
-  mini.setAlwaysOnTop(!!s().miniOnTop, "floating");
   mini.setOpacity(Math.max(0.3, Math.min(1, Number(s().miniOpacity) || 1)));
   if (want && !mini.isVisible() && !mini.webContents.isLoading()) mini.showInactive();
   else if (!want && mini.isVisible()) mini.hide();
+  if (mini.isVisible()) applyTopmost();
 }
 
 function openSettings() {
@@ -352,6 +360,7 @@ function openSettings() {
 function setSettings(patch, quiet) {
   const before = { ...s() };
   store.set(patch);
+  if ("miniOnTop" in patch) applyTopmost(); // the pin button, tray and right-click menus, and Settings all land here
   if ("launchAtLogin" in patch && process.platform === "win32") app.setLoginItemSettings({ openAtLogin: !!s().launchAtLogin, args: ["--hidden"] });
   if ("miniBounds" in patch && patch.miniBounds === null && mini && !mini.isDestroyed()) {
     const [w, h] = mini.getSize();
