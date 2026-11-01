@@ -1,0 +1,74 @@
+{
+  "name": "usage-meter-companion",
+  "productName": "Usage Meter Companion",
+  "version": "0.1.0",
+  "description": "Windows tray companion for the Usage Meter extension: shows Claude and ChatGPT / Codex usage next to the desktop apps.",
+  "main": "src/main.js",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test \"test/*.test.js\"",
+    "dist": "electron-builder --win --x64",
+    "dist:cross": "npm install --no-audit --no-fund --os=win32 --cpu=x64 && electron-builder --win --x64"
+  },
+  "dependencies": {
+    "koffi": "3.3.3"
+  },
+  "devDependencies": {
+    "electron": "42.11.14",
+    "electron-builder": "26.17.0"
+  },
+  "author": "Rodrigo Alencar",
+  "build": {
+    "appId": "fr.alencar.usage-meter-companion",
+    "productName": "Usage Meter Companion",
+    "executableName": "UsageMeterCompanion",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**",
+      "renderer/**",
+      "assets/**",
+      "package.json",
+      "!**/*.map",
+      "!node_modules/@koromix/koffi-linux-*/**",
+      "!node_modules/@koromix/koffi-darwin-*/**"
+    ],
+    "asarUnpack": [
+      "src/host.js",
+      "src/native-messaging.js",
+      "src/pipe-path.js"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "Usage-Meter-Companion-${version}-win-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "include": "build/installer.nsh",
+      "artifactName": "Usage-Meter-Companion-Setup-${version}.${ext}"
+    }
+  },
+  "optionalDependencies": {
+    "@koromix/koffi-win32-x64": "3.3.3"
+  }
+}

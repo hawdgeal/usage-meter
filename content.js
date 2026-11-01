@@ -271,6 +271,8 @@
       state.usageAt = payload.at;
       state.error = null;
       persist(false); ui.setBusy(false); render();
+      // Hand the update to background.js for the desktop companion (ignored when it isn't installed).
+      try{(globalThis.browser??chrome).runtime.sendMessage({type:'usage-meter-usage',site:SITE.id,data:payload.data,plan:state.plan,at:payload.at})?.catch?.(()=>{});}catch(_){}
     } else if (type === "usage-error") {
       state.error = payload.message;
       ui.setBusy(false); render();
@@ -670,7 +672,7 @@
   }
   function exportSettings(){
     const settings=Object.fromEntries(Object.keys(defaultPreferences()).filter(key=>key!=='creditReferencePending').map(key=>[key,structuredClone(state[key])]));
-    const data={format:'usage-meter-settings',site:SITE.id,version:1,extensionVersion:globalThis.chrome?.runtime?.getManifest?.().version||globalThis.browser?.runtime?.getManifest?.().version||'0.4.3',exportedAt:new Date().toISOString(),settings};
+    const data={format:'usage-meter-settings',site:SITE.id,version:1,extensionVersion:globalThis.chrome?.runtime?.getManifest?.().version||globalThis.browser?.runtime?.getManifest?.().version||'0.5.0',exportedAt:new Date().toISOString(),settings};
     let url;
     try{
       url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)+'\n'],{type:'application/json'}));

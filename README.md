@@ -2,6 +2,13 @@
 
 One browser extension that adds a **Usage** card to the left sidebar of **ChatGPT** (chatgpt.com) and **Claude** (claude.ai, including Claude Code on the web). Each site keeps its own settings, and the **Sync** tab copies settings between them in either direction.
 
+## What's new in 0.5.0
+
+- **Windows desktop companion** (new, in [`companion/`](companion/README.md)). A tray icon, a popup and an optional always-on-top mini panel that show your Claude or ChatGPT / Codex usage next to the desktop apps. They follow whichever app is in front (Claude desktop, ChatGPT desktop, Codex, and browser or terminal windows by title), or you can pin one in Settings. Usage comes from this extension, using your browser login, so the companion never handles passwords or tokens.
+- **The extension feeds the companion** through the browser's native messaging. When the companion is installed and running, the extension sends each usage update to it. When a site has no open tab, the extension fetches that site's usage itself every few minutes, from claude.ai and chatgpt.com only. Without the companion nothing changes: no extra requests are made.
+- **New permissions:** `nativeMessaging` (to talk to the companion) and `alarms` (to check for it once a minute). Chrome may ask you to approve them after updating.
+- The Claude usage converter moved into `claude-usage.js`, shared by the Claude page script and the background script. The panel's behavior on claude.ai is unchanged.
+
 ## What's new in 0.4.3
 
 - **Claude usage dialog:** shows only the usage content again, without Claude's Settings window, its menu or its header. The settings window's parts sit inside layout-only wrappers (`display: contents`), which the previous version could not see. The dialog now finds the settings menu by Claude's `…-settings` items (or, if those change, a narrow column of menu items) and keeps the content column beside it. **Layout → Visibility → Open usage pages** can open them in a new tab instead; the dialog stays the default.
@@ -53,10 +60,12 @@ One browser extension that adds a **Usage** card to the left sidebar of **ChatGP
 | `page-hook-chatgpt.js` | ChatGPT data: session token, `/backend-api/wham/usage`, resets, and a passive scan of ChatGPT's JSON responses for model and feature limits (bodies up to 2 MB, when idle). |
 | `page-hook-claude.js` | Claude data: organization, `/api/organizations/{org}/usage`, converted to the same shape. Refreshes after each reply, detected through the browser's performance timeline. |
 | `content.js` | The panel for both sites (picks the site from the hostname), settings, Sync, Export/Import. |
-| `background.js` | Sets the per-site toolbar icon. |
+| `claude-usage.js` | Converts Claude's usage payload into the shared shape. Used by `page-hook-claude.js` and `background.js`. |
+| `background.js` | Sets the per-site toolbar icon. Relays usage to the Windows desktop companion when it is installed, and fetches usage for a site with no open tab while the companion runs. |
+| `companion/` | The Windows desktop companion app. See [companion/README.md](companion/README.md). |
 | `tools/settings-outline.js` | Diagnostic, not part of the extension. Paste it into the browser console on claude.ai to print the layout of Claude's Settings window (no page text) when the usage dialog needs adjusting. |
 
-Privacy: the extension only contacts chatgpt.com and claude.ai, using your existing login. Settings and the last usage snapshot stay in the extension's local storage.
+Privacy: the extension only contacts chatgpt.com and claude.ai, using your existing login. Settings and the last usage snapshot stay in the extension's local storage. If you install the desktop companion, usage figures are also passed to it on the same computer.
 
 ## ChatGPT feature notes (from 0.3.34)
 

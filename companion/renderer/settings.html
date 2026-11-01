@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'">
+<title>Usage Meter Companion settings</title>
+<link rel="stylesheet" href="common.css">
+<link rel="stylesheet" href="settings.css">
+</head>
+<body>
+<main>
+  <header class="top">
+    <img src="../assets/icon.png" alt="" width="36" height="36">
+    <div><h1>Usage Meter Companion</h1><p class="muted" id="version"></p></div>
+  </header>
+
+  <section aria-labelledby="h-connect">
+    <h2 id="h-connect">Browser connection</h2>
+    <p class="muted">Usage comes from the Usage Meter extension in your browser, using your existing sign-in. The browser needs to be running; the Claude and ChatGPT tabs don't need to be open.</p>
+    <div id="hosts" class="status"></div>
+    <div id="reg" class="status"></div>
+    <div class="line">
+      <button id="connect" class="btn primary">Connect browsers again</button>
+      <span class="muted small">Then reload the extension (or restart the browser).</span>
+    </div>
+    <details id="manual">
+      <summary>Extension not found?</summary>
+      <p class="muted small">Chrome, Edge and other Chromium browsers only let listed extensions talk to this app. Installed copies are found automatically. If yours isn't, copy its ID from the browser's extensions page (turn on Developer mode) and add it here. Firefox needs no ID.</p>
+      <div class="line"><input id="idInput" type="text" spellcheck="false" maxlength="32" placeholder="32-letter extension ID" aria-label="Extension ID"><button id="addId" class="btn">Add</button></div>
+      <p id="idError" class="err small" role="alert" hidden></p>
+      <ul id="ids" class="ids"></ul>
+    </details>
+  </section>
+
+  <section aria-labelledby="h-show">
+    <h2 id="h-show">What to show</h2>
+    <label class="field"><span>Show usage for</span>
+      <select id="mode">
+        <option value="follow">The app in front (follows Claude, ChatGPT, Codex)</option>
+        <option value="claude">Always Claude</option>
+        <option value="chatgpt">Always ChatGPT</option>
+        <option value="codex">Always Codex</option>
+      </select>
+    </label>
+    <p id="followNote" class="muted small"></p>
+    <label class="check"><input type="checkbox" id="followBrowsers"> Also follow browser windows (by tab title)</label>
+    <label class="check"><input type="checkbox" id="followTerminals"> Also follow terminals running Claude Code or Codex (by window title)</label>
+    <label class="field"><span>Bars show</span>
+      <select id="show"><option value="left">What's left</option><option value="used">What's used</option></select>
+    </label>
+    <label class="check"><input type="checkbox" id="showModels"> Show per-model limits (for example Opus weekly)</label>
+  </section>
+
+  <section aria-labelledby="h-mini">
+    <h2 id="h-mini">Mini panel</h2>
+    <label class="check"><input type="checkbox" id="miniPanel"> Show the mini panel</label>
+    <label class="check"><input type="checkbox" id="miniOnTop"> Keep it on top of other windows</label>
+    <label class="check"><input type="checkbox" id="miniOnlyWithApp"> Only while Claude, ChatGPT or Codex is in front</label>
+    <label class="field"><span>Opacity</span><input type="range" id="miniOpacity" min="0.3" max="1" step="0.05"></label>
+    <div class="line"><button id="resetPos" class="btn">Move back to the corner</button><span class="muted small">Drag it by its header. Right-click it for options.</span></div>
+  </section>
+
+  <section aria-labelledby="h-general">
+    <h2 id="h-general">General</h2>
+    <label class="check"><input type="checkbox" id="launchAtLogin"> Start with Windows</label>
+    <label class="field"><span>Theme</span>
+      <select id="theme"><option value="system">Match Windows</option><option value="light">Light</option><option value="dark">Dark</option></select>
+    </label>
+  </section>
+</main>
+<script src="settings.js"></script>
+</body>
+</html>
