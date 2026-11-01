@@ -1,4 +1,8 @@
 html, body { margin: 0; padding: 0; background: transparent; overflow: hidden; }
+/* The Customize window: the card on the left, the Customize panel beside it (see embed-after.js). */
+html.edit, html.edit body { background: var(--edit-bg, #1b1b1b); height: 100%; }
+html.edit:not(.dark) { --edit-bg: #ececec; }
+html.edit #gptu-usage-host { width: 320px !important; margin: 16px !important; }
 body { font: 12px/1.4 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
 /* Both cards */
 .cards { display: flex; align-items: flex-start; }

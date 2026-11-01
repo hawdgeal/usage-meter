@@ -67,11 +67,18 @@ function panelWidth(site) {
   return Math.round(Math.max(240, Math.min(560, w || DEFAULT_WIDTH)));
 }
 
+// The look the cards are drawn with: the extension's (live), or the companion's own.
+const ownLook = () => s().lookSource === "own";
+function lookOf(site) {
+  return ownLook() && store.own[site] ? store.own[site] : store.ext[site];
+}
+
 function snapshot() {
   return {
     settings: s(),
     sites: store.usage,
     ext: store.ext,
+    look: { claude: lookOf("claude"), chatgpt: lookOf("chatgpt") },
     local: store.local,
     prefsVersion,
     app: currentApp(),
@@ -97,7 +104,7 @@ function changed() {
   setImmediate(() => {
     broadcastQueued = false;
     const snap = snapshot();
-    for (const w of [settingsWin, ...miniWins()]) if (w && !w.isDestroyed()) w.webContents.send("state", snap);
+    for (const w of [settingsWin, ...miniWins(), ...editors.values()]) if (w && !w.isDestroyed()) w.webContents.send("state", snap);
     updateTray();
     updateMinis();
   });
@@ -108,7 +115,8 @@ function onBridgeMessage(msg, host) {
   if (site !== "claude" && site !== "chatgpt") return;
   if (msg.type === "settings") {
     if (!msg.settings || typeof msg.settings !== "object") return;
-    if (store.setExt(site, msg.settings)) { prefsVersion[site]++; changed(); }
+    // With the companion's own look, the browser's changes don't redraw the cards.
+    if (store.setExt(site, msg.settings)) { if (!ownLook() || !store.own[site]) prefsVersion[site]++; changed(); }
     return;
   }
   const prev = store.usage[site] || {};
@@ -175,7 +183,7 @@ function attachTick() {
     const target = wins.find((w) => apps.includes(w.app));
     if (!target || target.minimized) { if (win.isVisible() && !drags.has(win)) win.hide(); m.target = null; continue; }
     m.target = target.hwnd;
-    if (s().attachMove && !drags.has(win)) followTarget(m, target.hwnd);
+    if (s().attachMove && !drags.has(win) && !widths.has(win)) followTarget(m, target.hwnd);
     if (!win.isVisible()) { if (!s().attachMove) keepOnScreen(win); win.showInactive(); pollHover(); }
     foreground.placeAbove(win.getNativeWindowHandle(), target.hwnd);
   }
@@ -367,6 +375,9 @@ function miniMenu(key) {
     ...modeItems(),
     { type: "separator" },
     { label: "Refresh", click: () => refresh() },
+    { label: "Reset width", enabled: !!(s().cardWidths || {})[m.key] && m.view !== "both", click: () => resetWidth(m.key) },
+    { label: `Customize look${m.view === "both" ? " (Claude)" : ""}…`, click: () => openEditor(m.view === "both" ? "claude" : m.view) },
+    ...(m.view === "both" ? [{ label: "Customize look (ChatGPT)…", click: () => openEditor("chatgpt") }] : []),
     { label: "Settings…", click: () => openSettings() },
     { label: "Hide mini panel", click: () => setSettings({ miniPanel: false }) },
   ]).popup({ window: m.win });
@@ -420,9 +431,19 @@ function viewWidth(view) {
   return s().cardsLayout === "row" ? a + b + GAP : Math.max(a, b);
 }
 
+// A mini panel's width: the one you gave it by dragging its edge, else the browser panel's.
+// (Two cards in one panel always use the browser widths.)
+const MIN_WIDTH = 240, MAX_WIDTH = 720;
+function widthFor(key, view) {
+  const m = minis.get(key);
+  if (m && m.liveWidth) return m.liveWidth;
+  const w = view !== "both" && (s().cardWidths || {})[key];
+  return w ? Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, Math.round(w))) : viewWidth(view);
+}
+
 function loadPanel(win, view, key) {
   loadedWith.set(win, panelKey(view));
-  win.setContentSize(viewWidth(view), win.getContentSize()[1]);
+  win.setContentSize(widthFor(key || "main", view), win.getContentSize()[1]);
   if (view === "both") {
     const row = s().cardsLayout === "row";
     win.loadFile(path.join(RENDERER, "both.html"), { query: { key: key || "main", layout: row ? "row" : "column", gap: String(GAP), w1: String(row ? panelWidth("claude") : viewWidth("both")), w2: String(row ? panelWidth("chatgpt") : viewWidth("both")) } });
@@ -463,7 +484,7 @@ function wantedMinis() {
 }
 
 function createMini(key, view) {
-  const width = viewWidth(view);
+  const width = widthFor(key, view);
   // Transparent, so the panel's own rounded frame (and hover-only frame) shows as in the browser.
   // It stays focusable (focusable: false stops it being dragged); see applyTopmost for why focus matters.
   const win = panelWindow({ width, height: 120, transparent: true, backgroundColor: "#00000000", hasShadow: false, alwaysOnTop: onTopFor(key) });
@@ -590,6 +611,99 @@ function stopDrag(win) {
   }
 }
 
+// ---------- the companion's own look ----------
+// Copies the browser's current look for both sites into the companion's own look.
+function importLook() {
+  for (const site of ["claude", "chatgpt"]) if (store.ext[site]) store.setOwn(site, store.ext[site]);
+  bumpLooks();
+}
+// Back to the browser's look, live; the own look is cleared.
+function resetLook() {
+  for (const site of ["claude", "chatgpt"]) store.setOwn(site, null);
+  setSettings({ lookSource: "browser" }, true);
+  bumpLooks();
+}
+function bumpLooks() {
+  prefsVersion.claude++; prefsVersion.chatgpt++;
+  changed();
+}
+
+// The editor: a larger window with one site's card and the extension's Customize panel. Its
+// changes are saved as the companion's own look (switching to it, from the browser's look, first).
+const editors = new Map(); // site -> window
+function openEditor(appId) {
+  const site = siteOf(appId);
+  if (!ownLook()) { if (!store.own.claude && !store.own.chatgpt) importLook(); setSettings({ lookSource: "own" }, true); bumpLooks(); }
+  const open = editors.get(site);
+  if (open && !open.isDestroyed()) { open.show(); open.focus(); return; }
+  const win = guard(new BrowserWindow({
+    width: 760, height: 720, minWidth: 700, minHeight: 480, title: `Customize the ${APP_LABELS[site]} card`,
+    autoHideMenuBar: true, show: false,
+    backgroundColor: nativeTheme.shouldUseDarkColors ? "#202020" : "#ffffff",
+    webPreferences: { preload: PRELOAD, contextIsolation: true, sandbox: true, nodeIntegration: false, spellcheck: false },
+  }));
+  win.setMenu(null);
+  win.on("page-title-updated", (e) => e.preventDefault()); // keep "Customize the … card"
+  editors.set(site, win);
+  win.loadFile(path.join(RENDERER, "panel.html"), { query: { app: site, key: "editor", edit: "1" } });
+  win.once("ready-to-show", () => win.show());
+  win.on("closed", () => { if (editors.get(site) === win) editors.delete(site); });
+}
+// What the editor's Customize panel saves.
+function saveLook(site, value) {
+  if (!ownLook() || (site !== "claude" && site !== "chatgpt") || !value || typeof value !== "object") return;
+  if (store.setOwn(site, value)) { prefsVersion[site]++; changed(); }
+}
+
+// ---------- resizing (width) ----------
+// The page asks for this when a mouse button is held on a card's left or right edge. The card's
+// width follows the pointer (the left edge keeps the right side in place) and is saved per card.
+const widths = new Map(); // window -> { edge, cx, x, w, started }
+let widthTimer = null;
+function startWidth(win, edge) {
+  const m = win && !win.isDestroyed() ? entryOf(win) : null;
+  if (!m || m.view === "both") return;
+  const b = win.getBounds();
+  widths.set(win, { edge, cx: screen.getCursorScreenPoint().x, x: b.x, w: win.getContentSize()[0], started: Date.now() });
+  if (!widthTimer) widthTimer = setInterval(moveWidths, 10);
+}
+function moveWidths() {
+  const cx = screen.getCursorScreenPoint().x;
+  for (const [win, d] of widths) {
+    const m = entryOf(win);
+    if (win.isDestroyed() || !m || Date.now() - d.started > 120000) { stopWidth(win); continue; }
+    const dx = cx - d.cx;
+    const w = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, Math.round(d.edge === "left" ? d.w - dx : d.w + dx)));
+    if (w === m.liveWidth) continue;
+    m.liveWidth = w;
+    const [, h] = win.getContentSize();
+    const [, y] = win.getPosition();
+    win.setContentSize(w, h);
+    if (d.edge === "left") win.setPosition(d.x + d.w - w, y);
+  }
+}
+function stopWidth(win) {
+  const d = widths.get(win);
+  widths.delete(win);
+  if (!widths.size) { clearInterval(widthTimer); widthTimer = null; }
+  const m = d && win && !win.isDestroyed() ? entryOf(win) : null;
+  if (!m || !m.liveWidth) return;
+  const w = m.liveWidth;
+  m.liveWidth = null;
+  store.set({ cardWidths: { ...(s().cardWidths || {}), [m.key]: w } });
+  const [x, y] = win.getPosition();
+  saveBounds(m.key, { x, y });
+  if (attached() && s().attachMove && m.target) saveOffset(m);
+}
+// Back to the browser panel's width.
+function resetWidth(key) {
+  const cw = { ...(s().cardWidths || {}) };
+  delete cw[key];
+  setSettings({ cardWidths: cw }, true);
+  const m = minis.get(key);
+  if (m && !m.win.isDestroyed()) m.win.setContentSize(widthFor(key, m.view), m.win.getContentSize()[1]);
+}
+
 function openSettings() {
   if (settingsWin && !settingsWin.isDestroyed()) { settingsWin.show(); settingsWin.focus(); return; }
   settingsWin = guard(new BrowserWindow({
@@ -613,6 +727,11 @@ function setSettings(patch, quiet) {
   if ("cards" in patch) setImmediate(() => updateTray());
   // Moving with the app starts from where each card is now.
   if (patch.attachMove) store.set({ attachOffsets: {} });
+  // Switching to the own look starts from the browser's look; either way the cards redraw.
+  if ("lookSource" in patch && patch.lookSource !== before.lookSource) {
+    if (patch.lookSource === "own" && !store.own.claude && !store.own.chatgpt) importLook();
+    else bumpLooks();
+  }
   if ("launchAtLogin" in patch && process.platform === "win32") app.setLoginItemSettings({ openAtLogin: !!s().launchAtLogin, args: ["--hidden"] });
   if ("miniBounds" in patch && patch.miniBounds === null) {
     store.set({ miniBoundsByApp: {}, attachOffsets: {} });
@@ -659,8 +778,9 @@ function cleanSettings(patch) {
     if (!(k in D) || k === "onboarded" || k === "lastApp") continue;
     if (k === "mode" && !["follow", ...APP_IDS].includes(v)) continue;
     if (k === "cards") { if (["one", "both", "separate"].includes(v)) clean[k] = v; continue; }
+    if (k === "lookSource") { if (["browser", "own"].includes(v)) clean[k] = v; continue; }
     if (k === "cardOnTop") { if (v && typeof v === "object") clean[k] = Object.fromEntries(["claude", "chatgpt"].filter((a) => typeof v[a] === "boolean").map((a) => [a, v[a]])); continue; }
-    if (k === "miniBoundsByApp" || k === "attachOffsets") continue; // only the app sets positions
+    if (k === "miniBoundsByApp" || k === "attachOffsets" || k === "cardWidths") continue; // only the app sets these
     if (k === "cardsLayout") { if (["column", "row"].includes(v)) clean[k] = v; continue; }
     if (k === "miniOpacity") { const n = Number(v); if (n >= 0.3 && n <= 1) clean[k] = n; continue; }
     if (k === "miniBounds") { if (v === null) clean[k] = null; continue; }
@@ -691,8 +811,7 @@ function setupIpc() {
     // slightly larger value, and setting that again made the width grow on every resize.
     const m = entryOf(win);
     if (!m) return;
-    const view = m.view;
-    const w = viewWidth(view);
+    const w = widthFor(m.key, m.view);
     const cur = win.getContentSize()[1];
     if (cur === h && Math.abs(win.getContentSize()[0] - w) <= 2) return;
     // Grow or shrink from the bottom edge when it sits near the bottom of the screen.
@@ -709,6 +828,12 @@ function setupIpc() {
   handle("toggle-pin", (e) => { const k = keyOf(e); if (k) togglePin(k); });
   handle("drag-start", (e) => startDrag(BrowserWindow.fromWebContents(e.sender)));
   handle("drag-end", (e) => stopDrag(BrowserWindow.fromWebContents(e.sender)));
+  handle("save-look", (e, site, value) => { if ([...editors.values()].includes(BrowserWindow.fromWebContents(e.sender))) saveLook(site, value); });
+  handle("look-import", () => { importLook(); setSettings({ lookSource: "own" }); return snapshot(); });
+  handle("look-reset", () => { resetLook(); return snapshot(); });
+  handle("customize", (e, appId) => openEditor(APP_IDS.includes(appId) ? appId : currentApp()));
+  handle("width-start", (e, edge) => startWidth(BrowserWindow.fromWebContents(e.sender), edge === "left" ? "left" : "right"));
+  handle("width-end", (e) => stopWidth(BrowserWindow.fromWebContents(e.sender)));
 }
 
 // ---------- start ----------

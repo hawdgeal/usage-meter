@@ -1,6 +1,6 @@
 // Runs after content.js: keeps its panel fed with usage, sizes the window to it, and adds the
-// companion's own behavior: hover tracking, dragging the panel by any non-interactive part, the pin
-// (always on top) and the right-click menu.
+// companion's own behavior: hover tracking, dragging the panel by any non-interactive part,
+// resizing its width by the side edges, the pin (on top) and the right-click menu.
 "use strict";
 (() => {
   const E = globalThis.__usageMeterCompanion;
@@ -19,7 +19,7 @@
   // ---------- hover ----------
   // windowHover: the pointer is over this window (from the companion, which polls the cursor, or
   // from the parent page when this is one of two cards). frameHover: over this card's frame.
-  let windowHover = false, frameHover = !E.framed;
+  let windowHover = E.edit, frameHover = !E.framed;
   function applyHover() { if (card) card.classList.toggle("js-hover", windowHover && frameHover); }
   if (E.framed) {
     window.addEventListener("message", (ev) => {
@@ -29,15 +29,54 @@
       applyHover();
     });
     document.documentElement.addEventListener("pointerleave", () => { frameHover = false; applyHover(); });
-  } else {
+  } else if (!E.edit) {
     C.onHover((on) => { windowHover = !!on; applyHover(); });
   }
   // Moving over the card shows hover controls right away, without waiting for the next poll.
   document.addEventListener("pointermove", () => { if (!windowHover || !frameHover) { windowHover = true; frameHover = true; applyHover(); } }, { passive: true });
 
+  // ---------- resizing (width) ----------
+  // Near the card's left or right edge the pointer becomes a resize arrow; pressing there changes
+  // the card's width instead of moving it. Not for two cards in one panel (each is a frame there).
+  // The grab zone is inside the card: the see-through margin around it doesn't take clicks.
+  const EDGE = 10; // px
+  function edgeAt(e) {
+    if (E.framed || E.edit || !card) return null;
+    const r = card.getBoundingClientRect();
+    if (e.clientY < r.top || e.clientY > r.bottom) return null;
+    if (e.clientX >= r.left - 2 && e.clientX <= r.left + EDGE) return "left";
+    if (e.clientX <= r.right + 2 && e.clientX >= r.right - EDGE) return "right";
+    return null;
+  }
+  let resizingEdge = null;
+  document.addEventListener("pointermove", (e) => {
+    if (!card || resizingEdge) return;
+    const cur = edgeAt(e) ? "ew-resize" : "";
+    if (card.style.cursor !== cur) card.style.cursor = cur;
+  }, { passive: true });
+  function startWidth(e, edge) {
+    e.preventDefault();
+    e.stopPropagation();
+    const target = e.target;
+    resizingEdge = edge;
+    const end = () => {
+      if (!resizingEdge) return;
+      resizingEdge = null;
+      C.widthEnd();
+      for (const t of ["pointerup", "pointercancel", "lostpointercapture"]) target.removeEventListener(t, end);
+      window.removeEventListener("blur", end);
+    };
+    try { target.setPointerCapture(e.pointerId); } catch (_) {}
+    for (const t of ["pointerup", "pointercancel", "lostpointercapture"]) target.addEventListener(t, end);
+    window.addEventListener("blur", end);
+    C.widthStart(edge);
+  }
+
   // ---------- dragging ----------
   function startDrag(e) {
     if (e.button !== 0 || !e.isPrimary) return;
+    const edge = edgeAt(e);
+    if (edge) { startWidth(e, edge); return; }
     const path = e.composedPath();
     if (path.some((n) => n instanceof Element && n.matches(INTERACTIVE))) return;
     // Leave the scrollbar of the card's body alone.
@@ -74,6 +113,19 @@
       .head>.pin[aria-pressed="false"]{opacity:.6}
       @media(hover:hover){.card[data-hover-refresh]:not(.js-hover):not(:has(:focus-visible)) .head>.pin{width:0;min-width:0;margin-right:-3px;overflow:hidden;}}`;
     root.appendChild(style);
+    if (E.edit) {
+      // The Customize window: the extension's own Customize panel, opened right away. Its changes
+      // become the companion's own look (see storage.set in embed.js).
+      const edit = document.createElement("style");
+      // The Customize panel fills the space to the right of the card instead of floating over it.
+      edit.textContent = `:host([data-embedded]) .customize{display:inline-grid !important;opacity:1 !important;pointer-events:auto !important;width:auto !important}
+        .settings{position:fixed !important;inset:16px 16px 16px 360px !important;width:auto !important;height:auto !important;max-width:none !important;max-height:none !important;margin:0 !important}
+        .settings .settings-resize,.settings-drag,.settings [data-settings-drag]{display:none !important}`;
+      root.appendChild(edit);
+      const open = () => { const b = root.querySelector(".customize"); if (b && b.getAttribute("aria-expanded") !== "true") b.click(); };
+      setTimeout(open, 200);
+      return true;
+    }
     if (E.pin) {
       const pin = document.createElement("button");
       pin.className = "icon pin";

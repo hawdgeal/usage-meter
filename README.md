@@ -2,6 +2,12 @@
 
 One browser extension that adds a **Usage** card to the left sidebar of **ChatGPT** (chatgpt.com) and **Claude** (claude.ai, including Claude Code on the web). Each site keeps its own settings, and the **Sync** tab copies settings between them in either direction.
 
+## What's new in 0.5.1
+
+- **Bar colors:** every color under **Bars** has a hex code box next to its color picker. Copy a code from there, or paste one in (`#d97757`, `d97757` or the short `#f80`), for example to reuse a color between the 0% and 100% ends, the middle colors, the other site, or the desktop companion.
+- **Reverse colors** (Bars → End colors, with **Color by percentage**): flips the color scale. The 0% and 100% colors swap, and each middle color moves to the mirrored range (20–40% becomes 60–80%), with its blends swapped.
+- The desktop companion can now keep its **own look**, changed with this same Customize panel (see the [companion README](companion/README.md)).
+
 ## What's new in 0.5.0
 
 - **Windows desktop companion** (new, in [`companion/`](companion/README.md)). A tray icon and an always-on-top mini panel that show your Claude or ChatGPT / Codex usage next to the desktop apps. They follow whichever app is in front (Claude desktop, ChatGPT desktop, Codex, and browser or terminal windows by title), or you can pin one in Settings. Usage comes from this extension, using your browser login, so the companion never handles passwords or tokens.

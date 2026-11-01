@@ -532,6 +532,8 @@
     .gradient-stop input[type=number] { width:43px; background:var(--surface); color:var(--fg); border:1px solid var(--line); border-radius:5px; padding:4px; }
     .gradient-stop input[data-gradient-before],.gradient-stop input[data-gradient-after] { width:56px; }
     .gradient-stop input[type=color] { width:32px; height:28px; background:var(--surface); border:1px solid var(--line); border-radius:5px; }
+    .color-pair { display:inline-flex; align-items:center; gap:6px; }
+    .hex-input { width:74px; padding:4px 6px; background:var(--surface); color:var(--fg); border:1px solid var(--line); border-radius:5px; font:11px/1.4 ui-monospace,"Cascadia Mono",Consolas,monospace; }
     .gradient-stop button { margin-left:auto; font-size:11px; }
     .bar-color-controls { display:flex; align-items:center; gap:6px; }
     .bar-color-controls select { max-width:145px; }
@@ -978,11 +980,13 @@
     const profile=spacingProfile();
     const box=key=>`<div class="spacing-box"><span class="spacing-box-title">${SPACING_AREAS[key].label}</span><div class="spacing-grid">${spacingValues(profile,key).map((value,side)=>`<label><span>${SPACING_SIDES[side]}</span><input type="number" min="0" max="120" step="1" value="${value}" aria-label="${SPACING_AREAS[key].label} ${SPACING_SIDES[side].toLowerCase()} spacing" data-space-area="${key}" data-space-side="${side}" data-space-profile="${profile}"></label>`).join('')}</div></div>`;
     const tab=(key,content)=>`<div class="settings-panel" role="tabpanel" id="gptu-settings-${key}" aria-labelledby="gptu-tab-${key}" ${state.settingsTab===key?'':'hidden'}>${content}</div>`;
-    const colorInput=(label,key)=>`<label class="setting"><span>${label}</span><input type="color" aria-label="${label}" data-simple-bar-color="${key}" value="${state[key]}"></label>`;
+    // Each color also has its hex code, to copy it or paste one in (also between the browser and the companion).
+    const hexInput=(attr,value,label)=>`<input type="text" class="hex-input" ${attr} value="${value}" maxlength="7" spellcheck="false" autocomplete="off" aria-label="${label} hex code">`;
+    const colorInput=(label,key)=>`<label class="setting"><span>${label}</span><span class="color-pair"><input type="color" aria-label="${label}" data-simple-bar-color="${key}" value="${state[key]}">${hexInput(`data-hex-for="${key}"`,state[key],label)}</span></label>`;
     const barPreview=`<div class="bar-preview"><div class="bar-preview-title">Color scale preview</div><div class="bar-preview-fill" role="img" aria-label="Bar color scale from 0 to 100 percent"></div><div class="bar-preview-labels"><span>0%</span><span>50%</span><span>100%</span></div></div>`;
-    const middleControls=`${state.gradientStops.map((stop,index)=>`<div class="gradient-stop" data-color-label="Middle color ${index+1}"><input type="color" value="${stop.color}" data-gradient-color="${index}" aria-label="Middle color ${index+1}"><label>From <input type="number" min="1" max="99" step="1" value="${stop.from}" data-gradient-from="${index}" aria-label="Middle color ${index+1} from">%</label><label>To <input type="number" min="1" max="99" step="1" value="${stop.to}" data-gradient-to="${index}" aria-label="Middle color ${index+1} to">%</label><button class="text-btn" data-remove-stop="${index}" aria-label="Remove middle color ${index+1}">Remove</button><div class="gradient-blends"><label>Blend before <input type="number" min="0" max="100" step="1" value="${stop.blendBefore??''}" placeholder="Auto" data-gradient-before="${index}" aria-label="Middle color ${index+1} blend before">%</label><label>Blend after <input type="number" min="0" max="100" step="1" value="${stop.blendAfter??''}" placeholder="Auto" data-gradient-after="${index}" aria-label="Middle color ${index+1} blend after">%</label></div></div>`).join('')}<button class="text-btn" data-add-stop ${state.gradientStops.length>=8?'disabled':''}>Add middle color</button><div class="note">From/To sets the solid color range. Blend before/after sets transition widths in percentage points: smaller is sharper, 0 is a hard edge, blank fills the gap. Neighboring middle colors share the transition between them. 0% is empty; 100% is full.</div>`;
+    const middleControls=`${state.gradientStops.map((stop,index)=>`<div class="gradient-stop" data-color-label="Middle color ${index+1}"><input type="color" value="${stop.color}" data-gradient-color="${index}" aria-label="Middle color ${index+1}">${hexInput(`data-hex-stop="${index}"`,stop.color,`Middle color ${index+1}`)}<label>From <input type="number" min="1" max="99" step="1" value="${stop.from}" data-gradient-from="${index}" aria-label="Middle color ${index+1} from">%</label><label>To <input type="number" min="1" max="99" step="1" value="${stop.to}" data-gradient-to="${index}" aria-label="Middle color ${index+1} to">%</label><button class="text-btn" data-remove-stop="${index}" aria-label="Remove middle color ${index+1}">Remove</button><div class="gradient-blends"><label>Blend before <input type="number" min="0" max="100" step="1" value="${stop.blendBefore??''}" placeholder="Auto" data-gradient-before="${index}" aria-label="Middle color ${index+1} blend before">%</label><label>Blend after <input type="number" min="0" max="100" step="1" value="${stop.blendAfter??''}" placeholder="Auto" data-gradient-after="${index}" aria-label="Middle color ${index+1} blend after">%</label></div></div>`).join('')}<button class="text-btn" data-add-stop ${state.gradientStops.length>=8?'disabled':''}>Add middle color</button><div class="note">From/To sets the solid color range. Blend before/after sets transition widths in percentage points: smaller is sharper, 0 is a hard edge, blank fills the gap. Neighboring middle colors share the transition between them. 0% is empty; 100% is full.</div>`;
     const barControls=group('barSource','Color source',select('Bar color','barMode',{auto:'Match theme',custom:'Custom'})+(state.barMode==='custom'?toggle('Color by percentage','data-bar-gradient',state.barGradient)+(state.barGradient?'':colorInput('Custom bar color','barColor')):'')+barPreview+`<div class="note">Applies to plan, credit and feature bars.</div>`)+
-      (state.barMode==='custom'&&state.barGradient?group('barDisplay','Meter display',toggle('Show gradient across meters','data-visible-gradient',state.barGradientVisible)+`<div class="note">Off: one color for the current percentage. On: show the color scale across the fill.</div>`)+group('barEnds','End colors',colorInput('Color at 0%','barStart')+colorInput('Color at 100%','barEnd'))+group('barMiddle','Middle colors & transitions',middleControls):'');
+      (state.barMode==='custom'&&state.barGradient?group('barDisplay','Meter display',toggle('Show gradient across meters','data-visible-gradient',state.barGradientVisible)+`<div class="note">Off: one color for the current percentage. On: show the color scale across the fill.</div>`)+group('barEnds','End colors',colorInput('Color at 0%','barStart')+colorInput('Color at 100%','barEnd')+`<button class="text-btn" data-reverse-colors>Reverse colors</button><div class="note">Flips the scale: the end colors swap and the middle colors mirror their ranges.</div>`)+group('barMiddle','Middle colors & transitions',middleControls):'');
     const themeSelect=`<label class="setting"><span>Theme preset</span><select aria-label="Theme preset" data-setting="preset"><optgroup label="${SITE.name}"><option value="auto" ${state.preset==='auto'?'selected':''}>Match ${SITE.name}</option><option value="${SITE.preset}" ${state.preset===SITE.preset?'selected':''}>${T('ChatGPT','Claude (page colors, Claude accent)')}</option></optgroup><optgroup label="Codex themes">${THEME_FAMILIES.map(name=>`<option value="${esc(name)}" ${state.preset===name?'selected':''}>${esc(name)}</option>`).join('')}</optgroup></select></label>`;
     $('.settings').innerHTML=`<div class="settings-header"><div class="settings-title" title="Drag to move settings · Double-click to reset position"><button class="icon settings-grab" aria-label="Move settings" title="Drag or use arrow keys · Home resets position">${icon('grip')}</button><span>Usage settings</span><div class="history-buttons"><button class="icon undo-changes" aria-label="Undo changes" title="Undo changes" ${undoChanges.length?'':'disabled'}>${icon('undo')}</button><button class="icon redo-changes" aria-label="Redo changes" title="Redo changes" ${redoChanges.length?'':'disabled'}>${icon('redo')}</button></div><button class="icon close-settings" aria-label="Close settings">✕</button></div><div class="settings-tabs" role="tablist" aria-label="Settings categories">${Object.entries(SETTINGS_TABS).map(([key,label])=>`<button class="settings-tab" role="tab" id="gptu-tab-${key}" aria-controls="gptu-settings-${key}" aria-selected="${state.settingsTab===key}" tabindex="${state.settingsTab===key?0:-1}" data-settings-tab="${key}">${label}</button>`).join('')}</div></div><div class="settings-body">${
       tab('panel',group('placement','Docking & size',select('Placement','position',{top:'Sidebar top',bottom:'Sidebar bottom',floating:'Floating'})+toggle('Compact mode','data-compact',state.compact)+select('Drag handle position','floatHandlePosition',{before:'Before Usage',after:'After settings'}))+group('visibility','Visibility',toggle('Hide docked panel with sidebar','data-hide-with-sidebar',state.hideWithSidebar)+toggle('Hide frame completely','data-hide-frame',state.hideFrame)+select('Open usage pages','usagePageMode',{dialog:'In a dialog over the page',tab:'In a new tab'}))+group('hover','Hover behavior',`<div class="note">Turn a switch off to keep that element visible. Keyboard focus also reveals hover-only controls.</div>`+Object.entries(HOVER_OPTIONS).map(([key,item])=>toggle(item.label,`data-hover="${key}" ${key==='frame'&&state.hideFrame?'disabled':''}`,state.hover[key])).join('')+toggle('Hide collapsed Usage until hover','data-hide-collapsed',state.hideCollapsed))+group('status','Update time & Details',toggle('Show update time','data-show-update',state.showUpdateTime)+toggle('Show Details button','data-show-details',state.showDetails)+select('Status position','footerPosition',{header:'Header: before refresh','header-after':'Header: after refresh',top:'Above modules',bottom:'Below modules'})))+
@@ -1193,11 +1197,35 @@
   root.addEventListener('input',event=>{
     const key=event.target.dataset.simpleBarColor,value=event.target.value;if(!['barColor','barStart','barEnd'].includes(key)||!isHex(value))return;
     state[key]=value;persist();render();
+    const hex=$(`[data-hex-for="${key}"]`);if(hex&&root.activeElement!==hex)hex.value=value;
   });
+  // Hex codes: "#d97757", "d97757" or "#f80" (pasted or typed) set the color once valid.
+  const parseHex=text=>{let v=String(text||'').trim().replace(/^#?/,'#').toLowerCase();if(/^#[0-9a-f]{3}$/.test(v))v='#'+[...v.slice(1)].map(c=>c+c).join('');return isHex(v)?v:null;};
+  function editHex(event){
+    const target=event.target;if(!target.classList||!target.classList.contains('hex-input'))return;
+    const value=parseHex(target.value);
+    if(event.type==='change'&&!value){target.value=target.dataset.hexFor?state[target.dataset.hexFor]:state.gradientStops[Number(target.dataset.hexStop)]?.color||'';return;}
+    if(!value)return;
+    if(target.dataset.hexFor){
+      const key=target.dataset.hexFor;if(!['barColor','barStart','barEnd'].includes(key))return;
+      state[key]=value;const swatch=$(`[data-simple-bar-color="${key}"]`);if(swatch)swatch.value=value;persist();render();
+    }else if(target.dataset.hexStop!==undefined){
+      const index=Number(target.dataset.hexStop),stop=state.gradientStops[index];if(!stop)return;
+      stop.color=value;const swatch=$(`[data-gradient-color="${index}"]`);if(swatch)swatch.value=value;persist();applyTheme();
+    }
+    if(event.type==='change')target.value=value;
+  }
+  root.addEventListener('input',editHex);root.addEventListener('change',editHex);
+  // Reverse colors: 0% and 100% swap, and each middle color moves to the mirrored range.
+  function reverseColors(){
+    [state.barStart,state.barEnd]=[state.barEnd,state.barStart];
+    state.gradientStops=state.gradientStops.map(stop=>({...stop,from:100-stop.to,to:100-stop.from,blendBefore:stop.blendAfter??null,blendAfter:stop.blendBefore??null})).reverse();
+    persist();render();renderSettings();
+  }
   function editMiddleColor(event){
     const target=event.target,index=Number(target.dataset.gradientColor??target.dataset.gradientFrom??target.dataset.gradientTo??target.dataset.gradientBefore??target.dataset.gradientAfter);
     const stop=state.gradientStops[index];if(!Number.isInteger(index)||!stop)return;
-    if(target.hasAttribute('data-gradient-color')&&isHex(target.value))stop.color=target.value;
+    if(target.hasAttribute('data-gradient-color')&&isHex(target.value)){stop.color=target.value;const hex=$(`[data-hex-stop="${index}"]`);if(hex&&root.activeElement!==hex)hex.value=target.value;}
     else if(target.hasAttribute('data-gradient-before')||target.hasAttribute('data-gradient-after')){
       if(!target.validity.valid)return;const key=target.hasAttribute('data-gradient-before')?'blendBefore':'blendAfter';stop[key]=target.value===''?null:Number(target.value);
     }
@@ -1215,6 +1243,7 @@
   root.addEventListener('input',editMiddleColor);root.addEventListener('change',editMiddleColor);
   root.addEventListener('click',event=>{
     const target=event.target;
+    if(target.hasAttribute('data-reverse-colors')){reverseColors();return;}
     if(target.hasAttribute('data-add-stop')&&state.gradientStops.length<8){
       const points=[0,...state.gradientStops.flatMap(stop=>[stop.from,stop.to]),100];let left=0,right=100,gap=0;
       for(let i=1;i<points.length;i++)if(points[i]-points[i-1]>gap){left=points[i-1];right=points[i];gap=right-left;}

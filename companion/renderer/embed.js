@@ -13,10 +13,12 @@
     framed: q.get("framed") === "1", // one of two cards (both.html)
     key: q.get("key") || "main", // which mini panel this is: "main", or "claude"/"chatgpt" (separate cards)
     pin: q.get("pin") === "1" || q.get("framed") !== "1",
+    edit: q.get("edit") === "1", // the Customize window for the companion's own look
     userRefreshUntil: 0, // set when the Refresh button is clicked (see embed-after.js)
     shown: { at: 0, errorAt: 0 },
   };
   E.ready = C.getState().then((s) => { E.state = s; E.prefs = s.prefsVersion[SITE]; theme(s); return s; });
+  if (E.edit) document.documentElement.classList.add("edit");
 
   // Approximate sidebar colors, used when the panel's theme is "Match site".
   const SURFACES = {
@@ -34,9 +36,11 @@
     el.style.color = fg;
   }
 
+  // The look comes from the browser's extension, or the companion's own look (see main.js lookOf).
   function settingsFor(site) {
     const s = E.state;
-    const out = { ...((s.ext && s.ext[site]) || {}), ...((s.local && s.local[site]) || {}) };
+    const look = (s.look && s.look[site]) || (s.ext && s.ext[site]) || {};
+    const out = { ...look, ...((s.local && s.local[site]) || {}) };
     const u = s.sites && s.sites[site];
     if (u && u.data && (!out.usageAt || u.at >= out.usageAt)) { out.usage = u.data; out.usageAt = u.at; if (u.plan) out.plan = u.plan; }
     return out;
@@ -66,12 +70,15 @@
           for (const k of [].concat(keys)) { const site = siteOfKey(k); if (site) out[k] = settingsFor(site); }
           return out;
         },
-        // Only the panel state (collapsed panel and sections) is kept by the companion; the rest
-        // of the look is changed in the browser, under Customize.
+        // On a card, only the panel state (collapsed panel and sections) is kept by the companion.
+        // In the Customize window, everything is saved as the companion's own look (both sites, so
+        // Settings → Sync works there too).
         async set(obj) {
           for (const [k, v] of Object.entries(obj || {})) {
             const site = siteOfKey(k);
-            if (site === SITE && v && typeof v === "object") C.panelState(site, { collapsed: v.collapsed, closed: v.closed });
+            if (!site || !v || typeof v !== "object") continue;
+            if (E.edit) C.saveLook(site, v);
+            else if (site === SITE) C.panelState(site, { collapsed: v.collapsed, closed: v.closed });
           }
         },
       },

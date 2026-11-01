@@ -41,8 +41,13 @@ function render() {
     state.foreground.available ? `Showing ${NAMES[state.followApp]} now. When something else is in front, the last app stays.` :
     `Following isn't available here (${state.foreground.error || "unknown reason"}). Showing ${NAMES[state.followApp]}.`;
 
+  const own = s.lookSource === "own";
+  for (const r of document.querySelectorAll('input[name="lookSource"]')) r.checked = r.value === (own ? "own" : "browser");
+  $("resetLook").disabled = !own;
   const got = ["claude", "chatgpt"].filter((k) => state.ext && state.ext[k]).map((k) => NAMES[k]);
-  $("lookStatus").textContent = got.length ? `Using your ${got.join(" and ")} panel settings from the extension.` : "No panel settings received yet; using the extension's defaults until the browser connects.";
+  $("importLook").disabled = !got.length;
+  $("lookStatus").textContent = own ? "Using the companion's own look." :
+    got.length ? `Using your ${got.join(" and ")} panel settings from the extension.` : "No panel settings received yet; using the extension's defaults until the browser connects.";
 
   // Connected browsers
   const hosts = state.hosts || [];
@@ -97,6 +102,17 @@ $("miniOnTop").addEventListener("change", (e) => { if (e.target.checked && state
 for (const k of SELECTS) $(k).addEventListener("change", (e) => save({ [k]: e.target.value }));
 $("miniOpacity").addEventListener("input", (e) => save({ miniOpacity: Number(e.target.value) }));
 $("resetPos").addEventListener("click", () => save({ miniBounds: null, miniPanel: true }));
+for (const r of document.querySelectorAll('input[name="lookSource"]')) r.addEventListener("change", (e) => { if (e.target.checked) save({ lookSource: e.target.value }); });
+$("customizeClaude").addEventListener("click", () => window.companion.customize("claude"));
+$("customizeChatgpt").addEventListener("click", () => window.companion.customize("chatgpt"));
+$("importLook").addEventListener("click", async () => {
+  if (state.settings.lookSource === "own" && !confirm("Replace the companion's look with your browser's current one?")) return;
+  state = await window.companion.importLook(); render();
+});
+$("resetLook").addEventListener("click", async () => {
+  if (!confirm("Drop the companion's own look and use your browser's again?")) return;
+  state = await window.companion.resetLook(); render();
+});
 $("connect").addEventListener("click", () => window.companion.connectBrowsers());
 $("addId").addEventListener("click", () => {
   const id = $("idInput").value.trim().toLowerCase();

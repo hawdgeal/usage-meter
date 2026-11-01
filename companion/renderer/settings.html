@@ -59,7 +59,15 @@
 
   <section aria-labelledby="h-look">
     <h2 id="h-look">Look and layout</h2>
-    <p class="muted">The panel looks and behaves like the one in your browser: theme, bar colors, spacing, compact mode, module order, hover options and width all come from the extension's settings for each site. Change them under <strong>Customize</strong> in the browser panel; the companion updates within a few seconds. Collapsing the panel or its sections here only affects the companion.</p>
+    <label class="check"><input type="radio" name="lookSource" value="browser"> <span><strong>Same as the browser</strong>: theme, bar colors, spacing, compact mode, module order, hover options and width come from the extension's settings for each site, and follow your changes there within a few seconds.</span></label>
+    <label class="check"><input type="radio" name="lookSource" value="own"> <span><strong>Own look</strong>: the companion keeps its own copy, which you change with Customize below. Your browser panel isn't affected.</span></label>
+    <div class="line">
+      <button id="customizeClaude" class="btn">Customize Claude…</button>
+      <button id="customizeChatgpt" class="btn">Customize ChatGPT…</button>
+      <button id="importLook" class="btn">Import from browser</button>
+      <button id="resetLook" class="btn">Reset</button>
+    </div>
+    <p class="muted small">Customize opens the extension's Customize panel for the companion (and switches to Own look). Import copies the browser's current look over the companion's. Reset drops the companion's look and goes back to the browser's. Collapsing the panel or its sections only affects the companion.</p>
     <p id="lookStatus" class="muted small"></p>
   </section>
 

@@ -21,6 +21,8 @@ const DEFAULTS = {
   miniOpacity: 1,
   miniBounds: null,
   miniBoundsByApp: {}, // separate cards: { claude: {x, y}, chatgpt: {x, y} }
+  cardWidths: {}, // widths set by dragging a card's edge: { main | claude | chatgpt: width }
+  lookSource: "browser", // the cards' look: "browser" (the extension's, live) or "own" (own-look.json)
   launchAtLogin: false,
   extensionIds: [], // extra Chromium extension IDs entered by hand
   lastApp: "claude",
@@ -41,11 +43,11 @@ function prefsKey(settings) {
 }
 
 function create(dir) {
-  const files = { settings: "settings.json", usage: "last-usage.json", ext: "extension-settings.json", local: "panel-state.json" };
+  const files = { settings: "settings.json", usage: "last-usage.json", ext: "extension-settings.json", local: "panel-state.json", own: "own-look.json" };
   const read = (f, d) => { try { const v = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8")); return v && typeof v === "object" ? v : d; } catch (_) { return d; } };
   const settings = { ...DEFAULTS, ...read(files.settings, {}) };
   for (const k of Object.keys(settings)) if (!(k in DEFAULTS)) delete settings[k];
-  const data = { usage: read(files.usage, {}), ext: read(files.ext, {}), local: read(files.local, {}) };
+  const data = { usage: read(files.usage, {}), ext: read(files.ext, {}), local: read(files.local, {}), own: read(files.own, {}) };
   const timers = {};
   const write = (name, value) => {
     clearTimeout(timers[name]);
@@ -63,6 +65,19 @@ function create(dir) {
     usage: data.usage,
     ext: data.ext,
     local: data.local,
+    own: data.own,
+    // The companion's own look for a site (the extension's panel settings, without what changes with
+    // every update). value null removes it. Returns true when the look changed.
+    setOwn(site, value) {
+      const before = prefsKey(data.own[site]);
+      if (value) {
+        const o = {};
+        for (const [k, v] of Object.entries(value)) if (!VOLATILE.includes(k)) o[k] = v;
+        data.own[site] = o;
+      } else delete data.own[site];
+      write("own", data.own);
+      return prefsKey(data.own[site]) !== before;
+    },
     set(patch) {
       for (const [k, v] of Object.entries(patch || {})) if (k in DEFAULTS) settings[k] = v;
       write("settings", settings);
