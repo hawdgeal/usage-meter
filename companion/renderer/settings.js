@@ -3,7 +3,7 @@
 const $ = (id) => document.getElementById(id);
 let state = null;
 const CHECKS = ["followBrowsers", "followTerminals", "miniPanel", "miniOnTop", "miniOnlyWithApp", "launchAtLogin"];
-const SELECTS = ["mode"];
+const SELECTS = ["mode", "cards", "cardsLayout"];
 const NAMES = { claude: "Claude", chatgpt: "ChatGPT", codex: "Codex" };
 
 function item(cls, text, sub) {
@@ -29,6 +29,7 @@ function render() {
   for (const k of CHECKS) $(k).checked = !!s[k];
   for (const k of SELECTS) $(k).value = s[k];
   $("miniOpacity").value = s.miniOpacity;
+  $("cardsLayout").disabled = s.cards !== "both";
   for (const k of ["miniOnTop", "miniOnlyWithApp", "miniOpacity"]) $(k).disabled = !s.miniPanel;
   for (const k of ["followBrowsers", "followTerminals"]) $(k).disabled = s.mode !== "follow" || !state.foreground.available;
   $("followNote").textContent = s.mode !== "follow" ? "" :

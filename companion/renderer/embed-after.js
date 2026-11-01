@@ -8,7 +8,6 @@
   const svg = (paths) => `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
   const PIN = svg('<path d="M9 3h6"/><path d="M10 3v5l-3 4h10l-3-4V3"/><path d="M12 12v9"/>');
   const PIN_OFF = svg('<path d="M9 3h6"/><path d="M10 3v5l-3 4h10l-3-4V3"/><path d="M12 12v9"/><path d="M4 4l16 16"/>');
-  const GEAR = svg('<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>');
 
   let host = null, root = null, card = null;
 
@@ -22,7 +21,7 @@
     const title = root.querySelector(".title");
     if (title) title.textContent = NAMES[E.app];
     root.addEventListener("click", (e) => { if (e.target.closest && e.target.closest(".refresh")) E.userRefreshUntil = Date.now() + 1500; }, true);
-    if (E.mode === "mini") {
+    if (E.mode === "mini" && E.pin) {
       const style = document.createElement("style");
       // Same hover-only behavior as the Refresh button.
       style.textContent = `.head>.pin[aria-pressed="false"]{opacity:.6}
@@ -33,10 +32,10 @@
       pin.addEventListener("click", () => C.setSettings({ miniOnTop: !onTop() }));
       root.querySelector(".head").insertBefore(pin, root.querySelector(".head>.refresh"));
       updatePin();
-      root.addEventListener("contextmenu", (e) => { e.preventDefault(); C.miniMenu(); });
     }
+    if (E.mode === "mini") root.addEventListener("contextmenu", (e) => { e.preventDefault(); C.miniMenu(); });
     new ResizeObserver(fit).observe(host);
-    if (E.mode === "popup") { buildBar(); new MutationObserver(barColors).observe(card, { attributes: true }); }
+    if (E.mode === "popup" && !E.framed) { window.companionBar(E.app); barColors(); new MutationObserver(barColors).observe(card, { attributes: true }); }
     fit();
     return true;
   }
@@ -53,40 +52,19 @@
 
   function fit() {
     if (!host) return;
+    if (E.framed) { parent.postMessage({ type: "umc-fit", height: Math.ceil(host.getBoundingClientRect().bottom), colors: cardColors() }, "*"); return; }
     C.resize(Math.ceil(host.getBoundingClientRect().bottom) + (E.mode === "popup" ? 6 : 0));
   }
 
-  function buildBar() {
-    const bar = document.getElementById("bar");
-    const apps = document.createElement("div");
-    apps.className = "apps";
-    for (const id of ["claude", "chatgpt", "codex"]) {
-      const b = document.createElement("button");
-      b.textContent = NAMES[id];
-      b.setAttribute("aria-pressed", String(id === E.app));
-      b.addEventListener("click", () => { if (id !== E.app) C.popupApp(id); });
-      apps.append(b);
-    }
-    const gear = document.createElement("button");
-    gear.className = "gear";
-    gear.title = "Companion settings";
-    gear.setAttribute("aria-label", "Companion settings");
-    gear.innerHTML = GEAR;
-    gear.addEventListener("click", () => C.openSettings());
-    bar.append(apps, gear);
-    bar.hidden = false;
-    barColors();
-    document.addEventListener("keydown", (e) => { if (e.key === "Escape") C.hide(); });
+  function cardColors() {
+    const cs = getComputedStyle(card);
+    const v = (k) => cs.getPropertyValue(`--${k}`).trim();
+    return { surface: cs.backgroundColor, fg: v("fg"), muted: v("muted"), line: v("line"), hover: v("hover"), accent: v("remaining") };
   }
 
   // The popup's background and switch use the panel's current colors.
   function barColors() {
-    if (!card) return;
-    const cs = getComputedStyle(card), b = document.body.style;
-    b.background = cs.backgroundColor;
-    for (const k of ["fg", "muted", "line", "hover", "surface"]) b.setProperty(`--bar-${k}`, cs.getPropertyValue(`--${k}`).trim());
-    b.setProperty("--bar-accent", cs.getPropertyValue("--remaining").trim());
-    b.setProperty("--bar-surface", cs.backgroundColor);
+    if (card && E.mode === "popup" && !E.framed) window.companionBarColors(cardColors());
   }
 
   C.onState((s) => {

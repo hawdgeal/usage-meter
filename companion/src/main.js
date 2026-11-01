@@ -27,6 +27,7 @@ const RENDERER = path.join(__dirname, "..", "renderer");
 const PRELOAD = path.join(__dirname, "preload.js");
 const DEFAULT_WIDTH = 300; // the extension's default floating width
 const LINK_HOSTS = ["https://claude.ai/", "https://chatgpt.com/"];
+const GAP = 8; // between the two cards when both are shown
 
 let store, bridge, tray;
 let popup = null, mini = null, settingsWin = null;
@@ -41,6 +42,8 @@ const prefsVersion = { claude: 0, chatgpt: 0 }; // bumps when the extension's pa
 
 const s = () => store.settings;
 const currentApp = () => (s().mode === "follow" ? followApp : APP_IDS.includes(s().mode) ? s().mode : "claude");
+// What a panel window shows: one app, or "both" (a Claude card and a ChatGPT card).
+const currentView = () => (s().cards === "both" ? "both" : currentApp());
 const siteOf = (id) => UsageView.APPS[id].site;
 const extOf = (site) => store.ext[site] || {};
 const showLeft = (site) => extOf(site).showRemainingPlan !== false;
@@ -148,8 +151,21 @@ function updateTray() {
   const view = UsageView.build(id, store.usage[site]);
   const key = `${id}|${view.head ? Math.round(view.head.left) : "-"}|${show}`;
   if (key !== lastTrayKey) { tray.setImage(trayImage(view, show)); lastTrayKey = key; }
-  tray.setToolTip(UsageView.tooltip(view, { show }));
+  let tip = UsageView.tooltip(view, { show });
+  if (s().cards === "both") {
+    const other = id === "claude" ? "chatgpt" : "claude";
+    const otherShow = showLeft(other) ? "left" : "used";
+    tip = `${tip}\n${UsageView.tooltip(UsageView.build(other, store.usage[other]), { show: otherShow })}`.slice(0, 127);
+  }
+  tray.setToolTip(tip);
   tray.setContextMenu(trayMenu());
+}
+
+function cardItems() {
+  return [
+    { label: "Show one app", type: "radio", checked: s().cards !== "both", click: () => setSettings({ cards: "one" }) },
+    { label: "Show Claude and ChatGPT", type: "radio", checked: s().cards === "both", click: () => setSettings({ cards: "both" }) },
+  ];
 }
 
 function modeItems() {
@@ -165,6 +181,8 @@ function trayMenu() {
     { label: "Mini panel", type: "checkbox", checked: s().miniPanel, click: (i) => setSettings({ miniPanel: i.checked }) },
     { label: "Keep mini panel on top", type: "checkbox", checked: s().miniOnTop, enabled: s().miniPanel, click: (i) => setSettings({ miniOnTop: i.checked }) },
     { type: "separator" },
+    ...cardItems(),
+    { type: "separator" },
     ...modeItems(),
     { type: "separator" },
     { label: "Refresh", click: () => refresh() },
@@ -179,6 +197,9 @@ function miniMenu() {
   Menu.buildFromTemplate([
     { label: "Keep on top", type: "checkbox", checked: s().miniOnTop, click: (i) => setSettings({ miniOnTop: i.checked }) },
     { label: "Only while Claude, ChatGPT or Codex is in front", type: "checkbox", checked: s().miniOnlyWithApp, click: (i) => setSettings({ miniOnlyWithApp: i.checked }) },
+    { type: "separator" },
+    ...cardItems(),
+    { label: "Side by side", type: "checkbox", checked: s().cardsLayout === "row", enabled: s().cards === "both", click: (i) => setSettings({ cardsLayout: i.checked ? "row" : "column" }) },
     { type: "separator" },
     ...modeItems(),
     { type: "separator" },
@@ -205,25 +226,38 @@ function panelWindow(extra) {
     maximizable: false,
     fullscreenable: false,
     skipTaskbar: true,
-    webPreferences: { preload: PRELOAD, contextIsolation: true, sandbox: true, nodeIntegration: false, spellcheck: false },
+    // The preload also runs in subframes: with both cards shown, each card is its own frame.
+    webPreferences: { preload: PRELOAD, contextIsolation: true, sandbox: true, nodeIntegration: false, nodeIntegrationInSubFrames: true, spellcheck: false },
     ...extra,
   }));
 }
 
-function panelKey(appId) {
-  return `${appId}|${prefsVersion[siteOf(appId)]}|${nativeTheme.shouldUseDarkColors}`;
+function panelKey(view) {
+  const v = view === "both" ? `both|${s().cardsLayout}|${prefsVersion.claude}|${prefsVersion.chatgpt}` : `${view}|${prefsVersion[siteOf(view)]}`;
+  return `${v}|${nativeTheme.shouldUseDarkColors}`;
 }
 
-function loadPanel(win, mode, appId) {
-  loadedWith.set(win, panelKey(appId));
-  win.setContentSize(panelWidth(siteOf(appId)), win.getContentSize()[1]);
-  win.loadFile(path.join(RENDERER, "panel.html"), { query: { mode, app: appId } });
+function viewWidth(view) {
+  if (view !== "both") return panelWidth(siteOf(view));
+  const a = panelWidth("claude"), b = panelWidth("chatgpt");
+  return s().cardsLayout === "row" ? a + b + GAP : Math.max(a, b);
+}
+
+function loadPanel(win, mode, view) {
+  loadedWith.set(win, panelKey(view));
+  win.setContentSize(viewWidth(view), win.getContentSize()[1]);
+  if (view === "both") {
+    const row = s().cardsLayout === "row";
+    win.loadFile(path.join(RENDERER, "both.html"), { query: { mode, layout: row ? "row" : "column", gap: String(GAP), w1: String(row ? panelWidth("claude") : viewWidth("both")), w2: String(row ? panelWidth("chatgpt") : viewWidth("both")) } });
+  } else {
+    win.loadFile(path.join(RENDERER, "panel.html"), { query: { mode, app: view } });
+  }
 }
 
 function showPopup(appId) {
-  const want = appId || currentApp();
+  const want = appId || currentView();
   if (!popup || popup.isDestroyed()) {
-    popup = panelWindow({ width: panelWidth(siteOf(want)), height: 260, alwaysOnTop: true, backgroundColor: nativeTheme.shouldUseDarkColors ? "#202020" : "#ffffff" });
+    popup = panelWindow({ width: viewWidth(want), height: 260, alwaysOnTop: true, backgroundColor: nativeTheme.shouldUseDarkColors ? "#202020" : "#ffffff" });
     popup.on("blur", () => { if (!popup.webContents.isDevToolsOpened()) popup.hide(); });
     popup.on("closed", () => { popup = null; popupApp = null; });
     popup.webContents.once("did-finish-load", () => placePopup(true));
@@ -273,8 +307,8 @@ function onScreen(b) {
 }
 
 function createMini() {
-  miniApp = currentApp();
-  const width = panelWidth(siteOf(miniApp));
+  miniApp = currentView();
+  const width = viewWidth(miniApp);
   // Transparent, so the panel's own rounded frame (and hover-only frame) shows as in the browser.
   mini = panelWindow({ width, height: 120, transparent: true, backgroundColor: "#00000000", hasShadow: false, alwaysOnTop: s().miniOnTop });
   const saved = s().miniBounds;
@@ -293,7 +327,7 @@ function updateMini() {
   if (want && !mini) return createMini();
   if (!mini || mini.isDestroyed()) return;
   // Redraw when it should show another app, or its settings or the Windows theme changed.
-  if (miniApp !== currentApp() || loadedWith.get(mini) !== panelKey(currentApp())) { miniApp = currentApp(); loadPanel(mini, "mini", miniApp); }
+  if (miniApp !== currentView() || loadedWith.get(mini) !== panelKey(currentView())) { miniApp = currentView(); loadPanel(mini, "mini", miniApp); }
   mini.setAlwaysOnTop(!!s().miniOnTop, "floating");
   mini.setOpacity(Math.max(0.3, Math.min(1, Number(s().miniOpacity) || 1)));
   if (want && !mini.isVisible() && !mini.webContents.isLoading()) mini.showInactive();
@@ -359,6 +393,8 @@ function cleanSettings(patch) {
   for (const [k, v] of Object.entries(patch)) {
     if (!(k in D) || k === "onboarded" || k === "lastApp") continue;
     if (k === "mode" && !["follow", ...APP_IDS].includes(v)) continue;
+    if (k === "cards") { if (["one", "both"].includes(v)) clean[k] = v; continue; }
+    if (k === "cardsLayout") { if (["column", "row"].includes(v)) clean[k] = v; continue; }
     if (k === "miniOpacity") { const n = Number(v); if (n >= 0.3 && n <= 1) clean[k] = n; continue; }
     if (k === "miniBounds") { if (v === null) clean[k] = null; continue; }
     if (k === "extensionIds") { if (Array.isArray(v)) clean[k] = [...new Set(v.map(String).filter((id) => registration.ID_RE.test(id)))].slice(0, 20); continue; }
@@ -398,7 +434,7 @@ function setupIpc() {
       if (win === popup) placePopup(false);
     }
   });
-  handle("popup-app", (_e, appId) => { if (APP_IDS.includes(appId)) showPopup(appId); });
+  handle("popup-app", (_e, view) => { if (APP_IDS.includes(view) || view === "both") showPopup(view); });
   handle("open-settings", () => { if (popup && !popup.isDestroyed()) popup.hide(); openSettings(); });
   handle("hide", (e) => { const w = BrowserWindow.fromWebContents(e.sender); if (w && w !== settingsWin) w.hide(); });
   handle("connect-browsers", () => connectBrowsers());

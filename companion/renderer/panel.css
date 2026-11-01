@@ -11,3 +11,7 @@ html.popup body { padding-bottom: 6px; }
 .bar .gear:hover { background: var(--bar-hover, #8882); color: var(--bar-fg, #222); }
 .bar .gear svg { width: 16px; height: 16px; }
 .bar button:focus-visible { outline: 2px solid var(--bar-accent, #2563eb); outline-offset: 1px; }
+/* Both cards */
+.cards { display: flex; align-items: flex-start; }
+.cards iframe { border: 0; display: block; background: transparent; color-scheme: normal; }
+html.popup.both .cards { padding: 0; }

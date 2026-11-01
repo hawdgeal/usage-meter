@@ -12,6 +12,8 @@
 
   const E = {
     mode: MODE, app: APP, site: SITE, state: null,
+    framed: q.get("framed") === "1", // one of two cards (both.html)
+    pin: q.get("pin") === "1" || q.get("framed") !== "1",
     userRefreshUntil: 0, // set when the Refresh button is clicked (see embed-after.js)
     shown: { at: 0, errorAt: 0 },
   };

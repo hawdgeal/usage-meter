@@ -9,6 +9,8 @@ const DEFAULTS = {
   mode: "follow", // "follow" the app in front, or always "claude" / "chatgpt" / "codex"
   followBrowsers: true, // match browser windows by title (e.g. "… - Claude")
   followTerminals: true, // match terminals running Claude Code or Codex by title
+  cards: "one", // "one" app, or "both" Claude and ChatGPT
+  cardsLayout: "column", // both cards "column" (stacked) or "row" (side by side)
   miniPanel: true,
   miniOnTop: true,
   miniOnlyWithApp: false, // show the mini panel only while a matching app is in front
