@@ -38,6 +38,7 @@ let frontMatched = false; // a matching app is in front right now
 let foregroundTimer = null;
 let reg = { state: "idle" }; // last browser registration result
 let quitting = false;
+let lastHeaderRightClick = 0; // see createMini
 const prefsVersion = { claude: 0, chatgpt: 0 }; // bumps when the extension's panel settings change
 
 const s = () => store.settings;
@@ -291,7 +292,7 @@ function placePopup(show) {
 function miniShouldShow() {
   if (!s().miniPanel) return false;
   if (!s().miniOnlyWithApp) return true;
-  return frontMatched || (mini && !mini.isDestroyed() && mini.isFocused());
+  return frontMatched;
 }
 
 function defaultMiniBounds(w, h) {
@@ -310,14 +311,23 @@ function createMini() {
   miniApp = currentView();
   const width = viewWidth(miniApp);
   // Transparent, so the panel's own rounded frame (and hover-only frame) shows as in the browser.
-  mini = panelWindow({ width, height: 120, transparent: true, backgroundColor: "#00000000", hasShadow: false, alwaysOnTop: s().miniOnTop });
+  // focusable: false (WS_EX_NOACTIVATE): clicking the panel doesn't activate it. Activation made
+  // Electron drop WS_EX_TOPMOST, so the panel sank behind other windows; the app in front also
+  // stays in front. Don't add thickFrame: false here; it breaks clicking on this window.
+  mini = panelWindow({ width, height: 120, transparent: true, backgroundColor: "#00000000", hasShadow: false, focusable: false, alwaysOnTop: s().miniOnTop });
   const saved = s().miniBounds;
   const pos = saved && onScreen(saved) ? saved : defaultMiniBounds(width, 120);
   mini.setPosition(Math.round(pos.x), Math.round(pos.y));
   mini.on("moved", () => { const [x, y] = mini.getPosition(); setSettings({ miniBounds: { x, y } }, true); });
   mini.on("closed", () => { mini = null; miniApp = null; });
-  // Right-clicking the header (a drag area) would open Windows' own window menu.
-  mini.on("system-context-menu", (e) => { e.preventDefault(); miniMenu(); });
+  // Right-clicking the header (a drag area) sends no DOM event, and with focusable: false Electron
+  // may not report it as system-context-menu either. Catch the right-click on the drag area
+  // (WM_NCRBUTTONUP) directly, and still keep Windows' own window menu from showing.
+  if (process.platform === "win32") {
+    const WM_NCRBUTTONUP = 0x00a5;
+    mini.hookWindowMessage(WM_NCRBUTTONUP, () => { lastHeaderRightClick = Date.now(); setImmediate(miniMenu); });
+  }
+  mini.on("system-context-menu", (e) => { e.preventDefault(); if (Date.now() - lastHeaderRightClick > 1000) miniMenu(); });
   mini.webContents.once("did-finish-load", () => updateMini());
   loadPanel(mini, "mini", miniApp);
 }
@@ -429,8 +439,13 @@ function setupIpc() {
     const win = BrowserWindow.fromWebContents(e.sender);
     const h = Math.max(40, Math.min(1000, Math.round(Number(height) || 0)));
     if (!win || win === settingsWin || !h) return;
-    const [w, cur] = win.getContentSize();
-    if (cur === h) return;
+    // Use the intended width: reading it back from this transparent frameless window returns a
+    // slightly larger value, and setting that again made the width grow on every resize.
+    const view = win === mini ? miniApp : popupApp;
+    if (!view) return;
+    const w = viewWidth(view);
+    const cur = win.getContentSize()[1];
+    if (cur === h && Math.abs(win.getContentSize()[0] - w) <= 2) return;
     if (win === mini) {
       // Grow or shrink from the bottom edge when it sits near the bottom of the screen.
       const [x, y] = win.getPosition();
