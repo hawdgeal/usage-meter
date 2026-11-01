@@ -377,9 +377,20 @@ function updateMinis() {
     if (m.view !== want.view || loadedWith.get(win) !== panelKey(want.view)) { m.view = want.view; loadPanel(win, "mini", want.view, m.key); }
     win.setOpacity(Math.max(0.3, Math.min(1, Number(s().miniOpacity) || 1)));
     if (!minisVisible()) { if (win.isVisible()) { stopDrag(win); win.hide(); } }
-    else if (!win.isVisible() && m.ready) { win.showInactive(); applyTopmost(m); }
+    else if (!win.isVisible() && m.ready) { keepOnScreen(win); win.showInactive(); applyTopmost(m); }
   }
   pollHover();
+}
+
+// Moves a mini panel back inside the work area of its display (above the taskbar) without
+// resizing it. Not while it's being dragged.
+function keepOnScreen(win) {
+  if (!win || win.isDestroyed() || drags.has(win)) return;
+  const b = win.getBounds();
+  const a = screen.getDisplayMatching(b).workArea;
+  const x = Math.max(a.x, Math.min(b.x, a.x + a.width - b.width));
+  const y = Math.max(a.y, Math.min(b.y, a.y + a.height - b.height));
+  if (x !== b.x || y !== b.y) win.setPosition(x, y);
 }
 
 // ---------- hover ----------
@@ -537,6 +548,7 @@ function setupIpc() {
       const nearBottom = !drags.has(win) && y + cur > area.y + area.height - 40; // not while being dragged
       win.setContentSize(w, h);
       if (nearBottom) win.setPosition(x, Math.max(area.y, y + cur - h));
+      keepOnScreen(win); // a panel that grew past the bottom (or edge) of the screen moves back up
     } else {
       win.setContentSize(w, h);
       if (win === popup) placePopup(false);

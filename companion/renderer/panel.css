@@ -13,5 +13,7 @@ html.popup body { padding-bottom: 6px; }
 .bar button:focus-visible { outline: 2px solid var(--bar-accent, #2563eb); outline-offset: 1px; }
 /* Both cards */
 .cards { display: flex; align-items: flex-start; }
-.cards iframe { border: 0; display: block; background: transparent; color-scheme: normal; }
+/* Chromium paints an opaque backdrop behind a frame whose color scheme differs from its page's.
+   both.js sets each frame's color-scheme to its page's own once the card reports it. */
+.cards iframe { border: 0; display: block; background: transparent; color-scheme: light dark; }
 html.popup.both .cards { padding: 0; }

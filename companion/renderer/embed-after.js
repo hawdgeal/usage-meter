@@ -104,7 +104,11 @@
 
   function fit() {
     if (!host) return;
-    if (E.framed) { parent.postMessage({ type: "umc-fit", height: Math.ceil(host.getBoundingClientRect().bottom), colors: cardColors() }, "*"); return; }
+    if (E.framed) {
+      const scheme = getComputedStyle(document.documentElement).colorScheme; // e.g. "dark", set by embed.js
+      parent.postMessage({ type: "umc-fit", height: Math.ceil(host.getBoundingClientRect().bottom), colors: cardColors(), scheme }, "*");
+      return;
+    }
     C.resize(Math.ceil(host.getBoundingClientRect().bottom) + (E.mode === "popup" ? 6 : 0));
   }
 

@@ -45,6 +45,8 @@
     const h = Math.max(0, Math.min(1000, Number(m.height) || 0));
     heights.set(f, h);
     f.style.height = h + "px";
+    // Match the frame's color scheme to its page's, so the frame stays see-through.
+    if (typeof m.scheme === "string" && /^(light|dark|light dark|normal)$/.test(m.scheme.trim()) && f.style.colorScheme !== m.scheme.trim()) f.style.colorScheme = m.scheme.trim();
     if (f === frames[0] && MODE === "popup") window.companionBarColors(m.colors);
     fit();
   });
