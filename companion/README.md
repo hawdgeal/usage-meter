@@ -4,8 +4,8 @@ A small Windows app that shows your **Claude** and **ChatGPT / Codex** plan usag
 
 - **Tray icon:** a ring showing how much of your tightest limit is left, in Claude orange or ChatGPT green. It turns red at 10% or less. Hover it for a one-line summary.
 - **Popup:** click the tray icon. It shows the usage panel, with a switch for Claude, ChatGPT, Codex or Both.
-- **Both cards:** choose **Show Claude and ChatGPT** (tray menu, mini panel menu or Settings) to see both at once, stacked or side by side. Each card uses that site's settings.
-- **Mini panel:** an optional panel you can drag anywhere by its header. The **pin** button in its header turns always on top on or off. Right-click it for more options.
+- **Both cards:** choose **Show Claude and ChatGPT** (tray menu, mini panel menu or Settings) to see both in one panel, stacked or side by side, or **Separate cards** for one panel per app, each with its own position and pin. Each card uses that site's settings.
+- **Mini panel:** an optional panel you can drag anywhere by any part that isn't a button or link (text isn't selectable, so dragging over text moves it; the mouse wheel still scrolls). The **pin** button turns always on top on or off. Right-click anywhere on it for more options. Hover-only controls follow the pointer, as in the browser.
 
 **The panel is the extension's own**, drawn with your extension settings for that site: theme and preset, bar colors and gradients, spacing, compact mode, module order and visibility, hover options, update-time position, and the panel's floating width. Change them under **Customize** in the browser panel; the companion redraws within seconds. Collapsing the panel or a module in the companion only affects the companion. Controls that only make sense in the browser are hidden: drag-to-float, resize, Customize, and module reordering. Links such as **Usage** and **Manage** open in your browser.
 
@@ -45,7 +45,7 @@ The connection is registered again every time the companion starts, so moving th
 | --- | --- |
 | Show usage for | Follow the app in front (default), or always Claude, ChatGPT or Codex. Codex and ChatGPT share the same account limits. |
 | Also follow browser windows / terminals | Match those windows by title. Turn off if, for example, a document called "Claude notes" switches the panel. |
-| Cards | One app, or both Claude and ChatGPT, stacked or side by side. Applies to the mini panel and the popup. The tray tooltip then lists both. |
+| Cards | One app; both Claude and ChatGPT in one panel (stacked or side by side); or separate cards. Applies to the mini panel; the popup shows both for the last two. The tray tooltip then lists both. |
 | Mini panel | Show it, keep it on top (also the pin button and the tray menu), show it only while Claude, ChatGPT or Codex is in front, opacity, and move it back to the corner. |
 | Start with Windows | Starts in the tray at sign-in. |
 

@@ -9,13 +9,15 @@ const DEFAULTS = {
   mode: "follow", // "follow" the app in front, or always "claude" / "chatgpt" / "codex"
   followBrowsers: true, // match browser windows by title (e.g. "… - Claude")
   followTerminals: true, // match terminals running Claude Code or Codex by title
-  cards: "one", // "one" app, or "both" Claude and ChatGPT
+  cards: "one", // "one" app, "both" Claude and ChatGPT in one panel, or "separate" panels
   cardsLayout: "column", // both cards "column" (stacked) or "row" (side by side)
+  cardOnTop: {}, // separate cards: { claude: bool, chatgpt: bool } set by each card's pin
   miniPanel: true,
   miniOnTop: true,
   miniOnlyWithApp: false, // show the mini panel only while a matching app is in front
   miniOpacity: 1,
   miniBounds: null,
+  miniBoundsByApp: {}, // separate cards: { claude: {x, y}, chatgpt: {x, y} }
   launchAtLogin: false,
   extensionIds: [], // extra Chromium extension IDs entered by hand
   lastApp: "claude",

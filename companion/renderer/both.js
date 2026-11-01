@@ -16,7 +16,7 @@
   const heights = new Map();
   const frames = ["claude", "chatgpt"].map((app, i) => {
     const f = document.createElement("iframe");
-    const params = new URLSearchParams({ mode: MODE, app, framed: "1" });
+    const params = new URLSearchParams({ mode: MODE, app, framed: "1", key: q.get("key") || "main" });
     if (MODE === "mini" && i === 0) params.set("pin", "1"); // one pin for the whole panel
     f.src = `panel.html?${params}`;
     f.title = app === "claude" ? "Claude usage" : "ChatGPT usage";
@@ -27,6 +27,10 @@
   });
 
   if (MODE === "popup") window.companionBar("both");
+
+  // Hover: pass the window's hover state to both cards; each card also tracks the pointer itself.
+  C.onHover((on) => { for (const f of frames) f.contentWindow && f.contentWindow.postMessage({ type: "umc-hover", on }, "*"); });
+  if (MODE === "mini") document.addEventListener("contextmenu", (e) => { e.preventDefault(); C.miniMenu(); });
 
   function fit() {
     const hs = frames.map((f) => heights.get(f) || 0);

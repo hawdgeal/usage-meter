@@ -15,4 +15,9 @@ contextBridge.exposeInMainWorld("companion", {
   hide: () => ipcRenderer.invoke("hide"),
   connectBrowsers: () => ipcRenderer.invoke("connect-browsers"),
   miniMenu: () => ipcRenderer.invoke("mini-menu"),
+  togglePin: () => ipcRenderer.invoke("toggle-pin"),
+  dragStart: () => ipcRenderer.invoke("drag-start"),
+  dragEnd: () => ipcRenderer.invoke("drag-end"),
+  // true while the pointer is over this window (the companion polls the cursor)
+  onHover: (cb) => ipcRenderer.on("hover", (_e, on) => cb(!!on)),
 });
