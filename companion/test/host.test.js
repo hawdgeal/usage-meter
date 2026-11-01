@@ -9,7 +9,10 @@ const { spawn } = require("child_process");
 const { encode, Decoder } = require("../src/native-messaging");
 const F = require("./fixtures");
 
-const sock = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "umc-")), "pipe.sock");
+// Windows only takes named pipes (\\.\pipe\...), not socket files.
+const sock = process.platform === "win32"
+  ? `\\\\.\\pipe\\umc-test-${process.pid}`
+  : path.join(fs.mkdtempSync(path.join(os.tmpdir(), "umc-")), "pipe.sock");
 process.env.USAGE_METER_PIPE = sock;
 const { Bridge } = require("../src/bridge");
 
