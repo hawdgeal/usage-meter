@@ -50,7 +50,11 @@ const currentView = () => (s().cards === "one" ? currentApp() : "both");
 const miniWins = () => [...minis.values()].map((m) => m.win).filter((w) => w && !w.isDestroyed());
 const entryOf = (win) => [...minis.values()].find((m) => m.win === win) || null;
 // Separate cards each have their own pin; otherwise one setting covers the mini panel.
-const onTopFor = (key) => (key !== "main" && s().cardOnTop && typeof s().cardOnTop[key] === "boolean" ? s().cardOnTop[key] : !!s().miniOnTop);
+const pinFor = (key) => (key !== "main" && s().cardOnTop && typeof s().cardOnTop[key] === "boolean" ? s().cardOnTop[key] : !!s().miniOnTop);
+// "On top of its app" (attachToApp) puts each card just above its app's window instead; the tray's
+// "Show usage" floats them above everything until one of the apps next comes to the front.
+const attached = () => !!s().attachToApp && foreground.available() && !forceShow;
+const onTopFor = (key) => (attached() ? false : pinFor(key));
 const siteOf = (id) => UsageView.APPS[id].site;
 const extOf = (site) => store.ext[site] || {};
 const showLeft = (site) => extOf(site).showRemainingPlan !== false;
@@ -70,6 +74,7 @@ function snapshot() {
     prefsVersion,
     app: currentApp(),
     onTop: { main: onTopFor("main"), claude: onTopFor("claude"), chatgpt: onTopFor("chatgpt") },
+    attached: attached(),
     followApp,
     frontMatched,
     hosts: bridge ? bridge.list() : [],
@@ -129,8 +134,70 @@ function pollForeground() {
   if (m === "self") return; // our own panels: keep what we show
   let dirty = false;
   if (m && m !== followApp) { followApp = m; store.set({ lastApp: m }); dirty = s().mode === "follow"; }
-  if (!!m !== frontMatched) { frontMatched = !!m; if (frontMatched) forceShow = false; dirty = true; }
+  // "Show usage" lasts until you next switch to one of the apps.
+  if (forceShow && m && (!frontMatched || win.title !== lastFrontTitle)) {
+    forceShow = false;
+    if (s().attachToApp) for (const e of minis.values()) applyTopmost(e);
+    dirty = true;
+  }
+  lastFrontTitle = win.title;
+  if (!!m !== frontMatched) { frontMatched = !!m; dirty = true; }
   if (dirty) changed();
+}
+let lastFrontTitle = "";
+
+// ---------- cards attached to their app ----------
+// Which apps a card sits on: its own with separate cards (ChatGPT's also covers Codex), otherwise
+// the app the panel shows.
+function appsFor(m) {
+  if (m.key === "claude") return ["claude"];
+  if (m.key === "chatgpt") return ["chatgpt", "codex"];
+  const id = currentApp();
+  return id === "chatgpt" || id === "codex" ? ["chatgpt", "codex"] : [id];
+}
+
+// Puts each card just above the highest window of its app, and hides it while that app has no
+// window on screen (closed or minimized). Runs often, since clicking the app raises it over the card.
+let attachTimer = null;
+function attachTick() {
+  if (!attached() || !minis.size) { clearInterval(attachTimer); attachTimer = null; return; }
+  if (!attachTimer) attachTimer = setInterval(attachTick, 150);
+  const opts = { browsers: s().followBrowsers, terminals: s().followTerminals, selfExe: process.execPath };
+  const wins = foreground.listWindows().map((w) => ({ ...w, app: matchApp(w, opts) }));
+  for (const m of minis.values()) {
+    const win = m.win;
+    if (!win || win.isDestroyed() || !m.ready) continue;
+    const apps = appsFor(m);
+    const target = wins.find((w) => apps.includes(w.app));
+    if (!target || target.minimized) { if (win.isVisible() && !drags.has(win)) win.hide(); m.target = null; continue; }
+    m.target = target.hwnd;
+    if (s().attachMove && !drags.has(win)) followTarget(m, target.hwnd);
+    if (!win.isVisible()) { if (!s().attachMove) keepOnScreen(win); win.showInactive(); pollHover(); }
+    foreground.placeAbove(win.getNativeWindowHandle(), target.hwnd);
+  }
+}
+
+// "Move with its app": the card keeps its offset from the nearest corner of its app's window, so it
+// follows when the window moves or is resized. Rectangles are in physical pixels.
+function cornerOffset(t, c) {
+  const right = c.x + c.w / 2 > t.x + t.w / 2, bottom = c.y + c.h / 2 > t.y + t.h / 2;
+  return { right, bottom, dx: right ? c.x + c.w - (t.x + t.w) : c.x - t.x, dy: bottom ? c.y + c.h - (t.y + t.h) : c.y - t.y };
+}
+function fromOffset(t, c, o) {
+  return { x: o.right ? t.x + t.w + o.dx - c.w : t.x + o.dx, y: o.bottom ? t.y + t.h + o.dy - c.h : t.y + o.dy };
+}
+function saveOffset(m) {
+  const t = m.target && foreground.rectOf(m.target, true), c = foreground.rectOf(m.win.getNativeWindowHandle(), true);
+  if (t && c) setSettings({ attachOffsets: { ...(s().attachOffsets || {}), [m.key]: cornerOffset(t, c) } }, true);
+}
+function followTarget(m, target) {
+  const handle = m.win.getNativeWindowHandle();
+  const t = foreground.rectOf(target, true), c = foreground.rectOf(handle, true);
+  if (!t || !c) return;
+  const o = (s().attachOffsets || {})[m.key];
+  if (!o) { saveOffset(m); return; } // first time: where it is now
+  const p = fromOffset(t, c, o);
+  if (Math.abs(p.x - c.x) > 1 || Math.abs(p.y - c.y) > 1) foreground.moveTo(handle, p.x, p.y);
 }
 
 function startForeground() {
@@ -149,23 +216,39 @@ function trayImage(view, show) {
   return img;
 }
 
-let lastTrayKey = "";
-function updateTray() {
-  if (!tray) return;
-  const id = currentApp();
+// With separate cards there is one tray icon per card (Claude, then ChatGPT); otherwise one icon
+// for what the panel shows.
+let tray2 = null; // the ChatGPT card's icon, only with separate cards
+const lastTrayKey = new WeakMap();
+function setTrayIcon(t, id, tip) {
   const site = siteOf(id);
   const show = showLeft(site) ? "left" : "used";
   const view = UsageView.build(id, store.usage[site]);
   const key = `${id}|${view.head ? Math.round(view.head.left) : "-"}|${show}`;
-  if (key !== lastTrayKey) { tray.setImage(trayImage(view, show)); lastTrayKey = key; }
-  let tip = UsageView.tooltip(view, { show });
+  if (lastTrayKey.get(t) !== key) { t.setImage(trayImage(view, show)); lastTrayKey.set(t, key); }
+  t.setToolTip((tip || UsageView.tooltip(view, { show })).slice(0, 127));
+  t.setContextMenu(trayMenu());
+}
+
+function updateTray() {
+  if (!tray) return;
+  if (s().cards === "separate" && s().miniPanel) {
+    const gpt = followApp === "codex" ? "codex" : "chatgpt";
+    setTrayIcon(tray, "claude");
+    if (!tray2 || tray2.isDestroyed()) { tray2 = new Tray(trayImage(UsageView.build(gpt, store.usage.chatgpt), "left")); tray2.on("click", () => showMinis("chatgpt")); }
+    setTrayIcon(tray2, gpt);
+    return;
+  }
+  if (tray2 && !tray2.isDestroyed()) tray2.destroy();
+  tray2 = null;
+  const id = currentApp();
+  let tip = null;
   if (s().cards !== "one") {
     const other = id === "claude" ? "chatgpt" : "claude";
-    const otherShow = showLeft(other) ? "left" : "used";
-    tip = `${tip}\n${UsageView.tooltip(UsageView.build(other, store.usage[other]), { show: otherShow })}`.slice(0, 127);
+    const show = (x) => (showLeft(siteOf(x)) ? "left" : "used");
+    tip = `${UsageView.tooltip(UsageView.build(id, store.usage[siteOf(id)]), { show: show(id) })}\n${UsageView.tooltip(UsageView.build(other, store.usage[other]), { show: show(other) })}`;
   }
-  tray.setToolTip(tip);
-  tray.setContextMenu(trayMenu());
+  setTrayIcon(tray, id, tip);
 }
 
 function cardItems() {
@@ -187,7 +270,9 @@ function trayMenu() {
   return Menu.buildFromTemplate([
     { label: "Show usage", click: () => showMinis() },
     { label: "Mini panel", type: "checkbox", checked: s().miniPanel, click: (i) => setSettings({ miniPanel: i.checked }) },
-    { label: "Keep mini panel on top", type: "checkbox", checked: s().miniOnTop, enabled: s().miniPanel, click: (i) => setSettings({ miniOnTop: i.checked, cardOnTop: {} }) },
+    { label: "Keep mini panel on top", type: "checkbox", checked: s().miniOnTop && !s().attachToApp, enabled: s().miniPanel, click: (i) => setSettings({ miniOnTop: i.checked, cardOnTop: {}, attachToApp: false }) },
+    attachItem(),
+    moveItem(),
     { type: "separator" },
     ...cardItems(),
     { type: "separator" },
@@ -205,8 +290,10 @@ function miniMenu(key) {
   const m = minis.get(key) || minis.values().next().value;
   if (!m || !m.win || m.win.isDestroyed()) return;
   Menu.buildFromTemplate([
-    { label: "Keep on top", type: "checkbox", checked: onTopFor(m.key), click: () => togglePin(m.key) },
-    { label: "Only while Claude, ChatGPT or Codex is in front", type: "checkbox", checked: s().miniOnlyWithApp, click: (i) => setSettings({ miniOnlyWithApp: i.checked }) },
+    { label: "Keep on top", type: "checkbox", checked: !s().attachToApp && pinFor(m.key), click: () => togglePin(m.key) },
+    attachItem(),
+    moveItem(),
+    { label: "Only while Claude, ChatGPT or Codex is in front", type: "checkbox", checked: s().miniOnlyWithApp, enabled: !s().attachToApp, click: (i) => setSettings({ miniOnlyWithApp: i.checked }) },
     { type: "separator" },
     ...cardItems(),
     { label: "Side by side", type: "checkbox", checked: s().cardsLayout === "row", enabled: s().cards === "both", click: (i) => setSettings({ cardsLayout: i.checked ? "row" : "column" }) },
@@ -219,7 +306,16 @@ function miniMenu(key) {
   ]).popup({ window: m.win });
 }
 
+function attachItem() {
+  return { label: "On top of its app only", type: "checkbox", checked: !!s().attachToApp, enabled: s().miniPanel && foreground.available(), click: (i) => setSettings({ attachToApp: i.checked }) };
+}
+function moveItem() {
+  return { label: "Move with its app", type: "checkbox", checked: !!s().attachToApp && !!s().attachMove, enabled: s().miniPanel && !!s().attachToApp, click: (i) => setSettings({ attachMove: i.checked }) };
+}
+
 function togglePin(key) {
+  // While cards sit on their apps, the pin floats them above everything again.
+  if (s().attachToApp) { setSettings({ attachToApp: false, miniOnTop: true, cardOnTop: {} }); return; }
   if (key !== "main" && s().cards === "separate") setSettings({ cardOnTop: { ...(s().cardOnTop || {}), [key]: !onTopFor(key) } });
   else setSettings({ miniOnTop: !s().miniOnTop, cardOnTop: {} });
 }
@@ -331,12 +427,13 @@ function applyTopmost(m) {
 
 // Tray click and "Show usage": turn the mini panel on if it's off, show it if "only while … in
 // front" hid it (until a matching app next comes to the front), and bring it above other windows.
-function showMinis() {
+// only: with separate cards, the card whose tray icon was clicked.
+function showMinis(only) {
   forceShow = true;
   if (!s().miniPanel) { setSettings({ miniPanel: true }); return; } // created and shown once loaded
   updateMinis();
   for (const m of minis.values()) {
-    if (m.win.isDestroyed() || !m.ready) continue;
+    if (m.win.isDestroyed() || !m.ready || (only && minis.has(only) && m.key !== only)) continue;
     if (!m.win.isVisible()) { keepOnScreen(m.win); m.win.showInactive(); }
     m.win.moveTop();
     applyTopmost(m);
@@ -355,9 +452,11 @@ function updateMinis() {
     // Redraw when it should show another view, or its settings or the Windows theme changed.
     if (m.view !== want.view || loadedWith.get(win) !== panelKey(want.view)) { m.view = want.view; loadPanel(win, want.view, m.key); }
     win.setOpacity(Math.max(0.3, Math.min(1, Number(s().miniOpacity) || 1)));
+    if (attached()) continue; // attachTick shows, hides and places it
     if (!minisVisible()) { if (win.isVisible()) { stopDrag(win); win.hide(); } }
     else if (!win.isVisible() && m.ready) { keepOnScreen(win); win.showInactive(); applyTopmost(m); }
   }
+  if (attached()) attachTick();
   pollHover();
 }
 
@@ -415,7 +514,10 @@ function stopDrag(win) {
   drags.delete(win);
   if (!drags.size) { clearInterval(dragTimer); dragTimer = null; }
   const m = d && !win.isDestroyed() ? entryOf(win) : null;
-  if (m) { const [x, y] = win.getPosition(); if (x !== d.x || y !== d.y) saveBounds(m.key, { x, y }); }
+  if (m) {
+    const [x, y] = win.getPosition();
+    if (x !== d.x || y !== d.y) { saveBounds(m.key, { x, y }); if (attached() && s().attachMove && m.target) saveOffset(m); }
+  }
 }
 
 function openSettings() {
@@ -437,10 +539,13 @@ function setSettings(patch, quiet) {
   const before = { ...s() };
   store.set(patch);
   // The pin buttons, tray and right-click menus, and Settings all land here.
-  if ("miniOnTop" in patch || "cardOnTop" in patch || "cards" in patch) setImmediate(() => { for (const m of minis.values()) applyTopmost(m); });
+  if ("miniOnTop" in patch || "cardOnTop" in patch || "cards" in patch || "attachToApp" in patch) setImmediate(() => { for (const m of minis.values()) applyTopmost(m); });
+  if ("cards" in patch) setImmediate(() => updateTray());
+  // Moving with the app starts from where each card is now.
+  if (patch.attachMove) store.set({ attachOffsets: {} });
   if ("launchAtLogin" in patch && process.platform === "win32") app.setLoginItemSettings({ openAtLogin: !!s().launchAtLogin, args: ["--hidden"] });
   if ("miniBounds" in patch && patch.miniBounds === null) {
-    store.set({ miniBoundsByApp: {} });
+    store.set({ miniBoundsByApp: {}, attachOffsets: {} });
     for (const m of minis.values()) {
       if (m.win.isDestroyed()) continue;
       const [w, h] = m.win.getSize();
@@ -485,7 +590,7 @@ function cleanSettings(patch) {
     if (k === "mode" && !["follow", ...APP_IDS].includes(v)) continue;
     if (k === "cards") { if (["one", "both", "separate"].includes(v)) clean[k] = v; continue; }
     if (k === "cardOnTop") { if (v && typeof v === "object") clean[k] = Object.fromEntries(["claude", "chatgpt"].filter((a) => typeof v[a] === "boolean").map((a) => [a, v[a]])); continue; }
-    if (k === "miniBoundsByApp") continue; // only the app sets positions
+    if (k === "miniBoundsByApp" || k === "attachOffsets") continue; // only the app sets positions
     if (k === "cardsLayout") { if (["column", "row"].includes(v)) clean[k] = v; continue; }
     if (k === "miniOpacity") { const n = Number(v); if (n >= 0.3 && n <= 1) clean[k] = n; continue; }
     if (k === "miniBounds") { if (v === null) clean[k] = null; continue; }
@@ -554,7 +659,7 @@ app.whenReady().then(async () => {
 
   setupIpc();
   tray = new Tray(trayImage(UsageView.build(currentApp(), store.usage[siteOf(currentApp())]), "left"));
-  tray.on("click", () => showMinis());
+  tray.on("click", () => showMinis(s().cards === "separate" ? "claude" : undefined));
   updateTray();
   updateMinis();
   startForeground();

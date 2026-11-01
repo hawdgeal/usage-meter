@@ -15,6 +15,9 @@ const DEFAULTS = {
   miniPanel: true,
   miniOnTop: true,
   miniOnlyWithApp: false, // show the mini panel only while a matching app is in front
+  attachToApp: false, // keep each card just above its own app's window instead of above everything
+  attachMove: false, // with attachToApp: the card also moves with its app's window
+  attachOffsets: {}, // with attachMove: { key: { right, bottom, dx, dy } } from the nearest corner of the app window
   miniOpacity: 1,
   miniBounds: null,
   miniBoundsByApp: {}, // separate cards: { claude: {x, y}, chatgpt: {x, y} }

@@ -94,7 +94,8 @@
     if (!pin) return;
     const on = onTop();
     pin.setAttribute("aria-pressed", String(on));
-    pin.title = on ? "Always on top: on (click to turn off)" : "Always on top: off (click to turn on)";
+    pin.title = E.state && E.state.attached ? "On top of its app only (click for always on top)"
+      : on ? "Always on top: on (click to turn off)" : "Always on top: off (click to turn on)";
     pin.setAttribute("aria-label", "Keep on top of other windows");
     pin.innerHTML = on ? PIN : PIN_OFF;
   }

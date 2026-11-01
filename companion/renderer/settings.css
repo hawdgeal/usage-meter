@@ -11,6 +11,7 @@ p { margin: 0; }
 .field { display: grid; grid-template-columns: 140px 1fr; align-items: center; gap: 10px; }
 .check { display: flex; gap: 8px; align-items: flex-start; }
 .check input { margin-top: 3px; }
+.check.sub { margin-left: 24px; }
 select, input[type="text"] { font: inherit; color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; min-width: 0; }
 input[type="text"] { flex: 1; font-family: ui-monospace, Consolas, monospace; }
 input[type="range"] { width: 100%; }

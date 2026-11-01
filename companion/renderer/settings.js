@@ -2,7 +2,7 @@
 "use strict";
 const $ = (id) => document.getElementById(id);
 let state = null;
-const CHECKS = ["followBrowsers", "followTerminals", "miniPanel", "miniOnTop", "miniOnlyWithApp", "launchAtLogin"];
+const CHECKS = ["followBrowsers", "followTerminals", "miniPanel", "miniOnTop", "attachToApp", "attachMove", "miniOnlyWithApp", "launchAtLogin"];
 const SELECTS = ["mode", "cards", "cardsLayout"];
 const NAMES = { claude: "Claude", chatgpt: "ChatGPT", codex: "Codex" };
 
@@ -30,7 +30,12 @@ function render() {
   for (const k of SELECTS) $(k).value = s[k];
   $("miniOpacity").value = s.miniOpacity;
   $("cardsLayout").disabled = s.cards !== "both";
-  for (const k of ["miniOnTop", "miniOnlyWithApp", "miniOpacity"]) $(k).disabled = !s.miniPanel;
+  for (const k of ["miniOnTop", "attachToApp", "miniOnlyWithApp", "miniOpacity"]) $(k).disabled = !s.miniPanel;
+  // On top of its own app replaces both "always on top" and "only while … in front".
+  if (s.attachToApp) { $("miniOnTop").checked = false; $("miniOnTop").disabled = $("miniOnlyWithApp").disabled = true; }
+  if (!state.foreground.available) $("attachToApp").disabled = true;
+  $("attachMove").disabled = !s.miniPanel || !s.attachToApp;
+  if (!s.attachToApp) $("attachMove").checked = false;
   for (const k of ["followBrowsers", "followTerminals"]) $(k).disabled = s.mode !== "follow" || !state.foreground.available;
   $("followNote").textContent = s.mode !== "follow" ? "" :
     state.foreground.available ? `Showing ${NAMES[state.followApp]} now. When something else is in front, the last app stays.` :
@@ -87,6 +92,8 @@ async function save(patch) {
 }
 
 for (const k of CHECKS) $(k).addEventListener("change", (e) => save({ [k]: e.target.checked }));
+// Turning "always on top" back on leaves "on top of its own app".
+$("miniOnTop").addEventListener("change", (e) => { if (e.target.checked && state.settings.attachToApp) save({ attachToApp: false }); });
 for (const k of SELECTS) $(k).addEventListener("change", (e) => save({ [k]: e.target.value }));
 $("miniOpacity").addEventListener("input", (e) => save({ miniOpacity: Number(e.target.value) }));
 $("resetPos").addEventListener("click", () => save({ miniBounds: null, miniPanel: true }));
