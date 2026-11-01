@@ -61,13 +61,21 @@
     <h2 id="h-look">Look and layout</h2>
     <label class="check"><input type="radio" name="lookSource" value="browser"> <span><strong>Same as the browser</strong>: theme, bar colors, spacing, compact mode, module order, hover options and width come from the extension's settings for each site, and follow your changes there within a few seconds.</span></label>
     <label class="check"><input type="radio" name="lookSource" value="own"> <span><strong>Own look</strong>: the companion keeps its own copy, which you change with Customize below. Your browser panel isn't affected.</span></label>
-    <div class="line">
-      <button id="customizeClaude" class="btn">Customize Claude…</button>
-      <button id="customizeChatgpt" class="btn">Customize ChatGPT…</button>
-      <button id="importLook" class="btn">Import from browser</button>
-      <button id="resetLook" class="btn">Reset</button>
+    <div class="line look-row" data-site="claude">
+      <strong class="look-name">Claude</strong>
+      <button class="btn" data-look="customize">Customize…</button>
+      <button class="btn" data-look="import">Import from browser</button>
+      <button class="btn" data-look="reset">Reset</button>
+      <span class="muted small" data-look-state></span>
     </div>
-    <p class="muted small">Customize opens the extension's Customize panel for the companion (and switches to Own look). Import copies the browser's current look over the companion's. Reset drops the companion's look and goes back to the browser's. Collapsing the panel or its sections only affects the companion.</p>
+    <div class="line look-row" data-site="chatgpt">
+      <strong class="look-name">ChatGPT</strong>
+      <button class="btn" data-look="customize">Customize…</button>
+      <button class="btn" data-look="import">Import from browser</button>
+      <button class="btn" data-look="reset">Reset</button>
+      <span class="muted small" data-look-state></span>
+    </div>
+    <p class="muted small">Customize opens the extension's Customize panel for that card (and switches to Own look). Import copies the browser's current look for that app over the companion's. Reset drops the companion's look for that app, so its card follows the browser again. Collapsing the panel or its sections only affects the companion.</p>
     <p id="lookStatus" class="muted small"></p>
   </section>
 

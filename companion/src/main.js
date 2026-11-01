@@ -16,7 +16,7 @@ if (!app.requestSingleInstanceLock()) {
 const Store = require("./store");
 const { Bridge } = require("./bridge");
 const UsageView = require("./usage");
-const { matchApp } = require("./app-match");
+const { matchApp, isDesktopApp } = require("./app-match");
 const foreground = require("./foreground");
 const { ringBitmap, trayColor, trayFraction } = require("./icon");
 const registration = require("./register");
@@ -79,6 +79,7 @@ function snapshot() {
     sites: store.usage,
     ext: store.ext,
     look: { claude: lookOf("claude"), chatgpt: lookOf("chatgpt") },
+    ownLooks: { claude: !!store.own.claude, chatgpt: !!store.own.chatgpt },
     local: store.local,
     prefsVersion,
     app: currentApp(),
@@ -168,8 +169,8 @@ function appsFor(m) {
   return id === "chatgpt" || id === "codex" ? ["chatgpt", "codex"] : [id];
 }
 
-// Puts each card just above the highest window of its app, and hides it while that app has no
-// window on screen (closed or minimized). Runs often, since clicking the app raises it over the card.
+// Puts each card just above the highest window of its desktop app, and hides it while that app has
+// no window on screen (closed or minimized). Runs often, since clicking the app raises it over the card.
 let attachTimer = null;
 function attachTick() {
   if (![...minis.values()].some(cardAttached)) { clearInterval(attachTimer); attachTimer = null; return; }
@@ -180,7 +181,9 @@ function attachTick() {
     const win = m.win;
     if (!win || win.isDestroyed() || !m.ready || m.peek || !cardAttached(m)) continue;
     const apps = appsFor(m);
-    const target = wins.find((w) => apps.includes(w.app));
+    // Only the desktop apps themselves (Claude, ChatGPT, Codex), never a browser or terminal window
+    // that has the app in its title: the card would jump between windows of different sizes.
+    const target = wins.find((w) => apps.includes(w.app) && isDesktopApp(w.exe));
     if (!target || target.minimized) { if (win.isVisible() && !drags.has(win)) win.hide(); m.target = null; continue; }
     m.target = target.hwnd;
     if (s().attachMove && !drags.has(win) && !widths.has(win)) followTarget(m, target.hwnd);
@@ -270,8 +273,19 @@ function followTarget(m, target) {
   if (!t || !c) return;
   const o = (s().attachOffsets || {})[m.key];
   if (!o) { saveOffset(m); return; } // first time: where it is now
-  const p = fromOffset(t, c, o);
+  const p = insideScreen(fromOffset(t, c, o), c);
   if (Math.abs(p.x - c.x) > 1 || Math.abs(p.y - c.y) > 1) foreground.moveTo(handle, p.x, p.y);
+}
+// Keeps a card (physical pixels, size c.w × c.h) inside the work area of the screen it's on, so
+// following a window that's partly off-screen never takes the card with it.
+function insideScreen(p, c) {
+  try {
+    const centre = screen.screenToDipPoint({ x: Math.round(p.x + c.w / 2), y: Math.round(p.y + c.h / 2) });
+    const a = screen.dipToScreenRect(null, screen.getDisplayNearestPoint(centre).workArea);
+    return { x: Math.max(a.x, Math.min(p.x, a.x + a.width - c.w)), y: Math.max(a.y, Math.min(p.y, a.y + a.height - c.h)) };
+  } catch (_) {
+    return p;
+  }
 }
 
 function startForeground() {
@@ -612,15 +626,24 @@ function stopDrag(win) {
 }
 
 // ---------- the companion's own look ----------
-// Copies the browser's current look for both sites into the companion's own look.
-function importLook() {
-  for (const site of ["claude", "chatgpt"]) if (store.ext[site]) store.setOwn(site, store.ext[site]);
+// Copies the browser's current look into the companion's own look: one site, or both.
+function importLook(site) {
+  for (const x of site ? [site] : ["claude", "chatgpt"]) {
+    if (store.ext[x]) store.setOwn(x, store.ext[x]);
+    const ed = editors.get(x);
+    if (ed && !ed.isDestroyed()) ed.reload(); // an open editor would save its old copy over it
+  }
   bumpLooks();
 }
-// Back to the browser's look, live; the own look is cleared.
-function resetLook() {
-  for (const site of ["claude", "chatgpt"]) store.setOwn(site, null);
-  setSettings({ lookSource: "browser" }, true);
+// Drops the companion's own look for one site (that card follows the browser again), or for both
+// (and the companion goes back to the browser's look).
+function resetLook(site) {
+  for (const x of site ? [site] : ["claude", "chatgpt"]) {
+    const ed = editors.get(x);
+    if (ed && !ed.isDestroyed()) { editors.delete(x); ed.destroy(); } // or it would save its copy again
+    store.setOwn(x, null);
+  }
+  if (!site || (!store.own.claude && !store.own.chatgpt)) setSettings({ lookSource: "browser" }, true);
   bumpLooks();
 }
 function bumpLooks() {
@@ -633,7 +656,8 @@ function bumpLooks() {
 const editors = new Map(); // site -> window
 function openEditor(appId) {
   const site = siteOf(appId);
-  if (!ownLook()) { if (!store.own.claude && !store.own.chatgpt) importLook(); setSettings({ lookSource: "own" }, true); bumpLooks(); }
+  if (!store.own[site]) importLook(site); // start from what the browser shows for this site
+  if (!ownLook()) { setSettings({ lookSource: "own" }, true); bumpLooks(); }
   const open = editors.get(site);
   if (open && !open.isDestroyed()) { open.show(); open.focus(); return; }
   const win = guard(new BrowserWindow({
@@ -829,8 +853,9 @@ function setupIpc() {
   handle("drag-start", (e) => startDrag(BrowserWindow.fromWebContents(e.sender)));
   handle("drag-end", (e) => stopDrag(BrowserWindow.fromWebContents(e.sender)));
   handle("save-look", (e, site, value) => { if ([...editors.values()].includes(BrowserWindow.fromWebContents(e.sender))) saveLook(site, value); });
-  handle("look-import", () => { importLook(); setSettings({ lookSource: "own" }); return snapshot(); });
-  handle("look-reset", () => { resetLook(); return snapshot(); });
+  const siteArg = (x) => (x === "claude" || x === "chatgpt" ? x : undefined);
+  handle("look-import", (_e, site) => { importLook(siteArg(site)); setSettings({ lookSource: "own" }); return snapshot(); });
+  handle("look-reset", (_e, site) => { resetLook(siteArg(site)); return snapshot(); });
   handle("customize", (e, appId) => openEditor(APP_IDS.includes(appId) ? appId : currentApp()));
   handle("width-start", (e, edge) => startWidth(BrowserWindow.fromWebContents(e.sender), edge === "left" ? "left" : "right"));
   handle("width-end", (e) => stopWidth(BrowserWindow.fromWebContents(e.sender)));

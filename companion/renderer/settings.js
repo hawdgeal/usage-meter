@@ -43,9 +43,14 @@ function render() {
 
   const own = s.lookSource === "own";
   for (const r of document.querySelectorAll('input[name="lookSource"]')) r.checked = r.value === (own ? "own" : "browser");
-  $("resetLook").disabled = !own;
   const got = ["claude", "chatgpt"].filter((k) => state.ext && state.ext[k]).map((k) => NAMES[k]);
-  $("importLook").disabled = !got.length;
+  for (const row of document.querySelectorAll(".look-row")) {
+    const site = row.dataset.site;
+    const hasOwn = own && !!(state.ownLooks && state.ownLooks[site]);
+    row.querySelector('[data-look="import"]').disabled = !(state.ext && state.ext[site]);
+    row.querySelector('[data-look="reset"]').disabled = !hasOwn;
+    row.querySelector("[data-look-state]").textContent = !own ? "same as the browser" : hasOwn ? "own look" : "same as the browser (not customized yet)";
+  }
   $("lookStatus").textContent = own ? "Using the companion's own look." :
     got.length ? `Using your ${got.join(" and ")} panel settings from the extension.` : "No panel settings received yet; using the extension's defaults until the browser connects.";
 
@@ -103,16 +108,18 @@ for (const k of SELECTS) $(k).addEventListener("change", (e) => save({ [k]: e.ta
 $("miniOpacity").addEventListener("input", (e) => save({ miniOpacity: Number(e.target.value) }));
 $("resetPos").addEventListener("click", () => save({ miniBounds: null, miniPanel: true }));
 for (const r of document.querySelectorAll('input[name="lookSource"]')) r.addEventListener("change", (e) => { if (e.target.checked) save({ lookSource: e.target.value }); });
-$("customizeClaude").addEventListener("click", () => window.companion.customize("claude"));
-$("customizeChatgpt").addEventListener("click", () => window.companion.customize("chatgpt"));
-$("importLook").addEventListener("click", async () => {
-  if (state.settings.lookSource === "own" && !confirm("Replace the companion's look with your browser's current one?")) return;
-  state = await window.companion.importLook(); render();
-});
-$("resetLook").addEventListener("click", async () => {
-  if (!confirm("Drop the companion's own look and use your browser's again?")) return;
-  state = await window.companion.resetLook(); render();
-});
+for (const row of document.querySelectorAll(".look-row")) {
+  const site = row.dataset.site, name = NAMES[site];
+  row.querySelector('[data-look="customize"]').addEventListener("click", () => window.companion.customize(site));
+  row.querySelector('[data-look="import"]').addEventListener("click", async () => {
+    if (!row.querySelector('[data-look="reset"]').disabled && !confirm(`Replace the companion's ${name} look with your browser's current one?`)) return;
+    state = await window.companion.importLook(site); render();
+  });
+  row.querySelector('[data-look="reset"]').addEventListener("click", async () => {
+    if (!confirm(`Drop the companion's own ${name} look and follow your browser's again?`)) return;
+    state = await window.companion.resetLook(site); render();
+  });
+}
 $("connect").addEventListener("click", () => window.companion.connectBrowsers());
 $("addId").addEventListener("click", () => {
   const id = $("idInput").value.trim().toLowerCase();

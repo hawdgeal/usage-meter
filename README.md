@@ -2,6 +2,13 @@
 
 One browser extension that adds a **Usage** card to the left sidebar of **ChatGPT** (chatgpt.com) and **Claude** (claude.ai, including Claude Code on the web). Each site keeps its own settings, and the **Sync** tab copies settings between them in either direction.
 
+## What's new in 0.5.2
+
+- **Individual colors** (Customize → Theme): set the background, text, secondary text, borders, hover, bar track and accent one by one, over the theme or preset. Each has a picker, a hex code box, an eyedropper and **Reset**; anything you leave alone keeps following the theme. **Reset all colors** clears them.
+- **Font** (Customize → Theme): Default, Segoe UI, Inter, Arial, Georgia, Monospace, or any installed font by name, and a **text size** from 80% to 150% for the usage card.
+- **Eyedropper** next to every color, bar colors included: picks a color from anywhere on the screen (in browsers that support it, such as Chrome and Edge).
+- Sync's **Theme** group now also copies individual colors and the font.
+
 ## What's new in 0.5.1
 
 - **Bar colors:** every color under **Bars** has a hex code box next to its color picker. Copy a code from there, or paste one in (`#d97757`, `d97757` or the short `#f80`), for example to reuse a color between the 0% and 100% ends, the middle colors, the other site, or the desktop companion.

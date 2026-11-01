@@ -29,4 +29,9 @@ function matchApp(win, opts) {
   return null;
 }
 
-module.exports = { matchApp, fromTitle };
+// True for the desktop apps themselves (not a browser or terminal window matched by its title).
+function isDesktopApp(exe) {
+  return !!APPS[base(exe)];
+}
+
+module.exports = { matchApp, fromTitle, isDesktopApp };

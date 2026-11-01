@@ -20,8 +20,8 @@ contextBridge.exposeInMainWorld("companion", {
   widthEnd: () => ipcRenderer.invoke("width-end"),
   // The companion's own look: the editor saves it; Settings imports or resets it.
   saveLook: (site, value) => ipcRenderer.invoke("save-look", site, value),
-  importLook: () => ipcRenderer.invoke("look-import"),
-  resetLook: () => ipcRenderer.invoke("look-reset"),
+  importLook: (site) => ipcRenderer.invoke("look-import", site),
+  resetLook: (site) => ipcRenderer.invoke("look-reset", site),
   customize: (app) => ipcRenderer.invoke("customize", app),
   // true while the pointer is over this window (the companion polls the cursor)
   onHover: (cb) => ipcRenderer.on("hover", (_e, on) => cb(!!on)),
