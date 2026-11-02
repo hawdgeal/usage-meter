@@ -2,6 +2,10 @@
 
 One browser extension that adds a **Usage** card to the left sidebar of **ChatGPT** (chatgpt.com) and **Claude** (claude.ai, including Claude Code on the web). Each site keeps its own settings, and the **Sync** tab copies settings between them in either direction.
 
+## What's new in 0.5.3
+
+- A clearer **eyedropper** (pipette) icon. In the desktop companion it opens the companion's own picker, which picks a color from anywhere on the screen, with a preview of the color and its hex code next to the pointer (Esc cancels).
+
 ## What's new in 0.5.2
 
 - **Individual colors** (Customize → Theme): set the background, text, secondary text, borders, hover, bar track and accent one by one, over the theme or preset. Each has a picker, a hex code box, an eyedropper and **Reset**; anything you leave alone keeps following the theme. **Reset all colors** clears them.

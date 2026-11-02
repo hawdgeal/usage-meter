@@ -97,6 +97,8 @@
       }
     },
     openUrl(url) { C.openUrl(String(url)); },
+    // The companion's own screen color picker (works outside the window, unlike the browser's).
+    pickColor() { return C.pickColor(); },
   };
   globalThis.__usageMeterCompanion = E;
 })();

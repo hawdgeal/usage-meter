@@ -941,7 +941,12 @@
   }
   const accentNames={auto:'Match theme',default:'Default',blue:'Blue',green:'Green',yellow:'Yellow',pink:'Pink',orange:'Orange',purple:'Purple',neutral:'Black / White'};
   const themeProbe=document.createElement('span');themeProbe.hidden=true;root.appendChild(themeProbe);
-  const EYEDROPPER=typeof globalThis.EyeDropper==='function';
+  // The companion has its own screen-wide picker; browsers use the EyeDropper API where they have it.
+  const EYEDROPPER=!!(EMBED&&EMBED.pickColor)||typeof globalThis.EyeDropper==='function';
+  async function pickScreenColor(){
+    if(EMBED&&EMBED.pickColor)return EMBED.pickColor();
+    try{return (await new globalThis.EyeDropper().open()).sRGBHex;}catch(_){return null;}
+  }
   // A theme color as the card shows it now, as #rrggbb (for the Individual colors pickers).
   function currentColor(key){
     themeProbe.style.color=getComputedStyle(card).getPropertyValue('--'+key).trim()||'currentColor';
@@ -1008,7 +1013,7 @@
     // Each color also has its hex code, to copy it or paste one in (also between the browser and the companion).
     const hexInput=(attr,value,label)=>`<input type="text" class="hex-input" ${attr} value="${value}" maxlength="7" spellcheck="false" autocomplete="off" aria-label="${label} hex code">`;
     // Eyedropper (where the browser has one): picks a color from anywhere on the screen.
-    const eyeBtn=(target,label)=>EYEDROPPER?`<button class="icon eyedrop" data-eyedrop="${target}" aria-label="Pick ${label} from the screen" title="Pick a color from anywhere on the screen"><svg aria-hidden="true" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m14 7 3 3"/><path d="M5 19l1.5-.5L17 8a2.1 2.1 0 0 0-3-3L3.5 15.5 3 17z"/><path d="m15.5 4 4.5 4.5"/></svg></button>`:'';
+    const eyeBtn=(target,label)=>EYEDROPPER?`<button class="icon eyedrop" data-eyedrop="${target}" aria-label="Pick ${label} from the screen" title="Pick a color from anywhere on the screen"><svg aria-hidden="true" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 7.5l3 3"/><path d="M15 6l2.3-2.3a2.1 2.1 0 0 1 3 3L18 9"/><path d="M14.5 8.5 6 17v2h2l8.5-8.5"/><path d="M4 20l2-1"/></svg></button>`:'';
     const colorInput=(label,key)=>`<label class="setting"><span>${label}</span><span class="color-pair"><input type="color" aria-label="${label}" data-simple-bar-color="${key}" value="${state[key]}">${hexInput(`data-hex-for="${key}"`,state[key],label)}${eyeBtn('simple:'+key,label)}</span></label>`;
     const customRow=c=>{const set=isHex(state.customColors[c.key]),value=set?state.customColors[c.key]:currentColor(c.key);return `<div class="setting"><span>${c.label}</span><span class="color-pair"><input type="color" aria-label="${c.label}" data-custom-color="${c.key}" value="${value}">${hexInput(`data-hex-custom="${c.key}"`,value,c.label)}${eyeBtn('custom:'+c.key,c.label)}<button class="text-btn" data-reset-color="${c.key}" ${set?'':'disabled'} title="Back to the theme's color">Reset</button></span></div>`;};
     const customColorsGroup=group('customColors','Individual colors',CUSTOM_COLORS.map(customRow).join('')+`<button class="text-btn" data-reset-colors ${Object.keys(state.customColors).length?'':'disabled'}>Reset all colors</button><div class="note">Each color you set here replaces the theme's. Reset goes back to the theme, preset or ${SITE.name}'s color. Bar colors are under Bars.</div>`);
@@ -1270,8 +1275,7 @@
     if(t.hasAttribute('data-reset-colors')){for(const c of CUSTOM_COLORS)if(state.customColors[c.key])setCustomColor(c.key,null);return;}
     // Eyedropper: the picked color goes through the matching hex box, like a pasted code.
     if(!EYEDROPPER)return;
-    let picked;try{picked=await new globalThis.EyeDropper().open();}catch(_){return;}
-    const value=parseHex(picked&&picked.sRGBHex);if(!value)return;
+    const value=parseHex(await pickScreenColor());if(!value)return;
     const [kind,key]=t.dataset.eyedrop.split(':');
     const hex=$(kind==='simple'?`[data-hex-for="${key}"]`:kind==='stop'?`[data-hex-stop="${key}"]`:`[data-hex-custom="${key}"]`);
     if(!hex)return;

@@ -39,6 +39,10 @@ function load() {
     api.WindowFromPoint = user32.func("intptr_t __stdcall WindowFromPoint(UMC_POINT Point)");
     api.GetAncestor = user32.func("intptr_t __stdcall GetAncestor(intptr_t hwnd, uint32_t gaFlags)");
     api.GetAsyncKeyState = user32.func("int16_t __stdcall GetAsyncKeyState(int vKey)");
+    // Reading a pixel from the screen (for the color picker).
+    api.GetDC = user32.func("intptr_t __stdcall GetDC(intptr_t hWnd)");
+    api.ReleaseDC = user32.func("int __stdcall ReleaseDC(intptr_t hWnd, intptr_t hDC)");
+    api.GetPixel = koffi.load("gdi32.dll").func("uint32_t __stdcall GetPixel(intptr_t hdc, int x, int y)");
     try {
       // Cloaked windows (other virtual desktops, suspended Store apps) count as visible but aren't shown.
       const dwm = koffi.load("dwmapi.dll");
@@ -225,8 +229,24 @@ function pointer() {
   }
 }
 
+// The color on screen at x, y (physical pixels), as "#rrggbb"; null if it can't be read.
+function pixelAt(x, y) {
+  if (!load()) return null;
+  let dc = 0;
+  try {
+    dc = api.GetDC(0);
+    const c = api.GetPixel(dc, Math.round(x), Math.round(y));
+    if (c === 0xffffffff) return null; // CLR_INVALID: outside every screen
+    return "#" + [c & 0xff, (c >> 8) & 0xff, (c >> 16) & 0xff].map((n) => n.toString(16).padStart(2, "0")).join("");
+  } catch (_) {
+    return null;
+  } finally {
+    if (dc) api.ReleaseDC(0, dc);
+  }
+}
+
 function available() {
   return !!load();
 }
 
-module.exports = { get, available, setTopmost, handleValue, listWindows, placeAbove, rectOf, moveTo, pointer, error: () => (load(), loadError) };
+module.exports = { get, available, setTopmost, handleValue, listWindows, placeAbove, rectOf, moveTo, pointer, pixelAt, error: () => (load(), loadError) };

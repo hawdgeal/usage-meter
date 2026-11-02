@@ -599,7 +599,7 @@ function pollHover() {
 const drags = new Map(); // window -> { cx, cy, x, y, started }
 let dragTimer = null;
 function startDrag(win) {
-  if (!win || win.isDestroyed() || !entryOf(win)) return;
+  if (!win || win.isDestroyed() || (!entryOf(win) && ![...editors.values()].includes(win))) return;
   const c = screen.getCursorScreenPoint();
   const [x, y] = win.getPosition();
   drags.set(win, { cx: c.x, cy: c.y, x, y, started: Date.now() });
@@ -611,7 +611,11 @@ function moveDrags() {
     if (win.isDestroyed() || Date.now() - d.started > 120000) { stopDrag(win); continue; }
     const nx = d.x + c.x - d.cx, ny = d.y + c.y - d.cy;
     const [x, y] = win.getPosition();
-    if (nx !== x || ny !== y) win.setPosition(nx, ny);
+    if (nx === x && ny === y) continue;
+    // The Customize window gets its exact size each time: moving this see-through window alone made
+    // it a few pixels bigger on every move.
+    if ([...editors.values()].includes(win)) win.setBounds({ x: nx, y: ny, ...EDITOR_SIZE });
+    else win.setPosition(nx, ny);
   }
 }
 function stopDrag(win) {
@@ -654,16 +658,19 @@ function bumpLooks() {
 // The editor: a larger window with one site's card and the extension's Customize panel. Its
 // changes are saved as the companion's own look (switching to it, from the browser's look, first).
 const editors = new Map(); // site -> window
+const EDITOR_SIZE = { width: 780, height: 740 };
 function openEditor(appId) {
   const site = siteOf(appId);
   if (!store.own[site]) importLook(site); // start from what the browser shows for this site
   if (!ownLook()) { setSettings({ lookSource: "own" }, true); bumpLooks(); }
   const open = editors.get(site);
   if (open && !open.isDestroyed()) { open.show(); open.focus(); return; }
+  // Frameless and see-through like the cards: the card and the Customize panel float on their own.
+  // It's moved by the card or the panel's title, and the panel's × closes it (see embed-after.js).
   const win = guard(new BrowserWindow({
-    width: 760, height: 720, minWidth: 700, minHeight: 480, title: `Customize the ${APP_LABELS[site]} card`,
-    autoHideMenuBar: true, show: false,
-    backgroundColor: nativeTheme.shouldUseDarkColors ? "#202020" : "#ffffff",
+    ...EDITOR_SIZE, title: `Customize the ${APP_LABELS[site]} card`,
+    frame: false, transparent: true, backgroundColor: "#00000000", hasShadow: false,
+    resizable: false, maximizable: false, fullscreenable: false, show: false,
     webPreferences: { preload: PRELOAD, contextIsolation: true, sandbox: true, nodeIntegration: false, spellcheck: false },
   }));
   win.setMenu(null);
@@ -677,6 +684,56 @@ function openEditor(appId) {
 function saveLook(site, value) {
   if (!ownLook() || (site !== "claude" && site !== "chatgpt") || !value || typeof value !== "object") return;
   if (store.setOwn(site, value)) { prefsVersion[site]++; changed(); }
+}
+
+// ---------- screen color picker ----------
+// The eyedropper in the companion: a nearly transparent layer over every screen. The color under
+// the pointer shows next to it; a click hides the layer and reads that pixel from the screen, so it
+// works anywhere (other apps, the desktop, the taskbar). Resolves to "#rrggbb", or null if cancelled.
+let picker = null; // { win, timer, resolve, last }
+function pickColor() {
+  if (picker) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const all = screen.getAllDisplays().map((d) => d.bounds);
+    const x = Math.min(...all.map((b) => b.x)), y = Math.min(...all.map((b) => b.y));
+    const w = Math.max(...all.map((b) => b.x + b.width)) - x, h = Math.max(...all.map((b) => b.y + b.height)) - y;
+    const win = guard(new BrowserWindow({
+      x, y, width: w, height: h, frame: false, transparent: true, backgroundColor: "#00000000", hasShadow: false,
+      resizable: false, movable: false, minimizable: false, maximizable: false, fullscreenable: false,
+      skipTaskbar: true, alwaysOnTop: true, show: false, enableLargerThanScreen: true,
+      webPreferences: { preload: PRELOAD, contextIsolation: true, sandbox: true, nodeIntegration: false },
+    }));
+    win.setAlwaysOnTop(true, "screen-saver");
+    win.setBounds({ x, y, width: w, height: h });
+    picker = { win, resolve, last: null, origin: { x, y } };
+    win.loadFile(path.join(RENDERER, "picker.html"));
+    win.once("ready-to-show", () => { win.show(); win.focus(); });
+    win.on("closed", () => finishPick(null));
+    picker.timer = setInterval(() => {
+      const p = foreground.pointer();
+      if (!p || !picker || picker.win.isDestroyed()) return;
+      const hex = foreground.pixelAt(p.x, p.y);
+      const dip = screen.screenToDipPoint({ x: p.x, y: p.y });
+      picker.last = hex;
+      picker.win.webContents.send("picker", { x: dip.x - picker.origin.x, y: dip.y - picker.origin.y, hex });
+    }, 30);
+  });
+}
+// pick: read the pixel under the pointer (after hiding the layer), or cancel.
+async function finishPick(pick) {
+  if (!picker) return;
+  const p = picker;
+  picker = null;
+  clearInterval(p.timer);
+  let hex = null;
+  if (pick && !p.win.isDestroyed()) {
+    p.win.hide();
+    await new Promise((r) => setTimeout(r, 80)); // let the screen redraw without the layer
+    const ptr = foreground.pointer();
+    hex = (ptr && foreground.pixelAt(ptr.x, ptr.y)) || p.last;
+  }
+  if (!p.win.isDestroyed()) p.win.destroy();
+  p.resolve(hex);
 }
 
 // ---------- resizing (width) ----------
@@ -857,6 +914,8 @@ function setupIpc() {
   handle("look-import", (_e, site) => { importLook(siteArg(site)); setSettings({ lookSource: "own" }); return snapshot(); });
   handle("look-reset", (_e, site) => { resetLook(siteArg(site)); return snapshot(); });
   handle("customize", (e, appId) => openEditor(APP_IDS.includes(appId) ? appId : currentApp()));
+  handle("pick-color", () => pickColor());
+  handle("picker-done", (e, pick) => { if (picker && BrowserWindow.fromWebContents(e.sender) === picker.win) finishPick(!!pick); });
   handle("width-start", (e, edge) => startWidth(BrowserWindow.fromWebContents(e.sender), edge === "left" ? "left" : "right"));
   handle("width-end", (e) => stopWidth(BrowserWindow.fromWebContents(e.sender)));
 }

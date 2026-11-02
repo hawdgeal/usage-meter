@@ -82,6 +82,10 @@
     // Leave the scrollbar of the card's body alone.
     const body = path.find((n) => n instanceof Element && n.classList && n.classList.contains("body"));
     if (body && e.clientX >= body.getBoundingClientRect().left + body.clientWidth) return;
+    beginDrag(e);
+  }
+  // The companion moves the window while the button is held.
+  function beginDrag(e) {
     e.preventDefault();
     const target = e.target;
     let dragging = true;
@@ -119,10 +123,35 @@
       const edit = document.createElement("style");
       // The Customize panel fills the space to the right of the card instead of floating over it.
       edit.textContent = `:host([data-embedded]) .customize{display:inline-grid !important;opacity:1 !important;pointer-events:auto !important;width:auto !important}
-        .settings{position:fixed !important;inset:16px 16px 16px 360px !important;width:auto !important;height:auto !important;max-width:none !important;max-height:none !important;margin:0 !important}
-        .settings .settings-resize,.settings-drag,.settings [data-settings-drag]{display:none !important}`;
+        .settings{position:fixed !important;inset:16px 16px auto 360px !important;width:auto !important;height:auto !important;max-width:none !important;max-height:calc(100vh - 32px) !important;margin:0 !important}
+        .settings .settings-resize,.settings-drag,.settings [data-settings-drag]{display:none !important}
+        .card{box-shadow:0 8px 28px #0006 !important}
+        .settings-header,.settings-title{cursor:default}`;
       root.appendChild(edit);
+      // The window has no frame: the panel's × closes it, and the card or the panel's title moves it.
+      root.addEventListener("click", (e) => {
+        if (e.target.closest && e.target.closest(".close-settings")) { e.preventDefault(); e.stopImmediatePropagation(); window.close(); }
+      }, true);
+      // Runs before the panel's own handlers (capture), so its title moves the window rather than
+      // sliding the panel around inside it.
+      root.addEventListener("pointerdown", (e) => {
+        if (e.button !== 0) return;
+        const path = e.composedPath();
+        const onTitle = path.some((n) => n instanceof Element && n.matches(".settings-title"));
+        // The Customize panel itself is a popover: only real controls inside it don't drag.
+        if (path.some((n) => n instanceof Element && n.matches(INTERACTIVE) && !n.matches("[popover],dialog,.settings-grab"))) return;
+        const onCard = path.some((n) => n === card);
+        if (!onCard && !onTitle) return;
+        e.stopImmediatePropagation();
+        beginDrag(e);
+      }, true);
+      root.addEventListener("dblclick", (e) => { if (e.target.closest && e.target.closest(".settings-title")) e.stopImmediatePropagation(); }, true);
+      // In this window the panel is the whole point: it doesn't close on Esc or a click elsewhere
+      // (a "manual" popover), and if it closes anyway it opens again.
+      const panel = root.querySelector(".settings");
+      if (panel) panel.setAttribute("popover", "manual");
       const open = () => { const b = root.querySelector(".customize"); if (b && b.getAttribute("aria-expanded") !== "true") b.click(); };
+      if (panel) panel.addEventListener("toggle", (e) => { if (e.newState === "closed") setTimeout(open, 50); });
       setTimeout(open, 200);
       return true;
     }

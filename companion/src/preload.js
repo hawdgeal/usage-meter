@@ -23,6 +23,10 @@ contextBridge.exposeInMainWorld("companion", {
   importLook: (site) => ipcRenderer.invoke("look-import", site),
   resetLook: (site) => ipcRenderer.invoke("look-reset", site),
   customize: (app) => ipcRenderer.invoke("customize", app),
+  // Screen color picker: pickColor resolves to "#rrggbb" or null. The picker layer uses the other two.
+  pickColor: () => ipcRenderer.invoke("pick-color"),
+  onPicker: (cb) => ipcRenderer.on("picker", (_e, p) => cb(p)),
+  pickerDone: (pick) => ipcRenderer.invoke("picker-done", !!pick),
   // true while the pointer is over this window (the companion polls the cursor)
   onHover: (cb) => ipcRenderer.on("hover", (_e, on) => cb(!!on)),
 });
