@@ -198,7 +198,9 @@ function attachTick() {
 // fade and let clicks through ("peek"). It stays that way while the pointer is in that area (the
 // menu, its items, a dialog there) and comes back PEEK_BACK_MS after the pointer leaves it, or when
 // you switch to another app. Clicks on the card itself don't count.
-const PEEK_NEAR_X = 40, PEEK_NEAR_Y = 250, PEEK_BACK_MS = 1500; // physical pixels; ms
+// A click must land within PEEK_CLICK of the card to start; once faded, the card stays out of the way
+// while the pointer is within PEEK_NEAR_X / PEEK_NEAR_Y of it (room for a menu that opens there).
+const PEEK_CLICK = 24, PEEK_NEAR_X = 40, PEEK_NEAR_Y = 250, PEEK_BACK_MS = 1500; // physical pixels; ms
 const FADED_OPACITY = 0.12;
 let clickTimer = null, wasDown = false;
 const normalOpacity = () => Math.max(0.3, Math.min(1, Number(s().miniOpacity) || 1));
@@ -228,7 +230,7 @@ function clickTick() {
   for (const m of active) {
     if (m.peek || !m.win.isVisible() || !appsFor(m).includes(app)) continue;
     const c = foreground.rectOf(m.win.getNativeWindowHandle(), true);
-    if (c && inRect(p, c, PEEK_NEAR_X, PEEK_NEAR_Y)) startPeek(m, c);
+    if (c && inRect(p, c, PEEK_CLICK, PEEK_CLICK)) startPeek(m, c);
   }
 }
 
