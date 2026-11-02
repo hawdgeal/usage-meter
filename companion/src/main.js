@@ -257,6 +257,13 @@ function popupOpen(m, target, t, f) {
   const c = m.win.isVisible() ? foreground.rectOf(m.win.getNativeWindowHandle(), false) : null;
   const top = c ? c.y : t.y + f.bottom - 150;
   const x = t.x + f.right;
+  // The edge is also the sidebar's resize handle: it lights up under the pointer (and while dragging
+  // it), and fades back for a moment after the pointer leaves.
+  const p = foreground.pointer();
+  if (p && Math.abs(p.x - x) <= Math.round(20 * scaleAt(t)) && p.y >= t.y && p.y < t.y + t.h) m.edgeHoverAt = Date.now();
+  if (Date.now() - (m.edgeHoverAt || 0) < 1000) return false;
+  // While a button is held (dragging the edge, say), the edge may have moved: keep the last answer.
+  if (p && p.button) return !!m.popup;
   let seen = 0, off = 0;
   for (const r of [0.15, 0.3, 0.45, 0.6]) {
     const y = Math.round(t.y + t.h * r);
@@ -265,7 +272,10 @@ function popupOpen(m, target, t, f) {
     const px = foreground.pixelAt(x, y);
     if (px && colorDiff(px, f.edge) > 12) off++;
   }
-  return seen >= 2 && off >= seen * 0.6;
+  // Seen twice in a row (about 0.3 s), so a passing flicker doesn't hide the card.
+  const dim = seen >= 2 && off >= seen * 0.6;
+  m.dimTicks = dim ? (m.dimTicks || 0) + 1 : 0;
+  return m.dimTicks >= 2;
 }
 
 // Tells the page how to look: flat, in the sidebar's colors, or (null) as usual.
@@ -334,12 +344,14 @@ function clickTick() {
   }
 }
 
-// A docked card: clicks in the sidebar column from its top down, around the card (your name in
-// Claude, your picture in ChatGPT's icon strip), open the menus that come up over it.
+// A docked card: clicks on the bottom row of the sidebar (your name in Claude, your picture in
+// ChatGPT's icon strip) open the menus that come up over it. Other clicks beside the card don't
+// count; a menu opened some other way is noticed in the picture (see dockTo).
 function dockMenuZone(m, c) {
   const f = m.dock && m.dock.found, t = m.target && foreground.rectOf(m.target, true);
   if (!f || !t) return null;
-  return { x: t.x, y: c.y, w: f.right, h: t.y + t.h - c.y };
+  const top = Math.max(c.y + c.h - 4, t.y + t.h - Math.round(80 * (m.dock.scale || 1)));
+  return { x: t.x, y: top, w: f.right, h: t.y + t.h - top };
 }
 
 function setFaded(m, fade) {
