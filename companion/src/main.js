@@ -18,6 +18,7 @@ const { Bridge } = require("./bridge");
 const UsageView = require("./usage");
 const { matchApp, isDesktopApp } = require("./app-match");
 const foreground = require("./foreground");
+const sidebar = require("./sidebar");
 const { ringBitmap, trayColor, trayFraction } = require("./icon");
 const registration = require("./register");
 
@@ -55,7 +56,11 @@ const pinFor = (key) => (key !== "main" && s().cardOnTop && typeof s().cardOnTop
 // an unpinned card is then an ordinary window. The tray's "Show usage" floats them above everything
 // until one of the apps next comes to the front.
 const attached = () => !!s().attachToApp && foreground.available() && !forceShow;
-const cardAttached = (m) => attached() && pinFor(m.key);
+// Docked in its app's sidebar: the card's dock button, else the "Dock in its app's sidebar" setting.
+const dockFor = (key) => (s().cardDock && typeof s().cardDock[key] === "boolean" ? s().cardDock[key] : !!s().dockSidebar);
+const cardAttached = (m) => attached() && (pinFor(m.key) || dockFor(m.key));
+// (One app per card; two cards in one panel stay as they are.)
+const docked = (m) => dockFor(m.key) && cardAttached(m) && m.view !== "both";
 const onTopFor = (key) => (attached() ? false : pinFor(key));
 const siteOf = (id) => UsageView.APPS[id].site;
 const extOf = (site) => store.ext[site] || {};
@@ -85,6 +90,7 @@ function snapshot() {
     app: currentApp(),
     // The pin's state: on top of everything, or of its own app with "On top of its app only".
     onTop: { main: pinFor("main"), claude: pinFor("claude"), chatgpt: pinFor("chatgpt") },
+    dock: { main: dockFor("main"), claude: dockFor("claude"), chatgpt: dockFor("chatgpt") },
     followApp,
     frontMatched,
     hosts: bridge ? bridge.list() : [],
@@ -186,10 +192,102 @@ function attachTick() {
     const target = wins.find((w) => apps.includes(w.app) && isDesktopApp(w.exe));
     if (!target || target.minimized) { if (win.isVisible() && !drags.has(win)) win.hide(); m.target = null; continue; }
     m.target = target.hwnd;
-    if (s().attachMove && !drags.has(win) && !widths.has(win)) followTarget(m, target.hwnd);
-    if (!win.isVisible()) { if (!s().attachMove) keepOnScreen(win); win.showInactive(); pollHover(); }
+    const dock = docked(m);
+    if (dock) { if (!dockTo(m, target.hwnd)) { if (win.isVisible()) win.hide(); continue; } }
+    else if (s().attachMove && !drags.has(win) && !widths.has(win)) followTarget(m, target.hwnd);
+    if (!win.isVisible()) { if (!s().attachMove && !dock) keepOnScreen(win); win.showInactive(); pollHover(); }
     foreground.placeAbove(win.getNativeWindowHandle(), target.hwnd);
   }
+}
+
+// ---------- docked into the app's sidebar ----------
+// The card takes the sidebar's width and sits at its bottom (in Claude just above your name), drawn flat in the sidebar's color. The sidebar is
+// found in a picture of the app's window (see sidebar.js), again whenever the window moves or
+// resizes and every DOCK_RECHECK_MS (for the sidebar's own width, or it being closed). With no
+// sidebar the card hides.
+const DOCK_RECHECK_MS = 500;
+function scaleAt(r) {
+  try { return screen.getDisplayNearestPoint(screen.screenToDipPoint({ x: r.x + 10, y: r.y + 10 })).scaleFactor || 1; } catch (_) { return 1; }
+}
+// Claude's footer has your name (and its menu), so the card stays above it. ChatGPT's footer is
+// its "Getting started" box: the card covers it and sits at the very bottom.
+const footOf = (m, f) => (m.view === "claude" ? f.bottom : f.end);
+function dockTo(m, target) {
+  const t = foreground.rectOf(target, true);
+  if (!t) return false;
+  const key = `${target}|${t.x},${t.y},${t.w},${t.h}`;
+  const now = Date.now();
+  if (!m.dock || m.dock.key !== key || now - m.dock.at > DOCK_RECHECK_MS) {
+    const scale = scaleAt(t);
+    const img = foreground.capture(target);
+    const found = sidebar.detect(img, t, scale);
+    const old = m.dock && m.dock.key === key && m.dock.found;
+    // While a dialog dims the window, the picture has the same sidebar in darker colors: keep the
+    // real ones (for 20 s at most). Anything else, such as another page of the app, replaces them.
+    const dimmed = m.popup && now - m.popupSince < 20000 && old && found && found.left === old.left && found.right === old.right &&
+      lum(found.bg) < lum(old.bg) - 6 && lum(found.edge) < lum(old.edge) - 6;
+    m.dock = { key, at: now, scale, found: dimmed ? old : found };
+    // A menu of the app open where the card sits (the account menu, a chat's menu): step aside.
+    const f0 = m.dock.found, c0 = foreground.rectOf(m.win.getNativeWindowHandle(), false);
+    m.dock.menu = !!(f0 && c0 && sidebar.covered(img, t, f0.bg, { x: f0.left, y: footOf(m, f0) - c0.h, w: f0.right - f0.left, h: c0.h }));
+    sendDock(m);
+  }
+  if (m.dock.menu) return false;
+  const f = m.dock.found;
+  if (!f) return false;
+  const popup = popupOpen(m, target, t, f);
+  if (popup && !m.popup) m.popupSince = now;
+  m.popup = popup;
+  if (popup) return false;
+  const handle = m.win.getNativeWindowHandle();
+  const w = Math.max(MIN_WIDTH / 2, Math.floor((f.right - f.left) / m.dock.scale));
+  if (m.dockWidth !== w) { m.dockWidth = w; m.win.setContentSize(w, m.win.getContentSize()[1]); }
+  const c = foreground.rectOf(handle, false);
+  if (!c) return true;
+  const x = t.x + f.left, y = Math.max(t.y, t.y + footOf(m, f) - c.h);
+  if (c.x !== x || c.y !== y) foreground.moveTo(handle, x, y);
+  return true;
+}
+// A dialog in the app (Settings, search…) dims the whole window, the sidebar's edge included. The
+// edge is checked on screen above the card, where only the app draws, while the app is in front there.
+const lum = (c) => parseInt(c.slice(1, 3), 16) + parseInt(c.slice(3, 5), 16) + parseInt(c.slice(5, 7), 16);
+const colorDiff = (a, b) => [1, 3, 5].reduce((n, i) => n + Math.abs(parseInt(a.slice(i, i + 2), 16) - parseInt(b.slice(i, i + 2), 16)), 0);
+function popupOpen(m, target, t, f) {
+  if (!f.edge) return false;
+  const c = m.win.isVisible() ? foreground.rectOf(m.win.getNativeWindowHandle(), false) : null;
+  const top = c ? c.y : t.y + f.bottom - 150;
+  const x = t.x + f.right;
+  let seen = 0, off = 0;
+  for (const r of [0.15, 0.3, 0.45, 0.6]) {
+    const y = Math.round(t.y + t.h * r);
+    if (y > top - 8 || foreground.windowAt(x, y) !== target) continue;
+    seen++;
+    const px = foreground.pixelAt(x, y);
+    if (px && colorDiff(px, f.edge) > 12) off++;
+  }
+  return seen >= 2 && off >= seen * 0.6;
+}
+
+// Tells the page how to look: flat, in the sidebar's colors, or (null) as usual.
+function sendDock(m) {
+  const f = docked(m) && m.dock && m.dock.found;
+  const look = f ? { bg: f.bg, line: f.line } : null;
+  const k = JSON.stringify(look);
+  if (m.dockSent === k || !m.win || m.win.isDestroyed() || m.win.webContents.isLoading()) return;
+  m.dockSent = k;
+  m.win.webContents.send("dock", look);
+}
+// Back to an ordinary card where it was before docking.
+function undock(m) {
+  if (!m.dock && !m.dockWidth) return;
+  m.dock = null;
+  m.dockWidth = null;
+  if (m.win.isDestroyed()) return;
+  sendDock(m);
+  m.win.setContentSize(widthFor(m.key, m.view), m.win.getContentSize()[1]);
+  const b = savedBounds(m.key);
+  if (b && onScreen(b)) m.win.setPosition(Math.round(b.x), Math.round(b.y));
+  keepOnScreen(m.win);
 }
 
 // ---------- getting out of the app's way ----------
@@ -230,8 +328,18 @@ function clickTick() {
   for (const m of active) {
     if (m.peek || !m.win.isVisible() || !appsFor(m).includes(app)) continue;
     const c = foreground.rectOf(m.win.getNativeWindowHandle(), true);
-    if (c && inRect(p, c, PEEK_CLICK, PEEK_CLICK)) startPeek(m, c);
+    if (!c) continue;
+    if (docked(m)) { const z = dockMenuZone(m, c); if (z && inRect(p, z) && !inRect(p, c)) startPeek(m, c); }
+    else if (inRect(p, c, PEEK_CLICK, PEEK_CLICK)) startPeek(m, c);
   }
+}
+
+// A docked card: clicks in the sidebar column from its top down, around the card (your name in
+// Claude, your picture in ChatGPT's icon strip), open the menus that come up over it.
+function dockMenuZone(m, c) {
+  const f = m.dock && m.dock.found, t = m.target && foreground.rectOf(m.target, true);
+  if (!f || !t) return null;
+  return { x: t.x, y: c.y, w: f.right, h: t.y + t.h - c.y };
 }
 
 function setFaded(m, fade) {
@@ -363,6 +471,7 @@ function trayMenu() {
     { label: "Keep mini panel on top", type: "checkbox", checked: s().miniOnTop && !s().attachToApp, enabled: s().miniPanel, click: (i) => setSettings({ miniOnTop: i.checked, cardOnTop: {}, attachToApp: false }) },
     attachItem(),
     moveItem(),
+    dockItem(),
     { type: "separator" },
     ...cardItems(),
     { type: "separator" },
@@ -383,6 +492,7 @@ function miniMenu(key) {
     { label: s().attachToApp ? "Keep on top of its app" : "Keep on top", type: "checkbox", checked: pinFor(m.key), click: () => togglePin(m.key) },
     attachItem(),
     moveItem(),
+    dockItem(m.key),
     { label: "Only while Claude, ChatGPT or Codex is in front", type: "checkbox", checked: s().miniOnlyWithApp, enabled: !s().attachToApp, click: (i) => setSettings({ miniOnlyWithApp: i.checked }) },
     { type: "separator" },
     ...cardItems(),
@@ -391,6 +501,7 @@ function miniMenu(key) {
     ...modeItems(),
     { type: "separator" },
     { label: "Refresh", click: () => refresh() },
+    { label: "Reset height", enabled: !!(s().cardHeights || {})[heightKey(m)] && m.view !== "both", click: () => resetHeight(m) },
     { label: "Reset width", enabled: !!(s().cardWidths || {})[m.key] && m.view !== "both", click: () => resetWidth(m.key) },
     { label: `Customize look${m.view === "both" ? " (Claude)" : ""}…`, click: () => openEditor(m.view === "both" ? "claude" : m.view) },
     ...(m.view === "both" ? [{ label: "Customize look (ChatGPT)…", click: () => openEditor("chatgpt") }] : []),
@@ -402,8 +513,20 @@ function miniMenu(key) {
 function attachItem() {
   return { label: "On top of its app only", type: "checkbox", checked: !!s().attachToApp, enabled: s().miniPanel && foreground.available(), click: (i) => setSettings({ attachToApp: i.checked }) };
 }
+// key: a card's own menu docks that card; the tray menu docks every card.
+function dockItem(key) {
+  if (key) return { label: "Dock in its app's sidebar", type: "checkbox", checked: !!s().attachToApp && dockFor(key), enabled: s().miniPanel && foreground.available(), click: () => toggleDock(key) };
+  return { label: "Dock in their apps' sidebars", type: "checkbox", checked: !!s().attachToApp && !!s().dockSidebar, enabled: s().miniPanel && foreground.available(), click: (i) => setSettings(i.checked ? { dockSidebar: true, attachToApp: true } : { dockSidebar: false }) };
+}
+// The card's dock button. Docking needs "On top of its app only", so it turns that on too.
+function toggleDock(key) {
+  const on = !(s().attachToApp && dockFor(key));
+  const patch = { cardDock: { ...(s().cardDock || {}), [key]: on } };
+  if (on && !s().attachToApp) patch.attachToApp = true;
+  setSettings(patch);
+}
 function moveItem() {
-  return { label: "Move with its app", type: "checkbox", checked: !!s().attachToApp && !!s().attachMove, enabled: s().miniPanel && !!s().attachToApp, click: (i) => setSettings({ attachMove: i.checked }) };
+  return { label: "Move with its app", type: "checkbox", checked: !!s().attachToApp && !!s().attachMove, enabled: s().miniPanel && !!s().attachToApp && !s().dockSidebar, click: (i) => setSettings({ attachMove: i.checked }) };
 }
 
 // The pin turns "on top" on or off for that card: on top of everything, or of its own app with
@@ -452,6 +575,7 @@ function viewWidth(view) {
 const MIN_WIDTH = 240, MAX_WIDTH = 720;
 function widthFor(key, view) {
   const m = minis.get(key);
+  if (m && m.dockWidth && docked(m)) return m.dockWidth;
   if (m && m.liveWidth) return m.liveWidth;
   const w = view !== "both" && (s().cardWidths || {})[key];
   return w ? Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, Math.round(w))) : viewWidth(view);
@@ -514,8 +638,8 @@ function createMini(key, view) {
   win.on("blur", () => applyTopmost(m));
   win.on("system-context-menu", (e) => e.preventDefault()); // no Windows window menu
   win.on("closed", () => { if (minis.get(key) === m) minis.delete(key); stopDrag(win); });
-  win.webContents.on("did-start-loading", () => { m.ready = false; });
-  win.webContents.on("did-finish-load", () => { m.ready = true; hoverSent.delete(win); updateMinis(); });
+  win.webContents.on("did-start-loading", () => { m.ready = false; m.dockSent = undefined; });
+  win.webContents.on("did-finish-load", () => { m.ready = true; hoverSent.delete(win); sendDock(m); updateMinis(); });
   loadPanel(win, view, key);
 }
 
@@ -556,6 +680,7 @@ function updateMinis() {
     // Redraw when it should show another view, or its settings or the Windows theme changed.
     if (m.view !== want.view || loadedWith.get(win) !== panelKey(want.view)) { m.view = want.view; loadPanel(win, want.view, m.key); }
     if (!m.faded) win.setOpacity(normalOpacity());
+    if (!docked(m)) undock(m);
     if (m.peek) continue; // stepped aside for the app's menu; see clickTick
     if (cardAttached(m)) continue; // attachTick shows, hides and places it
     // Unpinned while "On top of its app only" is on: an ordinary window, always shown.
@@ -602,6 +727,7 @@ const drags = new Map(); // window -> { cx, cy, x, y, started }
 let dragTimer = null;
 function startDrag(win) {
   if (!win || win.isDestroyed() || (!entryOf(win) && ![...editors.values()].includes(win))) return;
+  if (entryOf(win) && docked(entryOf(win))) return; // a docked card stays in its sidebar
   const c = screen.getCursorScreenPoint();
   const [x, y] = win.getPosition();
   drags.set(win, { cx: c.x, cy: c.y, x, y, started: Date.now() });
@@ -745,7 +871,7 @@ const widths = new Map(); // window -> { edge, cx, x, w, started }
 let widthTimer = null;
 function startWidth(win, edge) {
   const m = win && !win.isDestroyed() ? entryOf(win) : null;
-  if (!m || m.view === "both") return;
+  if (!m || m.view === "both" || docked(m)) return;
   const b = win.getBounds();
   widths.set(win, { edge, cx: screen.getCursorScreenPoint().x, x: b.x, w: win.getContentSize()[0], started: Date.now() });
   if (!widthTimer) widthTimer = setInterval(moveWidths, 10);
@@ -787,6 +913,49 @@ function resetWidth(key) {
   if (m && !m.win.isDestroyed()) m.win.setContentSize(widthFor(key, m.view), m.win.getContentSize()[1]);
 }
 
+// ---------- resizing (height) ----------
+// Held on a card's bottom edge (top edge when docked, since its bottom stays on the sidebar's
+// footer), the card's height follows the pointer; the page scrolls its content inside. Saved per
+// card, separately for docked and floating.
+const heights = new Map(); // window -> { edge, cy, h, started }
+let heightTimer = null;
+const heightKey = (m) => (docked(m) ? `${m.key}:dock` : m.key);
+const MIN_HEIGHT = 80, MAX_HEIGHT = 1400;
+function startHeight(win, edge, current) {
+  const m = win && !win.isDestroyed() ? entryOf(win) : null;
+  if (!m || m.view === "both" || !(Number(current) > 0)) return;
+  heights.set(win, { edge, cy: screen.getCursorScreenPoint().y, h: Number(current), started: Date.now() });
+  if (!heightTimer) heightTimer = setInterval(moveHeights, 15);
+}
+function moveHeights() {
+  const cy = screen.getCursorScreenPoint().y;
+  for (const [win, d] of heights) {
+    const m = entryOf(win);
+    if (win.isDestroyed() || !m || Date.now() - d.started > 120000) { stopHeight(win); continue; }
+    const dy = cy - d.cy;
+    const h = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, Math.round(d.edge === "top" ? d.h - dy : d.h + dy)));
+    if (h === m.liveHeight) continue;
+    m.liveHeight = h;
+    win.webContents.send("card-height", h);
+  }
+}
+function stopHeight(win) {
+  const d = heights.get(win);
+  heights.delete(win);
+  if (!heights.size) { clearInterval(heightTimer); heightTimer = null; }
+  const m = d && win && !win.isDestroyed() ? entryOf(win) : null;
+  if (!m || !m.liveHeight) return;
+  const h = m.liveHeight;
+  m.liveHeight = null;
+  setSettings({ cardHeights: { ...(s().cardHeights || {}), [heightKey(m)]: h } });
+}
+// Back to fitting its content.
+function resetHeight(m) {
+  const ch = { ...(s().cardHeights || {}) };
+  delete ch[heightKey(m)];
+  setSettings({ cardHeights: ch });
+}
+
 function openSettings() {
   if (settingsWin && !settingsWin.isDestroyed()) { settingsWin.show(); settingsWin.focus(); return; }
   settingsWin = guard(new BrowserWindow({
@@ -810,6 +979,8 @@ function setSettings(patch, quiet) {
   if ("cards" in patch) setImmediate(() => updateTray());
   // Moving with the app starts from where each card is now.
   if (patch.attachMove) store.set({ attachOffsets: {} });
+  // The setting docks or undocks every card, replacing each card's own choice.
+  if ("dockSidebar" in patch) store.set({ cardDock: {} });
   // Switching to the own look starts from the browser's look; either way the cards redraw.
   if ("lookSource" in patch && patch.lookSource !== before.lookSource) {
     if (patch.lookSource === "own" && !store.own.claude && !store.own.chatgpt) importLook();
@@ -863,7 +1034,7 @@ function cleanSettings(patch) {
     if (k === "cards") { if (["one", "both", "separate"].includes(v)) clean[k] = v; continue; }
     if (k === "lookSource") { if (["browser", "own"].includes(v)) clean[k] = v; continue; }
     if (k === "cardOnTop") { if (v && typeof v === "object") clean[k] = Object.fromEntries(["claude", "chatgpt"].filter((a) => typeof v[a] === "boolean").map((a) => [a, v[a]])); continue; }
-    if (k === "miniBoundsByApp" || k === "attachOffsets" || k === "cardWidths") continue; // only the app sets these
+    if (k === "miniBoundsByApp" || k === "attachOffsets" || k === "cardWidths" || k === "cardDock" || k === "cardHeights") continue; // only the app sets these
     if (k === "cardsLayout") { if (["column", "row"].includes(v)) clean[k] = v; continue; }
     if (k === "miniOpacity") { const n = Number(v); if (n >= 0.3 && n <= 1) clean[k] = n; continue; }
     if (k === "miniBounds") { if (v === null) clean[k] = null; continue; }
@@ -902,6 +1073,7 @@ function setupIpc() {
     const area = screen.getDisplayMatching(win.getBounds()).workArea;
     const nearBottom = !drags.has(win) && y + cur > area.y + area.height - 40; // not while being dragged
     win.setContentSize(w, h);
+    if (docked(m) && m.target) { dockTo(m, m.target); return; } // stays on its sidebar's footer
     if (nearBottom) win.setPosition(x, Math.max(area.y, y + cur - h));
     keepOnScreen(win); // a panel that grew past the bottom (or edge) of the screen moves back up
   });
@@ -909,6 +1081,10 @@ function setupIpc() {
   const keyOf = (e) => { const m = entryOf(BrowserWindow.fromWebContents(e.sender)); return m && m.key; };
   handle("mini-menu", (e) => { const k = keyOf(e); if (k) miniMenu(k); });
   handle("toggle-pin", (e) => { const k = keyOf(e); if (k) togglePin(k); });
+  handle("toggle-dock", (e) => { const k = keyOf(e); if (k) toggleDock(k); });
+  handle("height-start", (e, edge, current) => { if (edge === "top" || edge === "bottom") startHeight(BrowserWindow.fromWebContents(e.sender), edge, current); });
+  handle("height-end", (e) => stopHeight(BrowserWindow.fromWebContents(e.sender)));
+  handle("height-reset", (e) => { const m = entryOf(BrowserWindow.fromWebContents(e.sender)); if (m) resetHeight(m); });
   handle("drag-start", (e) => startDrag(BrowserWindow.fromWebContents(e.sender)));
   handle("drag-end", (e) => stopDrag(BrowserWindow.fromWebContents(e.sender)));
   handle("save-look", (e, site, value) => { if ([...editors.values()].includes(BrowserWindow.fromWebContents(e.sender))) saveLook(site, value); });

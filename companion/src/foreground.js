@@ -42,7 +42,16 @@ function load() {
     // Reading a pixel from the screen (for the color picker).
     api.GetDC = user32.func("intptr_t __stdcall GetDC(intptr_t hWnd)");
     api.ReleaseDC = user32.func("int __stdcall ReleaseDC(intptr_t hWnd, intptr_t hDC)");
-    api.GetPixel = koffi.load("gdi32.dll").func("uint32_t __stdcall GetPixel(intptr_t hdc, int x, int y)");
+    const gdi32 = koffi.load("gdi32.dll");
+    api.GetPixel = gdi32.func("uint32_t __stdcall GetPixel(intptr_t hdc, int x, int y)");
+    // Drawing another app's window into memory (for docking to its sidebar).
+    api.PrintWindow = user32.func("int __stdcall PrintWindow(intptr_t hwnd, intptr_t hdcBlt, uint32_t nFlags)");
+    api.CreateCompatibleDC = gdi32.func("intptr_t __stdcall CreateCompatibleDC(intptr_t hdc)");
+    api.CreateCompatibleBitmap = gdi32.func("intptr_t __stdcall CreateCompatibleBitmap(intptr_t hdc, int cx, int cy)");
+    api.SelectObject = gdi32.func("intptr_t __stdcall SelectObject(intptr_t hdc, intptr_t h)");
+    api.DeleteObject = gdi32.func("int __stdcall DeleteObject(intptr_t h)");
+    api.DeleteDC = gdi32.func("int __stdcall DeleteDC(intptr_t hdc)");
+    api.GetDIBits = gdi32.func("int __stdcall GetDIBits(intptr_t hdc, intptr_t hbm, uint32_t start, uint32_t lines, void *bits, void *bmi, uint32_t usage)");
     try {
       // Cloaked windows (other virtual desktops, suspended Store apps) count as visible but aren't shown.
       const dwm = koffi.load("dwmapi.dll");
@@ -259,6 +268,17 @@ function pointer() {
   }
 }
 
+// The top-level window at x, y (physical pixels), as a number; 0 if none.
+function windowAt(x, y) {
+  if (!load()) return 0;
+  try {
+    const child = api.WindowFromPoint({ x: Math.round(x), y: Math.round(y) });
+    return child ? Number(api.GetAncestor(child, GA_ROOT)) : 0;
+  } catch (_) {
+    return 0;
+  }
+}
+
 // The color on screen at x, y (physical pixels), as "#rrggbb"; null if it can't be read.
 function pixelAt(x, y) {
   if (!load()) return null;
@@ -275,8 +295,40 @@ function pixelAt(x, y) {
   }
 }
 
+// Draws a window (even when other windows cover it) into memory. Returns { x, y, w, h, data }:
+// the window's rectangle in physical pixels (with its invisible borders) and its pixels as BGRA rows,
+// top to bottom. null if it can't. PW_RENDERFULLCONTENT is needed for Chromium-based apps.
+const PW_RENDERFULLCONTENT = 2;
+function capture(hwnd) {
+  if (!load() || !api.PrintWindow) return null;
+  const r = rectOf(hwnd, false);
+  if (!r || r.w <= 0 || r.h <= 0 || r.w > 10000 || r.h > 10000) return null;
+  let screenDc = 0, dc = 0, bmp = 0, old = 0;
+  try {
+    screenDc = api.GetDC(0);
+    dc = api.CreateCompatibleDC(screenDc);
+    bmp = api.CreateCompatibleBitmap(screenDc, r.w, r.h);
+    old = api.SelectObject(dc, bmp);
+    if (!api.PrintWindow(hwnd, dc, PW_RENDERFULLCONTENT)) return null;
+    api.SelectObject(dc, old); old = 0;
+    const bmi = Buffer.alloc(44);
+    bmi.writeUInt32LE(40, 0); bmi.writeInt32LE(r.w, 4); bmi.writeInt32LE(-r.h, 8); // top-down rows
+    bmi.writeUInt16LE(1, 12); bmi.writeUInt16LE(32, 14);
+    const data = Buffer.alloc(r.w * r.h * 4);
+    if (!api.GetDIBits(dc, bmp, 0, r.h, data, bmi, 0)) return null;
+    return { ...r, data };
+  } catch (_) {
+    return null;
+  } finally {
+    if (old) api.SelectObject(dc, old);
+    if (bmp) api.DeleteObject(bmp);
+    if (dc) api.DeleteDC(dc);
+    if (screenDc) api.ReleaseDC(0, screenDc);
+  }
+}
+
 function available() {
   return !!load();
 }
 
-module.exports = { get, available, setTopmost, handleValue, listWindows, placeAbove, rectOf, moveTo, pointer, pixelAt, error: () => (load(), loadError) };
+module.exports = { get, available, setTopmost, handleValue, listWindows, placeAbove, rectOf, moveTo, pointer, windowAt, pixelAt, capture, error: () => (load(), loadError) };

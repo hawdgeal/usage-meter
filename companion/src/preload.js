@@ -18,6 +18,12 @@ contextBridge.exposeInMainWorld("companion", {
   // edge: "left" or "right"; the companion follows the pointer until widthEnd
   widthStart: (edge) => ipcRenderer.invoke("width-start", edge),
   widthEnd: () => ipcRenderer.invoke("width-end"),
+  // edge: "top" or "bottom"; current: the card's height now. The companion sends card-height while held.
+  heightStart: (edge, current) => ipcRenderer.invoke("height-start", edge, current),
+  heightEnd: () => ipcRenderer.invoke("height-end"),
+  heightReset: () => ipcRenderer.invoke("height-reset"),
+  onCardHeight: (cb) => ipcRenderer.on("card-height", (_e, h) => cb(h)),
+  toggleDock: () => ipcRenderer.invoke("toggle-dock"),
   // The companion's own look: the editor saves it; Settings imports or resets it.
   saveLook: (site, value) => ipcRenderer.invoke("save-look", site, value),
   importLook: (site) => ipcRenderer.invoke("look-import", site),
@@ -29,4 +35,6 @@ contextBridge.exposeInMainWorld("companion", {
   pickerDone: (pick) => ipcRenderer.invoke("picker-done", !!pick),
   // true while the pointer is over this window (the companion polls the cursor)
   onHover: (cb) => ipcRenderer.on("hover", (_e, on) => cb(!!on)),
+  // Docked in the app's sidebar: { bg, line } colors to draw the card flat with, or null.
+  onDock: (cb) => ipcRenderer.on("dock", (_e, look) => cb(look)),
 });

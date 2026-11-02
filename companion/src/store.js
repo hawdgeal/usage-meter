@@ -16,11 +16,14 @@ const DEFAULTS = {
   miniOnTop: true,
   miniOnlyWithApp: false, // show the mini panel only while a matching app is in front
   attachToApp: false, // keep each card just above its own app's window instead of above everything
+  dockSidebar: false, // with attachToApp: each card sits in its app's sidebar, as wide as it, above its footer
   attachMove: false, // with attachToApp: the card also moves with its app's window
   attachOffsets: {}, // with attachMove: { key: { right, bottom, dx, dy } } from the nearest corner of the app window
   miniOpacity: 1,
   miniBounds: null,
   miniBoundsByApp: {}, // separate cards: { claude: {x, y}, chatgpt: {x, y} }
+  cardDock: {}, // per card, overriding dockSidebar: { main | claude | chatgpt: true/false } (its dock button)
+  cardHeights: {}, // heights set by dragging a card's top or bottom edge: { key or "key:dock": height }
   cardWidths: {}, // widths set by dragging a card's edge: { main | claude | chatgpt: width }
   lookSource: "browser", // the cards' look: "browser" (the extension's, live) or "own" (own-look.json)
   launchAtLogin: false,

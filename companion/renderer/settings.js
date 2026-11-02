@@ -2,7 +2,7 @@
 "use strict";
 const $ = (id) => document.getElementById(id);
 let state = null;
-const CHECKS = ["followBrowsers", "followTerminals", "miniPanel", "miniOnTop", "attachToApp", "attachMove", "miniOnlyWithApp", "launchAtLogin"];
+const CHECKS = ["followBrowsers", "followTerminals", "miniPanel", "miniOnTop", "attachToApp", "attachMove", "dockSidebar", "miniOnlyWithApp", "launchAtLogin"];
 const SELECTS = ["mode", "cards", "cardsLayout"];
 const NAMES = { claude: "Claude", chatgpt: "ChatGPT", codex: "Codex" };
 
@@ -34,7 +34,9 @@ function render() {
   // On top of its own app replaces both "always on top" and "only while … in front".
   if (s.attachToApp) { $("miniOnTop").checked = false; $("miniOnTop").disabled = $("miniOnlyWithApp").disabled = true; }
   if (!state.foreground.available) $("attachToApp").disabled = true;
-  $("attachMove").disabled = !s.miniPanel || !s.attachToApp;
+  $("dockSidebar").disabled = !s.miniPanel || !s.attachToApp;
+  if (!s.attachToApp) $("dockSidebar").checked = false;
+  $("attachMove").disabled = !s.miniPanel || !s.attachToApp || s.dockSidebar;
   if (!s.attachToApp) $("attachMove").checked = false;
   for (const k of ["followBrowsers", "followTerminals"]) $(k).disabled = s.mode !== "follow" || !state.foreground.available;
   $("followNote").textContent = s.mode !== "follow" ? "" :
