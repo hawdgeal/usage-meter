@@ -395,6 +395,8 @@
 
     .card[data-meter-gradient] .bar i { background-image:var(--meter-gradient); background-size:var(--meter-scale,100%) 100%; background-repeat:no-repeat; }
     .err { margin:8px 12px; font-size:11px; color:var(--bad); overflow-wrap:anywhere; }
+    .err.signin { order:-1; margin:6px 10px 2px; padding:7px 9px; border-radius:8px; color:var(--fg); background:color-mix(in srgb, var(--warn) 18%, var(--surface)); border:1px solid color-mix(in srgb, var(--warn) 45%, var(--line)); font-size:11.5px; line-height:1.4; }
+    .err.signin strong { color:var(--warn); }
     pre { margin:0 12px 10px; padding:8px; background:var(--hover); border-radius:8px; max-height:160px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; font:10px/1.5 ui-monospace,monospace; }
     .settings { position:fixed; inset:auto; margin:0; padding:14px; width:min(300px,calc(100vw - 16px)); max-height:calc(100dvh - 16px); overflow:auto; border:1px solid var(--line); border-radius:14px; box-shadow:0 10px 40px #0004; }
     .settings:not(:popover-open) { display:none; }
@@ -942,6 +944,14 @@
   const accentNames={auto:'Match theme',default:'Default',blue:'Blue',green:'Green',yellow:'Yellow',pink:'Pink',orange:'Orange',purple:'Purple',neutral:'Black / White'};
   const themeProbe=document.createElement('span');themeProbe.hidden=true;root.appendChild(themeProbe);
   // The companion has its own screen-wide picker; browsers use the EyeDropper API where they have it.
+  // "Signed out of claude.ai in Chrome…" (from the background fetch, see background.js): shown as a
+  // banner at the top of the card, since the numbers below it are then the last ones known.
+  const isSigninError=()=>!!state.error&&/signed out|not signed in/i.test(state.error);
+  const signinBanner=()=>{
+    if(!isSigninError())return '';
+    const m=String(state.error).match(/^(.*?(?:in [A-Z][\w ]*?))[.:]\s*(.*)$/),head=m?m[1]:state.error,rest=m?m[2]:'';
+    return `<div class="err signin" role="status"><strong>${esc(head)}.</strong> ${esc(rest||'Sign in there to keep this updated.')}</div>`;
+  };
   const EYEDROPPER=!!(EMBED&&EMBED.pickColor)||typeof globalThis.EyeDropper==='function';
   async function pickScreenColor(){
     if(EMBED&&EMBED.pickColor)return EMBED.pickColor();
@@ -1084,10 +1094,12 @@
     const blocks={};
     blocks.plan=parsed.rows.length?`<div class="plan-grid">${parsed.rows.map(r=>{
       const left=r.resetsAt?r.resetsAt-Date.now():null;
-      const reset=left==null?'Reset not reported':left>0?`Resets in ${fmtDur(left)}`:'Reset · refresh to update';
+      // Nothing used and no reset time: the window starts with your next message (Claude's 5-hour limit).
+      const notStarted=left==null&&r.pct===0;
+      const reset=notStarted?'Starts with your next message':left==null?'Reset not reported':left>0?`Resets in ${fmtDur(left)}`:'Reset · refresh to update';
       const displayed=r.pct==null?null:state.showRemainingPlan?100-r.pct:r.pct;
       const full=`${r.label}: ${displayed==null?'Usage not reported':Math.round(displayed)+(state.showRemainingPlan?'% left':'% used')}${r.reached?' · Limit reached':''} · ${reset}${r.resetsAt?' · '+new Date(r.resetsAt).toLocaleString():''}`;
-      const caption=state.compact?(left==null?'Reset unknown':left>0?`Resets ${fmtDur(left)}`:'Refresh to update'):`${r.reached?'Limit reached · ':''}${left==null?'':reset}`;
+      const caption=state.compact?(notStarted?'Not started':left==null?'Reset unknown':left>0?`Resets ${fmtDur(left)}`:'Refresh to update'):`${r.reached?'Limit reached · ':''}${left==null?'':reset}`;
       return `<div class="row plan-row" ${state.compact?`tabindex="0" role="group" aria-label="${esc(full)}"`:''}><div class="rl"><span>${esc(r.label)}</span><span class="v ${r.reached&&!state.showRemainingPlan?'at-limit':''}">${displayed==null?'—':Math.round(displayed)+(state.showRemainingPlan?'% left':'%')}</span></div>${displayed==null?'':bar(displayed,r.label,state.showRemainingPlan)}<div class="sub">${esc(caption)}</div>${state.compact&&state.showPlanTooltips?`<div class="plan-tip" aria-hidden="true">${esc(full)}</div>`:''}</div>`;
     }).join('')}</div>`:`<div class="empty">${state.error?'Usage unavailable. Try refreshing.':state.usageAt?'No plan limits reported.':'Waiting for usage…'}</div>`;
     if(state.showPaidReset)blocks.plan+=`<button class="add-credits paid-reset" title="Open ChatGPT Usage to review paid reset offers">Paid reset…</button>`;
@@ -1125,8 +1137,8 @@
     $('.head-status-after-slot').innerHTML=state.footerPosition==='header-after'?footer:'';
     $('.head').classList.toggle('has-header-status',inHeader&&!!footer);
     $('.head').classList.toggle('has-status-after',state.footerPosition==='header-after'&&!!footer);
-    $('.body').innerHTML=(state.footerPosition==='top'?footer:'')+state.sections.filter(k=>!state.hidden[k]).map(k=>`<section class="section" data-section="${k}"><div class="section-head"><button class="section-toggle" data-collapse="${k}" aria-expanded="${!state.closed[k]}" aria-controls="gptu-${k}">${icon(k)}<span>${labels[k]}</span>${k==='credits'&&(state.closed.credits||balanceInTitle)?`<span class="credit-inline" role="group" aria-label="Available balance">${esc(creditText)}</span>`:''}${icon('chevron')}</button>${k==='plan'&&state.showUsageResets&&resetCount()!=null?`<span class="reset-tools" title="Available usage limit resets"><span>${resetCount()} ${resetCount()===1?'reset':'resets'}</span>${resetCount()>0?`<button class="use-reset" aria-label="Use usage limit reset" ${resetPending?'disabled':''}>Use</button>`:''}</span>`:''}<button class="icon section-handle" draggable="true" data-handle="${k}" aria-label="Reorder ${labels[k]}" title="Drag to reorder · ↑ / ↓">${icon('grip')}</button></div><div class="section-content" id="gptu-${k}" ${state.closed[k]?'hidden':''}>${blocks[k]}</div></section>`).join('')+
-      `${state.error?`<div class="err" role="status">${esc(state.error)}</div>`:''}${state.footerPosition==='bottom'?footer:''}${state.showRaw?`<pre>${esc(JSON.stringify(IS_CLAUDE?{claude:state.rawUsage??null,usage:state.usage,models:state.models}:{usage:state.usage,models:state.models},null,2))}</pre>`:''}`;
+    $('.body').innerHTML=signinBanner()+(state.footerPosition==='top'?footer:'')+state.sections.filter(k=>!state.hidden[k]).map(k=>`<section class="section" data-section="${k}"><div class="section-head"><button class="section-toggle" data-collapse="${k}" aria-expanded="${!state.closed[k]}" aria-controls="gptu-${k}">${icon(k)}<span>${labels[k]}</span>${k==='credits'&&(state.closed.credits||balanceInTitle)?`<span class="credit-inline" role="group" aria-label="Available balance">${esc(creditText)}</span>`:''}${icon('chevron')}</button>${k==='plan'&&state.showUsageResets&&resetCount()!=null?`<span class="reset-tools" title="Available usage limit resets"><span>${resetCount()} ${resetCount()===1?'reset':'resets'}</span>${resetCount()>0?`<button class="use-reset" aria-label="Use usage limit reset" ${resetPending?'disabled':''}>Use</button>`:''}</span>`:''}<button class="icon section-handle" draggable="true" data-handle="${k}" aria-label="Reorder ${labels[k]}" title="Drag to reorder · ↑ / ↓">${icon('grip')}</button></div><div class="section-content" id="gptu-${k}" ${state.closed[k]?'hidden':''}>${blocks[k]}</div></section>`).join('')+
+      `${state.error&&!isSigninError()?`<div class="err" role="status">${esc(state.error)}</div>`:''}${state.footerPosition==='bottom'?footer:''}${state.showRaw?`<pre>${esc(JSON.stringify(IS_CLAUDE?{claude:state.rawUsage??null,usage:state.usage,models:state.models}:{usage:state.usage,models:state.models},null,2))}</pre>`:''}`;
     $('.body').scrollTop=scroll;
     if(host.hasAttribute('data-bottom')) layoutBottom();
     if(rawFocused) $('.raw')?.focus();

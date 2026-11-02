@@ -8,7 +8,8 @@ const vm = require("vm");
 
 const EXT = path.join(__dirname, "..", "..");
 
-function makeBrowser({ hostInstalled = true, responses = {}, saved = {} } = {}) {
+// clock: { now } lets a test move time forward (the background script reads Date.now()).
+function makeBrowser({ hostInstalled = true, responses = {}, saved = {}, clock = null } = {}) {
   const listeners = { message: [], alarm: [] };
   const ports = [];
   const fetches = [];
@@ -39,7 +40,8 @@ function makeBrowser({ hostInstalled = true, responses = {}, saved = {} } = {}) 
     if (!r) return { ok: false, status: 404, json: async () => ({}) };
     return { ok: (r.status || 200) < 400, status: r.status || 200, json: async () => r.body };
   };
-  const ctx = vm.createContext({ chrome, fetch, navigator: { userAgent: "Mozilla/5.0 Chrome/140" }, setTimeout, console, Date, JSON, Promise, Object, Array, String, Number, Math, Error, encodeURIComponent, isFinite });
+  const FakeDate = clock ? Object.assign(class extends Date {}, { now: () => clock.now }) : Date;
+  const ctx = vm.createContext({ chrome, fetch, navigator: { userAgent: "Mozilla/5.0 Chrome/140" }, setTimeout, console, Date: FakeDate, JSON, Promise, Object, Array, String, Number, Math, Error, encodeURIComponent, isFinite });
   ctx.globalThis = ctx;
   ctx.importScripts = (f) => vm.runInContext(fs.readFileSync(path.join(EXT, f), "utf8"), ctx, { filename: f });
   vm.runInContext(fs.readFileSync(path.join(EXT, "background.js"), "utf8"), ctx, { filename: "background.js" });
@@ -84,7 +86,7 @@ test("connects, says hello, fetches stale sites itself and reports sign-in probl
   assert.strictEqual(claude.data.rate_limit.primary_window.used_percent, 40);
   assert.strictEqual(claude.data.rate_limit.secondary_window.limit_window_seconds, 604800);
   const err = port.sent.find((m) => m.type === "usage-error" && m.site === "chatgpt");
-  assert.strictEqual(err.message, "Not signed in to chatgpt.com in Chrome");
+  assert.match(err.message, /^Signed out of chatgpt.com in Chrome. Sign in there/);
   // Credentials are only sent to the two sites.
   assert.ok(b.fetches.every((f) => /^https:\/\/(claude\.ai|chatgpt\.com)\//.test(f.url)));
 });
@@ -147,4 +149,16 @@ test("panel settings go to the companion on connect and when they change", async
 test("site icon messages still work", async () => {
   const b = makeBrowser();
   assert.doesNotThrow(() => b.tabMessage({ type: "usage-meter-site", site: "claude" }));
+});
+
+test("after a sign-in error it tries again within minutes, not ten", async () => {
+  const clock = { now: 1_000_000 };
+  const b = await connected({ responses: CLAUDE, clock });
+  const gptFetches = () => b.fetches.filter((f) => f.url.startsWith("https://chatgpt.com/")).length;
+  const first = gptFetches();
+  assert.ok(first > 0);
+  clock.now += 60 * 1000; b.alarm(); await tick();
+  assert.strictEqual(gptFetches(), first, "not again after one minute");
+  clock.now += 90 * 1000; b.alarm(); await tick();
+  assert.ok(gptFetches() > first, "again after two and a half minutes");
 });

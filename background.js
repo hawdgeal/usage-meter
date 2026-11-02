@@ -32,7 +32,8 @@ const companion = (() => {
   const ALARM = "usage-meter-companion";
   const STALE_MS = 150 * 1000; // fetch a site ourselves when no tab updated it for 2.5 minutes
   const MIN_GAP_MS = 10 * 1000; // never fetch one site more often than this
-  const ERROR_BACKOFF_MS = 10 * 60 * 1000; // after "not signed in" and similar errors
+  const ERROR_BACKOFF_MS = 10 * 60 * 1000; // after other errors (site down, unexpected answer)
+  const SIGNIN_RETRY_MS = 2 * 60 * 1000; // after "signed out": picks up again soon after you sign in
   const SITES = ["claude", "chatgpt"];
   const SETTINGS_KEYS = { claude: "gptu-claude", chatgpt: "gptu" }; // content.js storage keys
 
@@ -138,9 +139,10 @@ const companion = (() => {
       delete backoffUntil[site];
       send({ type: "usage", site, ...latest[site] });
     } catch (e) {
-      backoffUntil[site] = Date.now() + ERROR_BACKOFF_MS;
+      const signin = !!(e && e.signin);
+      backoffUntil[site] = Date.now() + (signin ? SIGNIN_RETRY_MS : ERROR_BACKOFF_MS);
       const host = site === "claude" ? "claude.ai" : "chatgpt.com";
-      send({ type: "usage-error", site, at: Date.now(), message: e && e.signin ? `Not signed in to ${host} in ${browserName}` : String((e && e.message) || e) });
+      send({ type: "usage-error", site, at: Date.now(), message: signin ? `Signed out of ${host} in ${browserName}. Sign in there to keep this updated; the numbers below are the last ones received.` : String((e && e.message) || e) });
     } finally {
       inFlight[site] = false;
     }
