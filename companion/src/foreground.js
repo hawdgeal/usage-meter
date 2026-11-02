@@ -128,35 +128,65 @@ function isCloaked(hwnd) {
   return api.DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED, v, 4) === 0 && v[0] !== 0;
 }
 
-// The app windows on screen, in stacking order (top first): visible, not cloaked, not owned by
-// another window and not tool windows. Each: { hwnd, pid, exe, title, minimized }.
+// The app windows on screen, in stacking order (top first): visible, not cloaked, not tool windows,
+// and not owned by another window of the same program (its dialogs and pop-ups). A window owned by
+// another program counts: tab tools such as WindowTabs make each grouped app window owned by one of
+// theirs. Each: { hwnd, pid, exe, title, minimized } (minimized also covers windows parked off-screen,
+// as some tab tools do with inactive tabs).
 function listWindows() {
   if (!load()) return [];
   const out = [];
+  const pidOf = (w) => { const p = new Uint32Array(1); api.GetWindowThreadProcessIdI(w, p); return p[0]; };
   try {
     let h = api.GetTopWindow(0);
     for (let i = 0; h && i < 2000; i++, h = api.GetWindow(h, GW_HWNDNEXT)) {
-      if (!api.IsWindowVisible(h) || api.GetWindow(h, GW_OWNER)) continue;
+      if (!api.IsWindowVisible(h)) continue;
       if (api.GetWindowLongW(h, GWL_EXSTYLE) & WS_EX_TOOLWINDOW) continue;
       if (isCloaked(h)) continue;
-      const pid = new Uint32Array(1);
-      api.GetWindowThreadProcessIdI(h, pid);
+      const pid = pidOf(h);
+      const owner = api.GetWindow(h, GW_OWNER);
+      if (owner && pidOf(owner) === pid) continue;
       const tbuf = Buffer.alloc(1024);
       const n = api.GetWindowTextWI(h, tbuf, 512);
-      out.push({ hwnd: h, pid: pid[0], exe: pid[0] ? exeOf(pid[0]) : null, title: n > 0 ? tbuf.toString("utf16le", 0, n * 2) : "", minimized: !!api.IsIconic(h) });
+      const r = {};
+      const parked = api.GetWindowRect(h, r) && (r.left <= -30000 || r.top <= -30000);
+      out.push({ hwnd: h, pid, exe: pid ? exeOf(pid) : null, title: n > 0 ? tbuf.toString("utf16le", 0, n * 2) : "", minimized: !!api.IsIconic(h) || !!parked });
     }
   } catch (_) {}
   return out;
 }
 
+// Tab tools keep their own windows (tab bars) right above the app window they group, and put the
+// app back under them if anything slips in between. So their windows above an app count as part of it.
+const TAB_TOOLS = new Set(["groupyctrl.exe", "groupy.exe", "windowtabs.exe", "tidytabs.exe", "tidytabs.daemon.exe"]);
+const exeBase = (exe) => String(exe || "").split(/[\\/]/).pop().toLowerCase();
+function isTabTool(h) {
+  const p = new Uint32Array(1);
+  api.GetWindowThreadProcessIdI(h, p);
+  return !!p[0] && TAB_TOOLS.has(exeBase(exeOf(p[0])));
+}
+// The highest window of the app's group: the app window itself, or a tab tool's window stacked
+// directly above it (skipping hidden windows and `self`).
+function groupTop(target, self) {
+  let top = target;
+  for (let h = api.GetWindow(target, GW_HWNDPREV), i = 0; h && i < 50; h = api.GetWindow(h, GW_HWNDPREV), i++) {
+    if (h === self || !api.IsWindowVisible(h)) continue;
+    if (!isTabTool(h)) break;
+    top = h;
+  }
+  return top;
+}
+
 // Puts our window directly above `target` in the stacking order (not always on top), without
-// activating it. Does nothing when it's already there. Returns true when it is (or now is) there.
-function placeAbove(handle, target) {
+// activating it; above a tab tool's bar when one sits on the app. Does nothing when it's already
+// there. Returns true when it is (or now is) there.
+function placeAbove(handle, app) {
   if (!load()) return false;
   const hwnd = handleValue(handle);
-  if (hwnd == null || !target) return false;
+  if (hwnd == null || !app) return false;
   const self = Number(hwnd);
   try {
+    const target = groupTop(app, self);
     // The nearest visible window above the target: our window when nothing needs to change.
     let prev = api.GetWindow(target, GW_HWNDPREV);
     while (prev && prev !== self && !api.IsWindowVisible(prev)) prev = api.GetWindow(prev, GW_HWNDPREV);
