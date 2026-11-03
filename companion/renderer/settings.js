@@ -2,7 +2,7 @@
 "use strict";
 const $ = (id) => document.getElementById(id);
 let state = null;
-const CHECKS = ["followBrowsers", "followTerminals", "miniPanel", "miniOnTop", "attachToApp", "attachMove", "dockSidebar", "miniOnlyWithApp", "launchAtLogin"];
+const CHECKS = ["followBrowsers", "followTerminals", "miniPanel", "miniOnTop", "attachToApp", "attachMove", "dockSidebar", "miniOnlyWithApp", "launchAtLogin", "updateCheck"];
 const SELECTS = ["mode", "cards", "cardsLayout"];
 const NAMES = { claude: "Claude", chatgpt: "ChatGPT", codex: "Codex" };
 
@@ -57,6 +57,29 @@ function render() {
     got.length ? `Using your ${got.join(" and ")} panel settings from the extension.` : "No panel settings received yet; using the extension's defaults until the browser connects.";
 
   // Connected browsers
+  // The companion's own login
+  for (const row of document.querySelectorAll(".direct-row")) {
+    const d = (state.direct || {})[row.dataset.site] || {};
+    row.querySelector('[data-direct="in"]').textContent = d.signedIn ? "Sign in again…" : "Sign in…";
+    row.querySelector('[data-direct="out"]').disabled = !d.signedIn;
+    row.querySelector("[data-direct-state]").textContent = !d.signedIn ? "Not signed in here" : d.error ? d.error : d.at ? `Signed in · last update ${ago(d.at)}` : "Signed in";
+  }
+  // Updates
+  const u = state.update || {};
+  const us = $("updateStatus");
+  us.replaceChildren();
+  const ver = (u.latest && u.latest.version) || "";
+  if (u.state === "checking") us.append(item("wait", "Checking for updates…"));
+  else if (u.state === "downloading") us.append(item("wait", `Downloading ${ver}… ${Math.round((u.progress || 0) * 100)}%`));
+  else if (u.state === "installing") us.append(item("wait", `Installing ${ver}; the companion restarts in a moment`));
+  else if (u.available) us.append(item("warn", `Version ${ver} is available (you have ${u.current})`, u.can && !u.can.ok ? u.can.why : ""));
+  else if (u.state === "ready") us.append(item("ok", `Up to date (${u.current})`, u.checkedAt ? `checked ${ago(u.checkedAt)}` : ""));
+  if (u.error) us.append(item("bad", u.error));
+  $("updateInstall").hidden = !u.available;
+  $("updateInstall").disabled = !(u.can && u.can.ok) || u.state === "downloading" || u.state === "installing";
+  $("updateInstall").textContent = ver ? `Update to ${ver} and restart` : "Update and restart";
+  $("updateCheckNow").disabled = u.state === "checking" || u.state === "downloading" || u.state === "installing";
+
   const hosts = state.hosts || [];
   const hostBox = $("hosts");
   hostBox.replaceChildren();
@@ -123,6 +146,21 @@ for (const row of document.querySelectorAll(".look-row")) {
   });
 }
 $("connect").addEventListener("click", () => window.companion.connectBrowsers());
+for (const row of document.querySelectorAll(".direct-row")) {
+  const site = row.dataset.site, name = NAMES[site];
+  row.querySelector('[data-direct="in"]').addEventListener("click", async (e) => {
+    const b = e.currentTarget;
+    b.disabled = true;
+    row.querySelector("[data-direct-state]").textContent = "Sign in in the window that opened…";
+    try { await window.companion.signIn(site); } finally { b.disabled = false; }
+  });
+  row.querySelector('[data-direct="out"]').addEventListener("click", async () => {
+    if (!confirm(`Sign out of ${name} in the companion? Usage then comes from the browser only.`)) return;
+    state = await window.companion.signOut(site); render();
+  });
+}
+$("updateCheckNow").addEventListener("click", async () => { state = await window.companion.checkUpdate(); render(); });
+$("updateInstall").addEventListener("click", () => window.companion.installUpdate());
 $("addId").addEventListener("click", () => {
   const id = $("idInput").value.trim().toLowerCase();
   const err = $("idError");

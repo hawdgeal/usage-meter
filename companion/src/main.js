@@ -21,6 +21,8 @@ const foreground = require("./foreground");
 const sidebar = require("./sidebar");
 const { ringBitmap, trayColor, trayFraction } = require("./icon");
 const registration = require("./register");
+const direct = require("./direct");
+const updater = require("./updater");
 
 const APP_IDS = ["claude", "chatgpt", "codex"];
 const APP_LABELS = { claude: "Claude", chatgpt: "ChatGPT", codex: "Codex" };
@@ -81,6 +83,8 @@ function lookOf(site) {
 function snapshot() {
   return {
     settings: s(),
+    direct: Object.fromEntries(["claude", "chatgpt"].map((x) => [x, { signedIn: signedIn(x), at: direct$[x].at || null, error: direct$[x].error || null }])),
+    update: { state: update.state, current: app.getVersion(), available: !!update.available, latest: update.latest || null, progress: update.progress || 0, error: update.error || null, checkedAt: update.checkedAt || null, can: updater.canInstall() },
     sites: store.usage,
     ext: store.ext,
     look: { claude: lookOf("claude"), chatgpt: lookOf("chatgpt") },
@@ -126,20 +130,97 @@ function onBridgeMessage(msg, host) {
     if (store.setExt(site, msg.settings)) { if (!ownLook() || !store.own[site]) prefsVersion[site]++; changed(); }
     return;
   }
+  if (msg.type === "usage-error" && fresh(site, host.browser)) return; // the companion's own login has newer numbers
+  applyUsage(site, msg, host.browser);
+}
+
+// Usage from a browser, or from the companion's own login (browser "Companion").
+function applyUsage(site, msg, browser) {
   const prev = store.usage[site] || {};
   if (msg.type === "usage" && msg.data && typeof msg.data === "object") {
     const at = Number(msg.at) || Date.now();
-    // With several browsers connected, keep the newest report.
-    if (prev.at && at < prev.at && prev.browser !== host.browser) return;
-    store.usage[site] = { data: msg.data, plan: msg.plan || null, at, browser: host.browser, source: msg.source || null, error: null, errorAt: null };
+    // With several sources, keep the newest report.
+    if (prev.at && at < prev.at && prev.browser !== browser) return;
+    store.usage[site] = { data: msg.data, plan: msg.plan || null, at, browser, source: msg.source || null, error: null, errorAt: null };
   } else if (msg.type === "usage-error") {
-    store.usage[site] = { ...prev, error: String(msg.message || "Usage unavailable").slice(0, 200), errorAt: Number(msg.at) || Date.now(), browser: prev.browser || host.browser };
+    store.usage[site] = { ...prev, error: String(msg.message || "Usage unavailable").slice(0, 200), errorAt: Number(msg.at) || Date.now(), browser: prev.browser || browser };
   } else return;
   store.saveUsage();
   changed();
 }
+// Another source (not `except`) reported this site's usage in the last few minutes.
+const fresh = (site, except) => { const u = store.usage[site]; return !!(u && u.at && u.browser !== except && Date.now() - u.at < DIRECT_STALE_MS); };
+
+// ---------- the companion's own login ----------
+// Once you signed in in the companion (Settings → Sign in here), it fetches usage itself when no
+// browser reported it for a while, so the browser doesn't need to be running.
+const DIRECT_STALE_MS = 150 * 1000, DIRECT_TICK_MS = 60 * 1000;
+const direct$ = { claude: {}, chatgpt: {} }; // site -> { at, error, busy, backoff }
+const signedIn = (site) => !!(s().directLogin || {})[site];
+async function directFetch(site, force) {
+  const d = direct$[site];
+  if (!signedIn(site) || d.busy) return;
+  if (!force && (fresh(site, "Companion") || Date.now() < (d.backoff || 0))) return;
+  d.busy = true;
+  try {
+    const { data, plan } = await direct.fetchUsage(site);
+    Object.assign(d, { at: Date.now(), error: null, backoff: 0 });
+    applyUsage(site, { type: "usage", data, plan, at: Date.now(), source: "companion" }, "Companion");
+  } catch (e) {
+    const host = direct.SITES[site].host;
+    d.error = e && e.signin ? `Signed out of ${host} in the companion` : String((e && e.message) || e);
+    d.backoff = Date.now() + (e && e.signin ? 2 : 10) * 60 * 1000;
+    // Only when no browser has newer numbers.
+    if (!fresh(site, "Companion")) applyUsage(site, { type: "usage-error", at: Date.now(), message: e && e.signin ? `Signed out of ${host} in the companion. Sign in again in Settings; the numbers below are the last ones received.` : d.error }, "Companion");
+    changed();
+  } finally {
+    d.busy = false;
+  }
+}
+const directTick = () => { for (const site of ["claude", "chatgpt"]) directFetch(site, false); };
+async function signInDirect(site) {
+  if (!direct.SITES[site]) return false;
+  const ok = await direct.signIn(site, settingsWin && !settingsWin.isDestroyed() ? settingsWin : null);
+  if (ok) { setSettings({ directLogin: { ...(s().directLogin || {}), [site]: true } }); direct$[site].backoff = 0; await directFetch(site, true); }
+  changed();
+  return ok;
+}
+async function signOutDirect(site) {
+  if (!direct.SITES[site]) return;
+  await direct.signOut(site);
+  direct$[site] = {};
+  setSettings({ directLogin: { ...(s().directLogin || {}), [site]: false } });
+}
+
+// ---------- updates ----------
+const UPDATE_EVERY_MS = 6 * 3600 * 1000;
+let update = { state: "idle" }; // state: idle | checking | ready | downloading | installing | error
+async function checkUpdate(manual) {
+  if (update.state === "downloading" || update.state === "installing") return update;
+  update = { ...update, state: "checking" };
+  changed();
+  try { const r = await updater.check(); update = { ...r, state: "ready" }; }
+  catch (e) { update = { ...update, state: "error", error: manual ? String(e.message || e) : null }; }
+  changed();
+  return update;
+}
+async function installUpdate() {
+  if (!update.available || !update.latest || update.state === "downloading") return;
+  update = { ...update, state: "downloading", progress: 0, error: null };
+  changed();
+  try {
+    await updater.install(update.latest, (p) => { const q = Math.round(p * 100) / 100; if (q !== update.progress) { update.progress = q; changed(); } });
+    update.state = "installing";
+    changed();
+    setTimeout(() => { quitting = true; app.quit(); }, 400);
+  } catch (e) {
+    update = { ...update, state: "ready", error: String(e.message || e) };
+    changed();
+  }
+}
 
 function refresh(appId) {
+  for (const site of appId ? [siteOf(appId)] : ["claude", "chatgpt"]) directFetch(site, true);
   return { asked: bridge.refresh(appId ? siteOf(appId) : undefined) };
 }
 
@@ -491,6 +572,7 @@ function trayMenu() {
     { type: "separator" },
     { label: "Refresh", click: () => refresh() },
     { label: "Settings…", click: () => openSettings() },
+    ...(update.available && update.latest ? [{ type: "separator" }, { label: update.state === "downloading" ? `Downloading ${update.latest.version}… ${Math.round((update.progress || 0) * 100)}%` : `Update to ${update.latest.version}`, enabled: update.state !== "downloading" && updater.canInstall().ok, click: () => installUpdate() }] : []),
     { type: "separator" },
     { label: "Quit Usage Meter Companion", click: () => { quitting = true; app.quit(); } },
   ]);
@@ -1046,7 +1128,7 @@ function cleanSettings(patch) {
     if (k === "cards") { if (["one", "both", "separate"].includes(v)) clean[k] = v; continue; }
     if (k === "lookSource") { if (["browser", "own"].includes(v)) clean[k] = v; continue; }
     if (k === "cardOnTop") { if (v && typeof v === "object") clean[k] = Object.fromEntries(["claude", "chatgpt"].filter((a) => typeof v[a] === "boolean").map((a) => [a, v[a]])); continue; }
-    if (k === "miniBoundsByApp" || k === "attachOffsets" || k === "cardWidths" || k === "cardDock" || k === "cardHeights") continue; // only the app sets these
+    if (k === "miniBoundsByApp" || k === "attachOffsets" || k === "cardWidths" || k === "cardDock" || k === "cardHeights" || k === "directLogin") continue; // only the app sets these
     if (k === "cardsLayout") { if (["column", "row"].includes(v)) clean[k] = v; continue; }
     if (k === "miniOpacity") { const n = Number(v); if (n >= 0.3 && n <= 1) clean[k] = n; continue; }
     if (k === "miniBounds") { if (v === null) clean[k] = null; continue; }
@@ -1108,6 +1190,10 @@ function setupIpc() {
   handle("picker-done", (e, pick) => { if (picker && BrowserWindow.fromWebContents(e.sender) === picker.win) finishPick(!!pick); });
   handle("width-start", (e, edge) => startWidth(BrowserWindow.fromWebContents(e.sender), edge === "left" ? "left" : "right"));
   handle("width-end", (e) => stopWidth(BrowserWindow.fromWebContents(e.sender)));
+  handle("sign-in", (_e, site) => signInDirect(site));
+  handle("sign-out", (_e, site) => signOutDirect(site).then(() => snapshot()));
+  handle("update-check", () => checkUpdate(true).then(() => snapshot()));
+  handle("update-install", () => installUpdate());
 }
 
 // ---------- start ----------
@@ -1139,4 +1225,12 @@ app.whenReady().then(async () => {
 
   // Keep reset countdowns current in the tooltip.
   setInterval(() => updateTray(), 30 * 1000);
+
+  // The companion's own login, when you've signed in there.
+  setTimeout(directTick, 5000);
+  setInterval(directTick, DIRECT_TICK_MS);
+  // Updates: shortly after start, then every few hours.
+  const autoCheck = () => { if (s().updateCheck) checkUpdate(false); };
+  setTimeout(autoCheck, 20 * 1000);
+  setInterval(autoCheck, UPDATE_EVERY_MS);
 });

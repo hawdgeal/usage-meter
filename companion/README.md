@@ -28,7 +28,13 @@ claude.ai / chatgpt.com ──▶ extension (browser) ──native messaging─�
 - **Refresh** in the companion asks the extension to fetch right away.
 - The *host* is a small relay that the browser starts. It is the companion's own executable running in Node mode, so there is nothing extra to install.
 
-Nothing leaves your computer. The extension only contacts claude.ai and chatgpt.com, and the companion makes no network requests.
+**Without the browser:** Settings → **Sign in here** opens claude.ai's or chatgpt.com's own sign-in page in a window of the companion. Once you're signed in there, the companion fetches your usage itself (the same requests the extension makes) whenever no browser reported it for a few minutes, so the browser doesn't need to be running. The login stays in the companion's data folder; **Sign out** forgets it. If that login expires, the card says so.
+
+Nothing leaves your computer. The extension and the companion's own login only contact claude.ai and chatgpt.com. Apart from that, the companion only asks GitHub whether a newer version exists (see Updates).
+
+## Updates
+
+The companion checks the project's GitHub releases shortly after it starts and every few hours (Settings → Updates; you can turn that off). When a newer companion is out, Settings and the tray menu show **Update to x.y.z**: it downloads the release's companion zip, quits, copies the new files over the app's folder and starts again. Your settings stay. The browser extension is updated separately.
 
 ## Install
 
@@ -83,6 +89,9 @@ On Linux or macOS, `npm run dist:cross` builds the zip. The installer needs Wind
 | `src/bridge.js` | Named-pipe server that browser hosts connect to. |
 | `src/host.js` | Native-messaging host: relays between the extension (stdin/stdout) and the app (pipe). Keeps the latest usage while the app isn't running. |
 | `src/register.js` | Writes the host launcher and manifests, finds the extension's ID in browser profiles, and registers under `HKEY_CURRENT_USER`. |
+| `src/direct.js` | The companion's own sign-in windows (one login per site, kept in its data folder) and its usage requests. |
+| `src/updater.js` | Checks GitHub's latest release, downloads the companion zip and swaps the app's files. |
+| `src/sidebar.js` | Finds an app's sidebar (edges, colors, footer) in a picture of its window, for docking. |
 | `src/foreground.js` | Reads the window in front (executable and title) via Win32, through koffi. |
 | `src/app-match.js` | Maps that window to Claude, ChatGPT or Codex. |
 | `src/usage.js` | Turns usage into rows, headline and tooltip. Shared with the pages. |

@@ -27,6 +27,8 @@ const DEFAULTS = {
   cardWidths: {}, // widths set by dragging a card's edge: { main | claude | chatgpt: width }
   lookSource: "browser", // the cards' look: "browser" (the extension's, live) or "own" (own-look.json)
   launchAtLogin: false,
+  directLogin: {}, // { claude, chatgpt: true } once you signed in in the companion itself (see direct.js)
+  updateCheck: true, // look for a newer companion on GitHub at start and every few hours
   extensionIds: [], // extra Chromium extension IDs entered by hand
   lastApp: "claude",
   onboarded: false,

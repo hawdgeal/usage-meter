@@ -24,6 +24,11 @@ contextBridge.exposeInMainWorld("companion", {
   heightReset: () => ipcRenderer.invoke("height-reset"),
   onCardHeight: (cb) => ipcRenderer.on("card-height", (_e, h) => cb(h)),
   toggleDock: () => ipcRenderer.invoke("toggle-dock"),
+  // The companion's own login per site ("claude" | "chatgpt"); signIn resolves true once it works.
+  signIn: (site) => ipcRenderer.invoke("sign-in", site),
+  signOut: (site) => ipcRenderer.invoke("sign-out", site),
+  checkUpdate: () => ipcRenderer.invoke("update-check"),
+  installUpdate: () => ipcRenderer.invoke("update-install"),
   // The companion's own look: the editor saves it; Settings imports or resets it.
   saveLook: (site, value) => ipcRenderer.invoke("save-look", site, value),
   importLook: (site) => ipcRenderer.invoke("look-import", site),

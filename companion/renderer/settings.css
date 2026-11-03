@@ -24,6 +24,7 @@ input[type="range"] { width: 100%; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; transform: translateY(-1px); }
 .dot.ok { background: #16a34a; }
 .dot.bad { background: var(--bad); }
+.dot.warn { background: #d97706; }
 .ids { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
 .ids li { display: flex; gap: 8px; align-items: center; font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
 .ids .src { font-family: inherit; color: var(--muted); }
