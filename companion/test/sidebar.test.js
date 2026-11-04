@@ -44,6 +44,20 @@ test("a scrollbar along the sidebar's edge isn't its edge", () => {
   assert.strictEqual(detect(img, { x: 0, y: 0, w: 900, h: 800 }).right, 300);
 });
 
+test("a partly covered edge (a scrollbar on hover) is kept when it was found before", () => {
+  const img = picture({ rail: 50 });
+  for (let y = 0; y < 800; y++) for (let x = 600; x < 602; x++) { const i = (y * 900 + x) * 4; img.data[i] = img.data[i + 1] = img.data[i + 2] = 0x44; } // a line in the main area
+  const frame = { x: 0, y: 0, w: 900, h: 800 };
+  const first = detect(img, frame);
+  assert.strictEqual(first.right, 350);
+  // The scrollbar covers the sidebar's edge on part of the rows: it's no longer a strong edge.
+  for (let y = 100; y < 260; y++) { const i = (y * 900 + 350) * 4; img.data[i] = img.data[i + 1] = img.data[i + 2] = 0x1f; }
+  assert.notStrictEqual(detect(img, frame).right, 350, "without the previous result it would jump");
+  const again = detect(img, frame, 1, first);
+  assert.strictEqual(again.left, first.left);
+  assert.strictEqual(again.right, first.right);
+});
+
 test("no sidebar: nothing found", () => {
   const img = picture({ side: 0 });
   assert.strictEqual(detect(img, { x: 0, y: 0, w: 900, h: 800 }), null);

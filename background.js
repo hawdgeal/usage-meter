@@ -74,8 +74,10 @@ const companion = (() => {
       if (msg.type === "refresh") refresh(SITES.includes(msg.site) ? [msg.site] : SITES, true);
       else if (msg.type === "companion") {
         companionUp = !!msg.connected;
-        if (companionUp) refresh(SITES, false);
+        if (companionUp) { refresh(SITES, false); browserSync.companionReady(); }
       }
+      else if (msg.type === "sync-save") browserSync.saveCompanion(msg.data, msg.at);
+      else if (msg.type === "restore-settings") browserSync.restore(msg.settings);
     });
     send({ type: "hello", extensionVersion: version });
     for (const site of SITES) if (latest[site]) send({ type: "usage", site, ...latest[site] });
@@ -183,5 +185,140 @@ const companion = (() => {
   api.runtime.onInstalled?.addListener(tick);
   tick();
 
-  return { fromTab };
+  return { fromTab, send: (m) => send(m), up: () => !!port && companionUp };
+})();
+
+// ---------- browser sync ----------
+// Your panel settings, and the desktop companion's settings and layout, follow your browser
+// account (Chrome or Edge sync, Firefox Sync) to your other computers. The extension's fixed ID
+// (the "key" in manifest.json) makes it the same extension everywhere. Things that belong to one
+// computer or one moment (usage, panel position, the settings window) stay local. Each setting
+// object is stored in a few small items, since sync allows 8 KB per item.
+const browserSync = (() => {
+  const S = api.storage && api.storage.sync;
+  const L = api.storage && api.storage.local;
+  const KEYS = { gptu: "chatgpt", "gptu-claude": "claude" }; // content.js storage key -> site
+  const VOLATILE = ["usage", "plan", "usageAt", "models", "creditReferencePending", "settingsTab", "settingsClosed", "settingsPosition", "settingsSize", "collapsed", "closed", "floating", "position", "appliedAt"];
+  const STATE = "gptu-sync"; // local: { ready, at: { key: ms }, json: { key: last synced JSON } }
+  const CHUNK = 3000, DELAY_MS = 4000, RESTORE_WAIT_MS = 45 * 1000;
+  let st = null, restoring = false;
+  const timers = {};
+  const strip = (v) => { const o = { ...(v || {}) }; for (const k of VOLATILE) delete o[k]; return o; };
+  const saveState = () => L.set({ [STATE]: st }).catch?.(() => {});
+
+  async function put(name, value, at) {
+    const json = JSON.stringify(value), n = Math.max(1, Math.ceil(json.length / CHUNK));
+    const old = (await S.get(`${name}#m`))[`${name}#m`];
+    const items = { [`${name}#m`]: { n, at } };
+    for (let i = 0; i < n; i++) items[`${name}#${i}`] = json.slice(i * CHUNK, (i + 1) * CHUNK);
+    await S.set(items);
+    if (old && old.n > n) await S.remove(Array.from({ length: old.n - n }, (_, i) => `${name}#${n + i}`));
+  }
+  async function get(name) {
+    const m = (await S.get(`${name}#m`))[`${name}#m`];
+    if (!m || !m.n) return null;
+    const keys = Array.from({ length: m.n }, (_, i) => `${name}#${i}`);
+    const got = await S.get(keys);
+    if (keys.some((k) => typeof got[k] !== "string")) return null; // still arriving
+    try { return { value: JSON.parse(keys.map((k) => got[k]).join("")), at: m.at }; } catch (_) { return null; }
+  }
+
+  // Another computer's settings for this site, over the local ones (keeping what stays local).
+  // The new appliedAt makes open panels load them right away.
+  async function applyLocal(key, value, at) {
+    const cur = (await L.get(key))[key] || {};
+    const keep = Object.fromEntries(VOLATILE.filter((k) => k in cur).map((k) => [k, cur[k]]));
+    const next = { ...strip(value), ...keep, appliedAt: Date.now() };
+    st.at[key] = at;
+    st.json[key] = JSON.stringify(strip(next));
+    await saveState();
+    await L.set({ [key]: next });
+  }
+
+  async function push(key) {
+    if (!st || !st.ready) return;
+    const cur = (await L.get(key))[key];
+    if (!cur) return;
+    const value = strip(cur), json = JSON.stringify(value);
+    if (json === st.json[key]) return;
+    const at = Date.now();
+    await put(`ext:${key}`, value, at);
+    st.at[key] = at;
+    st.json[key] = json;
+    await saveState();
+  }
+  const schedule = (key) => { clearTimeout(timers[key]); timers[key] = setTimeout(() => push(key).catch(() => {}), DELAY_MS); };
+
+  async function pull(key) {
+    const r = await get(`ext:${key}`);
+    if (r && r.at > (st.at[key] || 0) && JSON.stringify(strip(r.value)) !== st.json[key]) await applyLocal(key, r.value, r.at);
+    return r;
+  }
+
+  async function sendCompanion() {
+    if (!companion.up()) return;
+    const r = await get("umc");
+    if (r) companion.send({ type: "sync-data", data: r.value, at: r.at });
+  }
+
+  async function init() {
+    if (!S || !L) return;
+    st = (await L.get(STATE))[STATE] || null;
+    const first = !st;
+    if (first) st = { ready: false, at: {}, json: {} };
+    let found = false;
+    for (const key of Object.keys(KEYS)) if (await pull(key)) found = true;
+    if (!st.ready) {
+      if (found) st.ready = true;
+      else {
+        // Nothing synced yet: the companion may still have this computer's settings (a fresh
+        // install, or the extension's ID changed). Ask it; after a while, start from what's here.
+        restoring = true;
+        setTimeout(() => { if (restoring) finishRestore(); }, RESTORE_WAIT_MS);
+        companionReady();
+      }
+    }
+    await saveState();
+    if (st.ready) for (const key of Object.keys(KEYS)) schedule(key);
+  }
+  async function finishRestore() {
+    restoring = false;
+    st.ready = true;
+    await saveState();
+    for (const key of Object.keys(KEYS)) schedule(key);
+  }
+
+  function companionReady() {
+    if (!st) return;
+    if (restoring && companion.up()) companion.send({ type: "settings-missing" });
+    sendCompanion().catch(() => {});
+  }
+  async function restore(settings) {
+    if (!restoring || !settings || typeof settings !== "object") return;
+    for (const [key, site] of Object.entries(KEYS)) {
+      const v = settings[site];
+      if (v && typeof v === "object") await applyLocal(key, v, 0);
+    }
+    st.json = {}; // push the restored settings to sync
+    await finishRestore();
+  }
+  async function saveCompanion(data, at) {
+    if (!S || !data || typeof data !== "object" || !(Number(at) > 0)) return;
+    const cur = await get("umc");
+    if (cur && cur.at >= at) return;
+    await put("umc", data, Number(at));
+  }
+
+  try {
+    api.storage.onChanged.addListener((changes, area) => {
+      if (!st) return;
+      if (area === "local") { for (const key of Object.keys(KEYS)) if (changes[key] && st.ready) schedule(key); return; }
+      if (area !== "sync") return;
+      for (const key of Object.keys(KEYS)) if (changes[`ext:${key}#m`]) pull(key).catch(() => {});
+      if (changes["umc#m"]) sendCompanion().catch(() => {});
+    });
+  } catch (_) {}
+  init().catch(() => {});
+
+  return { companionReady, restore, saveCompanion };
 })();

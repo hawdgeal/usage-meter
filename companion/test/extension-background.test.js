@@ -9,8 +9,11 @@ const vm = require("vm");
 const EXT = path.join(__dirname, "..", "..");
 
 // clock: { now } lets a test move time forward (the background script reads Date.now()).
-function makeBrowser({ hostInstalled = true, responses = {}, saved = {}, clock = null } = {}) {
-  const listeners = { message: [], alarm: [] };
+// syncStore: a shared object standing in for browser sync (two browsers can share one).
+function makeBrowser({ hostInstalled = true, responses = {}, saved = {}, clock = null, syncStore = null } = {}) {
+  const listeners = { message: [], alarm: [], storage: [] };
+  const fireStorage = (c, area) => listeners.storage.forEach((f) => f(c, area));
+  const pick = (store, keys) => Object.fromEntries([].concat(keys).filter((k) => k in store).map((k) => [k, JSON.parse(JSON.stringify(store[k]))]));
   const ports = [];
   const fetches = [];
   const ev = () => { const l = []; return { addListener: (f) => l.push(f), fire: (...a) => l.forEach((f) => f(...a)), l }; };
@@ -30,8 +33,16 @@ function makeBrowser({ hostInstalled = true, responses = {}, saved = {}, clock =
     action: { setIcon: () => Promise.resolve(), setTitle: () => Promise.resolve() },
     alarms: { get: () => Promise.resolve(null), create: () => {}, onAlarm: { addListener: (f) => listeners.alarm.push(f) } },
     storage: {
-      local: { get: async (keys) => Object.fromEntries([].concat(keys).filter((k) => k in saved).map((k) => [k, saved[k]])) },
-      onChanged: { addListener: (f) => listeners.storage = f },
+      local: {
+        get: async (keys) => pick(saved, keys),
+        set: async (items) => { const c = {}; for (const [k, v] of Object.entries(items)) { c[k] = { oldValue: saved[k], newValue: v }; saved[k] = JSON.parse(JSON.stringify(v)); } setTimeout(() => fireStorage(c, "local"), 0); },
+      },
+      ...(syncStore ? { sync: {
+        get: async (keys) => pick(syncStore, keys),
+        set: async (items) => { const c = {}; for (const [k, v] of Object.entries(items)) { c[k] = { newValue: v }; syncStore[k] = JSON.parse(JSON.stringify(v)); } setTimeout(() => fireStorage(c, "sync"), 0); },
+        remove: async (keys) => { for (const k of [].concat(keys)) delete syncStore[k]; },
+      } } : {}),
+      onChanged: { addListener: (f) => listeners.storage.push(f) },
     },
   };
   const fetch = async (url, init) => {
@@ -41,12 +52,12 @@ function makeBrowser({ hostInstalled = true, responses = {}, saved = {}, clock =
     return { ok: (r.status || 200) < 400, status: r.status || 200, json: async () => r.body };
   };
   const FakeDate = clock ? Object.assign(class extends Date {}, { now: () => clock.now }) : Date;
-  const ctx = vm.createContext({ chrome, fetch, navigator: { userAgent: "Mozilla/5.0 Chrome/140" }, setTimeout, console, Date: FakeDate, JSON, Promise, Object, Array, String, Number, Math, Error, encodeURIComponent, isFinite });
+  const ctx = vm.createContext({ chrome, fetch, navigator: { userAgent: "Mozilla/5.0 Chrome/140" }, setTimeout, clearTimeout, console, Date: FakeDate, JSON, Promise, Object, Array, String, Number, Math, Error, encodeURIComponent, isFinite });
   ctx.globalThis = ctx;
   ctx.importScripts = (f) => vm.runInContext(fs.readFileSync(path.join(EXT, f), "utf8"), ctx, { filename: f });
   vm.runInContext(fs.readFileSync(path.join(EXT, "background.js"), "utf8"), ctx, { filename: "background.js" });
   const tabMessage = (m) => listeners.message.forEach((f) => f(m, { tab: { id: 1 } }));
-  return { ctx, ports, fetches, tabMessage, storageChange: (c) => listeners.storage(c, "local"), alarm: () => listeners.alarm.forEach((f) => f({ name: "usage-meter-companion" })) };
+  return { ctx, ports, fetches, tabMessage, storageChange: (c) => fireStorage(c, "local"), saved, alarm: () => listeners.alarm.forEach((f) => f({ name: "usage-meter-companion" })) };
 }
 
 const tick = () => new Promise((r) => setTimeout(r, 20));
@@ -161,4 +172,43 @@ test("after a sign-in error it tries again within minutes, not ten", async () =>
   assert.strictEqual(gptFetches(), first, "not again after one minute");
   clock.now += 90 * 1000; b.alarm(); await tick();
   assert.ok(gptFetches() > first, "again after two and a half minutes");
+});
+
+test("browser sync: restores from the companion, syncs without per-computer parts, and another browser picks it up", async () => {
+  const syncStore = {};
+  const a = makeBrowser({ saved: { gptu: { theme: "dark", usage: { x: 1 }, position: { x: 5 } } }, syncStore });
+  await tick();
+  const port = a.ports[0];
+  port.onMessage.fire({ type: "companion", connected: true });
+  await tick();
+  // Nothing in sync yet: the extension asks the companion for this computer's settings.
+  assert.ok(port.sent.some((m) => m.type === "settings-missing"));
+  port.onMessage.fire({ type: "restore-settings", settings: { chatgpt: { theme: "light", position: { x: 9 } } } });
+  await tick();
+  assert.strictEqual(a.saved.gptu.theme, "light");
+  assert.deepStrictEqual(a.saved.gptu.position, { x: 5 }, "the panel position stays this computer's");
+  // A few seconds later the settings are in sync, without usage or position.
+  await new Promise((r) => setTimeout(r, 4300));
+  const meta = syncStore["ext:gptu#m"];
+  assert.ok(meta && meta.n >= 1);
+  const synced = JSON.parse(Array.from({ length: meta.n }, (_, i) => syncStore["ext:gptu#" + i]).join(""));
+  assert.strictEqual(synced.theme, "light");
+  assert.ok(!("usage" in synced) && !("position" in synced));
+  // The companion's own settings are kept in sync too, and the newest wins.
+  port.onMessage.fire({ type: "sync-save", data: { settings: { mode: "claude" } }, at: 50 });
+  await tick();
+  port.onMessage.fire({ type: "sync-save", data: { settings: { mode: "chatgpt" } }, at: 40 });
+  await tick();
+  assert.strictEqual(JSON.parse(syncStore["umc#0"]).settings.mode, "claude");
+
+  // Another computer: empty extension, same browser account.
+  const b = makeBrowser({ syncStore });
+  await tick(); await tick();
+  assert.strictEqual(b.saved.gptu.theme, "light");
+  assert.ok(b.saved.gptu.appliedAt, "open panels reload it");
+  b.ports[0].onMessage.fire({ type: "companion", connected: true });
+  await tick();
+  const data = b.ports[0].sent.find((m) => m.type === "sync-data");
+  assert.ok(data && data.data.settings.mode === "claude" && data.at === 50);
+  assert.ok(!b.ports[0].sent.some((m) => m.type === "settings-missing"), "nothing to restore: sync had it");
 });

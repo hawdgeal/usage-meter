@@ -55,6 +55,15 @@ class Bridge extends EventEmitter {
     return n;
   }
 
+  // Send a message to every connected browser. Returns how many got it.
+  send(msg) {
+    let n = 0;
+    for (const sock of this.hosts.keys()) {
+      try { sock.write(JSON.stringify(msg) + "\n"); n++; } catch (_) {}
+    }
+    return n;
+  }
+
   stop() {
     for (const sock of this.hosts.keys()) sock.destroy();
     if (this.server) this.server.close();

@@ -12,6 +12,7 @@ const RETRY_MS = Number(process.env.USAGE_METER_RETRY_MS) || 3000;
 const latest = new Map(); // site -> last usage / usage-error message
 const settings = new Map(); // site -> last panel settings message
 let hello = null;
+let syncData = null; // the companion's settings from browser sync, replayed when the companion connects
 let sock = null;
 let closing = false;
 
@@ -32,7 +33,8 @@ function fromBrowser(msg) {
     const prev = latest.get(msg.site) || {};
     latest.set(msg.site, msg.type === "usage" ? { usage: msg } : { usage: prev.usage, error: msg });
   } else if (msg.type === "settings" && typeof msg.site === "string") settings.set(msg.site, msg);
-  else return;
+  else if (msg.type === "sync-data") syncData = msg;
+  else if (msg.type !== "settings-missing") return;
   toCompanion(msg);
 }
 
@@ -43,6 +45,7 @@ function connect() {
     sock = s;
     toCompanion({ type: "host-hello", pid: process.pid, browser: hello && hello.browser, extensionVersion: hello && hello.extensionVersion });
     for (const m of settings.values()) toCompanion(m);
+    if (syncData) toCompanion(syncData);
     for (const { usage, error } of latest.values()) {
       if (usage) toCompanion(usage);
       if (error) toCompanion(error);
@@ -50,7 +53,9 @@ function connect() {
     toBrowser({ type: "companion", connected: true });
   });
   s.on("data", lineReader((msg) => {
-    if (msg && msg.type === "refresh") toBrowser({ type: "refresh", site: typeof msg.site === "string" ? msg.site : undefined });
+    if (!msg || typeof msg !== "object") return;
+    if (msg.type === "refresh") toBrowser({ type: "refresh", site: typeof msg.site === "string" ? msg.site : undefined });
+    else if (msg.type === "sync-save" || msg.type === "restore-settings") toBrowser(msg);
   }));
   s.on("error", () => {});
   s.on("close", () => {

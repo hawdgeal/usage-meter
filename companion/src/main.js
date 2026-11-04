@@ -122,6 +122,8 @@ function changed() {
 }
 
 function onBridgeMessage(msg, host) {
+  if (msg.type === "sync-data") return applySynced(msg.data, Number(msg.at) || 0);
+  if (msg.type === "settings-missing") return void bridge.send({ type: "restore-settings", settings: store.ext || {} });
   const site = msg.site;
   if (site !== "claude" && site !== "chatgpt") return;
   if (msg.type === "settings") {
@@ -150,6 +152,45 @@ function applyUsage(site, msg, browser) {
 }
 // Another source (not `except`) reported this site's usage in the last few minutes.
 const fresh = (site, except) => { const u = store.usage[site]; return !!(u && u.at && u.browser !== except && Date.now() - u.at < DIRECT_STALE_MS); };
+
+// ---------- settings that follow you ----------
+// The companion's settings, layout and own look travel through the extension into your browser
+// account's sync, so another computer with the extension picks them up. Window positions, logins,
+// "Start with Windows" and the like stay on each computer.
+const SYNCED = ["mode", "followBrowsers", "followTerminals", "cards", "cardsLayout", "cardOnTop", "miniPanel", "miniOnTop", "miniOnlyWithApp", "attachToApp", "dockSidebar", "attachMove", "miniOpacity", "cardDock", "cardHeights", "cardWidths", "lookSource", "updateCheck"];
+let syncedJson = null, syncTimer = null, hostsSyncTimer = null;
+function syncedNow() {
+  return { settings: Object.fromEntries(SYNCED.map((k) => [k, s()[k]])), own: store.own || {}, local: store.local || {} };
+}
+// A few seconds after a change here, hand the new state to the browser(s).
+function syncLater() {
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => {
+    const json = JSON.stringify(syncedNow());
+    if (json === syncedJson) return;
+    syncedJson = json;
+    store.set({ syncAt: Date.now() });
+    sendSynced();
+  }, 3000);
+}
+function sendSynced() {
+  if (s().syncAt > 0 && bridge) bridge.send({ type: "sync-save", data: syncedNow(), at: s().syncAt });
+}
+// Settings from another computer, when newer than this one's.
+function applySynced(data, at) {
+  if (!data || typeof data !== "object" || !(at > (s().syncAt || 0))) { sendSynced(); return; }
+  const incoming = data.settings && typeof data.settings === "object" ? cleanSettings(Object.fromEntries(Object.entries(data.settings).filter(([k]) => SYNCED.includes(k)))) : {};
+  for (const k of ["cardOnTop", "cardDock", "cardHeights", "cardWidths"]) if (data.settings && data.settings[k] && typeof data.settings[k] === "object") incoming[k] = data.settings[k];
+  store.set({ ...incoming, syncAt: at }); // as is: setSettings' side effects would undo parts of it
+  setImmediate(() => { for (const m of minis.values()) applyTopmost(m); updateTray(); });
+  for (const site of ["claude", "chatgpt"]) {
+    if (data.own && data.own[site] && typeof data.own[site] === "object") store.setOwn(site, data.own[site]);
+    if (data.local && data.local[site] && typeof data.local[site] === "object") store.setLocal(site, data.local[site]);
+  }
+  syncedJson = JSON.stringify(syncedNow());
+  bumpLooks();
+  changed();
+}
 
 // ---------- the companion's own login ----------
 // Once you signed in in the companion (Settings → Sign in here), it fetches usage itself when no
@@ -301,13 +342,16 @@ function dockTo(m, target) {
   if (!m.dock || m.dock.key !== key || now - m.dock.at > DOCK_RECHECK_MS) {
     const scale = scaleAt(t);
     const img = foreground.capture(target);
-    const found = sidebar.detect(img, t, scale);
-    const old = m.dock && m.dock.key === key && m.dock.found;
-    // While a dialog dims the window, the picture has the same sidebar in darker colors: keep the
-    // real ones (for 20 s at most). Anything else, such as another page of the app, replaces them.
-    const dimmed = m.popup && now - m.popupSince < 20000 && old && found && found.left === old.left && found.right === old.right &&
-      lum(found.bg) < lum(old.bg) - 6 && lum(found.edge) < lum(old.edge) - 6;
-    m.dock = { key, at: now, scale, found: dimmed ? old : found };
+    // base: the last picture of the sidebar without a dialog over it (the same window, any size).
+    const base = m.dock && m.dock.target === target ? m.dock.base : null;
+    const found = sidebar.detect(img, t, scale, m.dock && m.dock.key === key ? m.dock.found : null);
+    // A dialog (Settings, search…) dims the whole window: the same sidebar, its background darker.
+    // Then the card hides and keeps the real colors (for a minute at most, in case the app simply
+    // turned darker). Hover effects, scrollbars and the edge's own highlight don't change that.
+    const dimmed = !!(base && found && found.right === base.right && found.left === base.left && lum(found.bg) < lum(base.bg) - 6);
+    if (dimmed && !m.popup) m.popupSince = now;
+    m.popup = dimmed && now - (m.popupSince || now) < 60000;
+    m.dock = { key, target, at: now, scale, found: m.popup ? base : found, base: m.popup ? base : found || base };
     // A menu of the app open where the card sits (the account menu, a chat's menu): step aside.
     const f0 = m.dock.found, c0 = foreground.rectOf(m.win.getNativeWindowHandle(), false);
     m.dock.menu = !!(f0 && c0 && sidebar.covered(img, t, f0.bg, { x: f0.left, y: footOf(m, f0) - c0.h, w: f0.right - f0.left, h: c0.h }));
@@ -316,10 +360,7 @@ function dockTo(m, target) {
   if (m.dock.menu) return false;
   const f = m.dock.found;
   if (!f) return false;
-  const popup = popupOpen(m, target, t, f);
-  if (popup && !m.popup) m.popupSince = now;
-  m.popup = popup;
-  if (popup) return false;
+  if (m.popup) return false;
   const handle = m.win.getNativeWindowHandle();
   const w = Math.max(MIN_WIDTH / 2, Math.floor((f.right - f.left) / m.dock.scale));
   if (m.dockWidth !== w) { m.dockWidth = w; m.win.setContentSize(w, m.win.getContentSize()[1]); }
@@ -329,35 +370,8 @@ function dockTo(m, target) {
   if (c.x !== x || c.y !== y) foreground.moveTo(handle, x, y);
   return true;
 }
-// A dialog in the app (Settings, search…) dims the whole window, the sidebar's edge included. The
-// edge is checked on screen above the card, where only the app draws, while the app is in front there.
+
 const lum = (c) => parseInt(c.slice(1, 3), 16) + parseInt(c.slice(3, 5), 16) + parseInt(c.slice(5, 7), 16);
-const colorDiff = (a, b) => [1, 3, 5].reduce((n, i) => n + Math.abs(parseInt(a.slice(i, i + 2), 16) - parseInt(b.slice(i, i + 2), 16)), 0);
-function popupOpen(m, target, t, f) {
-  if (!f.edge) return false;
-  const c = m.win.isVisible() ? foreground.rectOf(m.win.getNativeWindowHandle(), false) : null;
-  const top = c ? c.y : t.y + f.bottom - 150;
-  const x = t.x + f.right;
-  // The edge is also the sidebar's resize handle: it lights up under the pointer (and while dragging
-  // it), and fades back for a moment after the pointer leaves.
-  const p = foreground.pointer();
-  if (p && Math.abs(p.x - x) <= Math.round(20 * scaleAt(t)) && p.y >= t.y && p.y < t.y + t.h) m.edgeHoverAt = Date.now();
-  if (Date.now() - (m.edgeHoverAt || 0) < 1000) return false;
-  // While a button is held (dragging the edge, say), the edge may have moved: keep the last answer.
-  if (p && p.button) return !!m.popup;
-  let seen = 0, off = 0;
-  for (const r of [0.15, 0.3, 0.45, 0.6]) {
-    const y = Math.round(t.y + t.h * r);
-    if (y > top - 8 || foreground.windowAt(x, y) !== target) continue;
-    seen++;
-    const px = foreground.pixelAt(x, y);
-    if (px && colorDiff(px, f.edge) > 12) off++;
-  }
-  // Seen twice in a row (about 0.3 s), so a passing flicker doesn't hide the card.
-  const dim = seen >= 2 && off >= seen * 0.6;
-  m.dimTicks = dim ? (m.dimTicks || 0) + 1 : 0;
-  return m.dimTicks >= 2;
-}
 
 // Tells the page how to look: flat, in the sidebar's colors, or (null) as usual.
 function sendDock(m) {
@@ -1204,12 +1218,23 @@ app.on("before-quit", () => { quitting = true; if (bridge) bridge.stop(); });
 app.whenReady().then(async () => {
   if (process.platform === "win32") app.setAppUserModelId("fr.alencar.usage-meter-companion");
   store = Store.create(app.getPath("userData"));
+  // Any change to what follows you (from Settings, menus, dragging a card's edge, the own look,
+  // collapsed sections) is handed to browser sync a few seconds later.
+  {
+    const set = store.set.bind(store), setOwn = store.setOwn.bind(store), setLocal = store.setLocal.bind(store);
+    store.set = (patch) => { const r = set(patch); if (patch && !("syncAt" in patch) && SYNCED.some((k) => k in patch)) syncLater(); return r; };
+    store.setOwn = (...a) => { const r = setOwn(...a); syncLater(); return r; };
+    store.setLocal = (...a) => { const r = setLocal(...a); syncLater(); return r; };
+  }
+  syncedJson = JSON.stringify(syncedNow());
+  // An existing install starts the sync with what it has; a new one waits for the browser's copy.
+  if (!s().syncAt && s().onboarded) store.set({ syncAt: Date.now() });
   followApp = APP_IDS.includes(s().lastApp) ? s().lastApp : "claude";
   nativeTheme.on("updated", () => changed());
 
   bridge = new Bridge();
   bridge.on("message", onBridgeMessage);
-  bridge.on("hosts", () => changed());
+  bridge.on("hosts", () => { changed(); clearTimeout(hostsSyncTimer); hostsSyncTimer = setTimeout(sendSynced, 2000); });
   try { await bridge.start(); } catch (e) { console.error("pipe:", e.message); }
 
   setupIpc();

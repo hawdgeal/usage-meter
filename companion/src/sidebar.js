@@ -16,7 +16,9 @@ const hex = (c) => "#" + c.toString(16).padStart(6, "0");
 // top-left corner, { left, right, bottom, end, bg, line } (right, bottom and end exclusive; bottom is
 // the footer's top, end the sidebar's own bottom; bg and line as
 // "#rrggbb"), or null when there is no sidebar (collapsed, or a layout this doesn't recognize).
-function detect(img, frame, scale = 1) {
+// prev: the last result for this window. While its edges are still there (even partly covered,
+// say by a scrollbar that shows on hover), they are kept, so the card doesn't jump.
+function detect(img, frame, scale = 1, prev = null) {
   if (!img || !frame || !img.data) return null;
   const ox = frame.x - img.x, oy = frame.y - img.y;
   const W = Math.min(frame.w, img.w - ox), H = Math.min(frame.h, img.h - oy);
@@ -42,17 +44,22 @@ function detect(img, frame, scale = 1) {
     edges.push(x);
     if (n >= ys.length * 0.9) strong.add(x);
   }
-  let i = edges.findIndex((x) => x >= u(160) && strong.has(x));
-  if (i < 0) return null;
-  // A scrollbar running down the sidebar is another edge just before the real one.
-  while (i + 1 < edges.length && edges[i + 1] - edges[i] <= u(20) && strong.has(edges[i + 1])) i++;
-  const right = edges[i];
+  const near = (x) => edges.find((e) => Math.abs(e - x) <= 2);
+  let right = prev && near(prev.right) != null ? prev.right : null;
+  if (right == null) {
+    let i = edges.findIndex((x) => x >= u(160) && strong.has(x));
+    if (i < 0) return null;
+    // A scrollbar running down the sidebar is another edge just before the real one.
+    while (i + 1 < edges.length && edges[i + 1] - edges[i] <= u(20) && strong.has(edges[i + 1])) i++;
+    right = edges[i];
+  }
   // The edge's own color, to notice a dialog dimming the window (see main.js).
   const edgeCounts = new Map();
   for (const y of ys) { const c = px(right, y); edgeCounts.set(c, (edgeCounts.get(c) || 0) + 1); }
   const edge = [...edgeCounts].sort((a, b) => b[1] - a[1])[0][0];
   const before = edges.filter((x) => x < right - u(100));
   let left = before.length ? before[before.length - 1] + 1 : 0;
+  if (prev && prev.right === right && (prev.left <= 1 ? left <= 1 : near(prev.left - 1) != null)) left = prev.left;
 
   // Background: the most common color inside the sidebar.
   const counts = new Map();

@@ -10,6 +10,9 @@ const { execFile } = require("child_process");
 const HOST = "fr.alencar.usage_meter";
 const FIREFOX_ID = "chatgpt-usage-meter@alencar.fr";
 const ID_RE = /^[a-p]{32}$/;
+// The extension's fixed ID (from the "key" in its manifest): the same on every computer, so a new
+// install connects before the extension was ever seen in a browser profile.
+const EXTENSION_ID = "edbdlebefdoiafhlfbpfdhcpejcpfbjm";
 
 // reg: where the browser looks for hosts (null: it reads Chrome's key).
 // data: its profile folder, under %LOCALAPPDATA% (local) or %APPDATA% (roaming).
@@ -101,7 +104,7 @@ function registryPlan(files, hasChromiumIds) {
 
 async function register({ dir, exePath, scriptPath, manualIds, env }) {
   const detected = detectExtensionIds(env);
-  const ids = [...detected.map((d) => d.id), ...(manualIds || [])];
+  const ids = [...new Set([EXTENSION_ID, ...detected.map((d) => d.id), ...(manualIds || [])])];
   const files = writeHostFiles(dir, { exePath, scriptPath, ids });
   const plan = registryPlan(files, files.origins.length > 0);
   const results = [];
@@ -118,4 +121,4 @@ async function unregister() {
   return out;
 }
 
-module.exports = { HOST, FIREFOX_ID, ID_RE, BROWSERS, detectExtensionIds, writeHostFiles, registryPlan, register, unregister, isUsageMeter };
+module.exports = { HOST, FIREFOX_ID, EXTENSION_ID, ID_RE, BROWSERS, detectExtensionIds, writeHostFiles, registryPlan, register, unregister, isUsageMeter };

@@ -2,7 +2,8 @@
   "manifest_version": 3,
   "name": "Usage Meter for ChatGPT & Claude",
   "short_name": "Usage Meter",
-  "version": "0.5.4",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAmj6P6ybNok6GUXR1dIOQQbR6vLv7BYaiKqseTvMB/8nZgJDVjD8mVmr1z6ALROSu5R7cAxiretXfqYY+de5a7LKKXkNi7cRM6ZLqi/M0o2wMzTcYcCpstq53bk8UoU/DkAsM9J76xWeM36foqoO76SGqQpomtxP+eLpNDz2CzpApK7h3KpM41tOyABznYE5EEnt6R9IxVVEnY45b+nRiOpmPOGI58tAmOP6o2qB6s/L2ZzW3yEX02MwJrDLoiVr72cSIVqKQ0S/ff7u0XYWfNIrFlOLYrOfo1ONzFxjXm01oTRcqqXa/Vb898aj1hM295sAwcpXdNxJgEePkP1vljQIDAQAB",
+  "version": "0.5.5",
   "description": "Shows your ChatGPT / Codex and Claude plan usage, credits and limits in each site's sidebar, with settings you can copy between them.",
   "icons": {
     "16": "icons/icon16.png",
