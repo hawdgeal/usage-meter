@@ -340,9 +340,11 @@ function attachTick() {
 // ---------- docked into the app's sidebar ----------
 // The card takes the sidebar's width and sits at its bottom (in Claude just above your name), drawn flat in the sidebar's color. The sidebar is
 // found in a picture of the app's window (see sidebar.js), again whenever the window moves or
-// resizes and every DOCK_RECHECK_MS (for the sidebar's own width, or it being closed). With no
+// resizes and every dockRecheckMs() (for the sidebar's own width, or it being closed). With no
 // sidebar the card hides.
-const DOCK_RECHECK_MS = 500;
+// Half a second right after you use the mouse or keyboard (menus and dialogs open then), every
+// two seconds otherwise.
+const dockRecheckMs = () => (foreground.idleMs() < 3000 ? 500 : 2000);
 function scaleAt(r) {
   try { return screen.getDisplayNearestPoint(screen.screenToDipPoint({ x: r.x + 10, y: r.y + 10 })).scaleFactor || 1; } catch (_) { return 1; }
 }
@@ -355,7 +357,7 @@ function dockTo(m, target) {
   const side = dockSide(m) || "left";
   const key = `${target}|${side}|${t.x},${t.y},${t.w},${t.h}`;
   const now = Date.now();
-  if (!m.dock || m.dock.key !== key || now - m.dock.at > DOCK_RECHECK_MS) {
+  if (!m.dock || m.dock.key !== key || now - m.dock.at > dockRecheckMs()) {
     const scale = scaleAt(t);
     const img = foreground.capture(target);
     // base: the last picture of the sidebar without a dialog over it (the same window, any size).
@@ -429,10 +431,13 @@ function clickTick() {
   const active = [...minis.values()].filter((m) => m.win && !m.win.isDestroyed() && (m.win.isVisible() || m.peek));
   if (!active.length || !foreground.available()) { clearInterval(clickTimer); clickTimer = null; return; }
   if (!clickTimer) clickTimer = setInterval(clickTick, 30);
+  // The cheap check first: only a new press, or a faded card, needs the window under the pointer.
+  const button = foreground.buttons();
+  const down = button && !wasDown;
+  wasDown = button;
+  if (!down && !active.some((m) => m.peek)) return;
   const p = foreground.pointer();
   if (!p) return;
-  const down = p.button && !wasDown;
-  wasDown = p.button;
   const now = Date.now();
 
   for (const m of active) {

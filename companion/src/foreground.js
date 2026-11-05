@@ -51,6 +51,10 @@ function load() {
     api.SelectObject = gdi32.func("intptr_t __stdcall SelectObject(intptr_t hdc, intptr_t h)");
     api.DeleteObject = gdi32.func("int __stdcall DeleteObject(intptr_t h)");
     api.DeleteDC = gdi32.func("int __stdcall DeleteDC(intptr_t hdc)");
+    // How long since the last mouse or keyboard input, to slow down work while you're away.
+    koffi.struct("UMC_LASTINPUT", { cbSize: "uint32_t", dwTime: "uint32_t" });
+    api.GetLastInputInfo = user32.func("int __stdcall GetLastInputInfo(_Inout_ UMC_LASTINPUT *plii)");
+    api.GetTickCount = koffi.load("kernel32.dll").func("uint32_t __stdcall GetTickCount()");
     api.GetDIBits = gdi32.func("int __stdcall GetDIBits(intptr_t hdc, intptr_t hbm, uint32_t start, uint32_t lines, void *bits, void *bmi, uint32_t usage)");
     try {
       // Cloaked windows (other virtual desktops, suspended Store apps) count as visible but aren't shown.
@@ -299,6 +303,9 @@ function pixelAt(x, y) {
 // the window's rectangle in physical pixels (with its invisible borders) and its pixels as BGRA rows,
 // top to bottom. null if it can't. PW_RENDERFULLCONTENT is needed for Chromium-based apps.
 const PW_RENDERFULLCONTENT = 2;
+// The picture's memory is kept and reused while the size stays the same (a window of 3240×2064 is a
+// 27 MB picture): use the result right away, the next capture overwrites it.
+let shot = null; // { w, h, data, bmi }
 function capture(hwnd) {
   if (!load() || !api.PrintWindow) return null;
   const r = rectOf(hwnd, false);
@@ -311,12 +318,14 @@ function capture(hwnd) {
     old = api.SelectObject(dc, bmp);
     if (!api.PrintWindow(hwnd, dc, PW_RENDERFULLCONTENT)) return null;
     api.SelectObject(dc, old); old = 0;
-    const bmi = Buffer.alloc(44);
-    bmi.writeUInt32LE(40, 0); bmi.writeInt32LE(r.w, 4); bmi.writeInt32LE(-r.h, 8); // top-down rows
-    bmi.writeUInt16LE(1, 12); bmi.writeUInt16LE(32, 14);
-    const data = Buffer.alloc(r.w * r.h * 4);
-    if (!api.GetDIBits(dc, bmp, 0, r.h, data, bmi, 0)) return null;
-    return { ...r, data };
+    if (!shot || shot.w !== r.w || shot.h !== r.h) {
+      const bmi = Buffer.alloc(44);
+      bmi.writeUInt32LE(40, 0); bmi.writeInt32LE(r.w, 4); bmi.writeInt32LE(-r.h, 8); // top-down rows
+      bmi.writeUInt16LE(1, 12); bmi.writeUInt16LE(32, 14);
+      shot = { w: r.w, h: r.h, bmi, data: Buffer.allocUnsafe(r.w * r.h * 4) };
+    }
+    if (!api.GetDIBits(dc, bmp, 0, r.h, shot.data, shot.bmi, 0)) return null;
+    return { ...r, data: shot.data };
   } catch (_) {
     return null;
   } finally {
@@ -327,8 +336,26 @@ function capture(hwnd) {
   }
 }
 
+// Whether a mouse button is held: cheap, for polling (pointer() also finds the window under it).
+function buttons() {
+  if (!load()) return false;
+  try { return isDown(VK_LBUTTON) || isDown(VK_RBUTTON); } catch (_) { return false; }
+}
+
+// Milliseconds since the last mouse or keyboard input anywhere; 0 if unknown.
+function idleMs() {
+  if (!load() || !api.GetLastInputInfo) return 0;
+  try {
+    const info = { cbSize: 8, dwTime: 0 };
+    if (!api.GetLastInputInfo(info)) return 0;
+    return (api.GetTickCount() - info.dwTime) >>> 0;
+  } catch (_) {
+    return 0;
+  }
+}
+
 function available() {
   return !!load();
 }
 
-module.exports = { get, available, setTopmost, handleValue, listWindows, placeAbove, rectOf, moveTo, pointer, windowAt, pixelAt, capture, error: () => (load(), loadError) };
+module.exports = { get, available, setTopmost, handleValue, listWindows, placeAbove, rectOf, moveTo, pointer, buttons, idleMs, windowAt, pixelAt, capture, error: () => (load(), loadError) };
