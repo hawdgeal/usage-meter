@@ -6,7 +6,7 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { spawn, execFile } = require("child_process");
+const { execFile } = require("child_process");
 const { app, net } = require("electron");
 
 const REPO = "hawdgeal/usage-meter";
@@ -94,9 +94,21 @@ async function install(latest, progress) {
     "Remove-Item -LiteralPath (Split-Path $src) -Recurse -Force -ErrorAction SilentlyContinue",
   ].join("\r\n"), "utf8");
   const log = path.join(app.getPath("userData"), "update.log");
-  const child = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", script,
-    "-pid0", String(process.pid), "-src", dir, "-dst", appDir(), "-exe", EXE, "-log", log], { detached: true, stdio: "ignore", windowsHide: true });
-  child.unref();
+  // Started through Start-Process, not spawn({ detached: true }): a detached powershell.exe has
+  // no console and exits at once without running the script, so the app quit and never came back.
+  // Start-Process gives it its own hidden console and outlives this app; if it fails, this throws
+  // and the app stays open with the error instead of quitting.
+  await ps(["-Command", swapLaunchCommand(script, { pid0: process.pid, src: dir, dst: appDir(), exe: EXE, log })]);
 }
 
-module.exports = { check, install, canInstall, compare, fromRelease };
+// The PowerShell command that starts swap.ps1 in its own hidden window. Each value goes into
+// -ArgumentList in double quotes (paths can hold spaces; Windows paths can't hold "), and the
+// whole list is a single-quoted PowerShell string.
+function swapLaunchCommand(script, params) {
+  const args = ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", `"${script}"`];
+  for (const [k, v] of Object.entries(params)) args.push(`-${k}`, `"${String(v)}"`);
+  const list = args.join(" ").replace(/'/g, "''");
+  return `Start-Process -FilePath powershell.exe -WindowStyle Hidden -ArgumentList '${list}'`;
+}
+
+module.exports = { check, install, canInstall, compare, fromRelease, swapLaunchCommand };
