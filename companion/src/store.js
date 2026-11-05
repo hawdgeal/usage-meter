@@ -11,18 +11,14 @@ const DEFAULTS = {
   followTerminals: true, // match terminals running Claude Code or Codex by title
   cards: "one", // "one" app, "both" Claude and ChatGPT in one panel, or "separate" panels
   cardsLayout: "column", // both cards "column" (stacked) or "row" (side by side)
-  cardOnTop: {}, // separate cards: { claude: bool, chatgpt: bool } set by each card's pin
-  miniPanel: true,
-  miniOnTop: true,
-  miniOnlyWithApp: false, // show the mini panel only while a matching app is in front
-  attachToApp: false, // keep each card just above its own app's window instead of above everything
-  dockSidebar: false, // with attachToApp: each card sits in its app's sidebar, as wide as it, above its footer
-  attachMove: false, // with attachToApp: the card also moves with its app's window
+  miniPanel: true, // show the cards
+  placement: {}, // per card (main | claude | chatgpt): "float" (default), "app" (on top of its app) or "dock" (in its app's sidebar)
+  onTop: {}, // per floating card: keep above other windows (default true)
+  attachMove: false, // "app" cards also move with their app's window
   attachOffsets: {}, // with attachMove: { key: { right, bottom, dx, dy } } from the nearest corner of the app window
   miniOpacity: 1,
   miniBounds: null,
   miniBoundsByApp: {}, // separate cards: { claude: {x, y}, chatgpt: {x, y} }
-  cardDock: {}, // per card, overriding dockSidebar: { main | claude | chatgpt: true/false } (its dock button)
   cardHeights: {}, // heights set by dragging a card's top or bottom edge: { key or "key:dock": height }
   cardWidths: {}, // widths set by dragging a card's edge: { main | claude | chatgpt: width }
   lookSource: "browser", // the cards' look: "browser" (the extension's, live) or "own" (own-look.json)
@@ -51,7 +47,8 @@ function prefsKey(settings) {
 function create(dir) {
   const files = { settings: "settings.json", usage: "last-usage.json", ext: "extension-settings.json", local: "panel-state.json", own: "own-look.json" };
   const read = (f, d) => { try { const v = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8")); return v && typeof v === "object" ? v : d; } catch (_) { return d; } };
-  const settings = { ...DEFAULTS, ...read(files.settings, {}) };
+  const raw = read(files.settings, {});
+  const settings = { ...DEFAULTS, ...raw };
   for (const k of Object.keys(settings)) if (!(k in DEFAULTS)) delete settings[k];
   const data = { usage: read(files.usage, {}), ext: read(files.ext, {}), local: read(files.local, {}), own: read(files.own, {}) };
   const timers = {};
@@ -68,6 +65,7 @@ function create(dir) {
   };
   return {
     settings,
+    raw, // settings.json as read, for converting settings an older version wrote
     usage: data.usage,
     ext: data.ext,
     local: data.local,
@@ -105,4 +103,20 @@ function create(dir) {
   };
 }
 
-module.exports = { create, DEFAULTS, prefsKey, LOCAL_STATE };
+// 0.2.17 and earlier: "Keep on top" (miniOnTop, per card cardOnTop), "On top of its app only"
+// (attachToApp), "Dock in its app's sidebar" (dockSidebar, per card cardDock) and "Only while … in
+// front" (miniOnlyWithApp) become { placement, onTop } per card. null when there's nothing to convert.
+const OLD_PLACEMENT = ["miniOnTop", "cardOnTop", "attachToApp", "dockSidebar", "cardDock", "miniOnlyWithApp"];
+function placementFromOld(o) {
+  if (!o || !OLD_PLACEMENT.some((k) => k in o)) return null;
+  const pin = (k) => (k !== "main" && o.cardOnTop && typeof o.cardOnTop[k] === "boolean" ? o.cardOnTop[k] : o.miniOnTop !== false);
+  const dock = (k) => (o.cardDock && typeof o.cardDock[k] === "boolean" ? o.cardDock[k] : !!o.dockSidebar);
+  const placement = {}, onTop = {};
+  for (const k of ["main", "claude", "chatgpt"]) {
+    placement[k] = o.attachToApp ? (dock(k) ? "dock" : pin(k) ? "app" : "float") : o.miniOnlyWithApp ? "app" : "float";
+    onTop[k] = pin(k); // unpinned with "on top of its app" was an ordinary window: floating, not on top
+  }
+  return { placement, onTop };
+}
+
+module.exports = { create, DEFAULTS, prefsKey, LOCAL_STATE, placementFromOld };

@@ -1,7 +1,7 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert");
-const { detect, covered } = require("../src/sidebar");
+const { detect, detectRail, covered } = require("../src/sidebar");
 
 // A fake window picture: background, a sidebar with an edge line, a footer divider, some text.
 function picture({ w = 900, h = 800, rail = 0, side = 300, footer = 60, box = false }) {
@@ -69,4 +69,27 @@ test("an open menu over the card's spot counts as covering it; chat titles don't
   assert.strictEqual(covered(img, frame, "#1f1f1f", area), false);
   for (let y = 520; y < 730; y++) for (let x = 10; x < 260; x++) { const i = (y * 900 + x) * 4; img.data[i] = img.data[i + 1] = img.data[i + 2] = 0x2c; }
   assert.strictEqual(covered(img, frame, "#1f1f1f", area), true);
+});
+
+test("finds Claude's session rail on the right, and nothing while it's hidden", () => {
+  const W = 1200, H = 800;
+  const make = (rail) => {
+    const data = Buffer.alloc(W * H * 4);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      let c = x < 300 ? 0x1f1f1f : 0x191919;
+      if (x === 300) c = 0x303030;
+      if (rail && (x === 900 || x === 901)) c = 0x303030; // the rail's 2-pixel edge
+      const i = (y * W + x) * 4; data[i] = c & 255; data[i + 1] = (c >> 8) & 255; data[i + 2] = c >> 16;
+    }
+    for (let y = 60; y < 600; y += 40) for (let x = 920; x < 1000; x++) { const i = (y * W + x) * 4; data[i] = data[i + 1] = data[i + 2] = 0xdd; } // rail text
+    return { x: 0, y: 0, w: W, h: H, data };
+  };
+  const frame = { x: 0, y: 0, w: W, h: H };
+  const r = detectRail(make(true), frame);
+  assert.strictEqual(r.side, "right");
+  assert.strictEqual(r.left, 902);
+  assert.strictEqual(r.right, W - 1);
+  assert.strictEqual(r.end, H);
+  assert.strictEqual(r.bg, "#191919");
+  assert.strictEqual(detectRail(make(false), frame), null);
 });

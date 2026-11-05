@@ -12,7 +12,6 @@ contextBridge.exposeInMainWorld("companion", {
   resize: (h) => ipcRenderer.invoke("resize", h),
   connectBrowsers: () => ipcRenderer.invoke("connect-browsers"),
   miniMenu: () => ipcRenderer.invoke("mini-menu"),
-  togglePin: () => ipcRenderer.invoke("toggle-pin"),
   dragStart: () => ipcRenderer.invoke("drag-start"),
   dragEnd: () => ipcRenderer.invoke("drag-end"),
   // edge: "left" or "right"; the companion follows the pointer until widthEnd
@@ -23,7 +22,8 @@ contextBridge.exposeInMainWorld("companion", {
   heightEnd: () => ipcRenderer.invoke("height-end"),
   heightReset: () => ipcRenderer.invoke("height-reset"),
   onCardHeight: (cb) => ipcRenderer.on("card-height", (_e, h) => cb(h)),
-  toggleDock: () => ipcRenderer.invoke("toggle-dock"),
+  // The card's placement button: a menu of where the card sits (floating, on its app, in its sidebar).
+  placementMenu: () => ipcRenderer.invoke("placement-menu"),
   // The companion's own login per site ("claude" | "chatgpt"); signIn resolves true once it works.
   signIn: (site) => ipcRenderer.invoke("sign-in", site),
   signOut: (site) => ipcRenderer.invoke("sign-out", site),

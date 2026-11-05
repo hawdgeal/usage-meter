@@ -93,6 +93,55 @@ function detect(img, frame, scale = 1, prev = null) {
   return { left, right, bottom, end, edge: hex(edge), bg: hex(bg), line: line == null ? null : hex(line) };
 }
 
+// Claude's session rail: the panel on the right of the window (Environment, Context, Outputs…),
+// from its edge line to the window's right edge. Same result shape as detect() (side "right"), with
+// no footer: the card sits at the rail's bottom. null while the rail is hidden.
+function detectRail(img, frame, scale = 1, prev = null) {
+  if (!img || !frame || !img.data) return null;
+  const ox = frame.x - img.x, oy = frame.y - img.y;
+  const W = Math.min(frame.w, img.w - ox), H = Math.min(frame.h, img.h - oy);
+  if (W < 400 || H < 200 || ox < 0 || oy < 0) return null;
+  const d = img.data;
+  const px = (x, y) => { const i = ((y + oy) * img.w + x + ox) * 4; return (d[i + 2] << 16) | (d[i + 1] << 8) | d[i]; };
+  const u = (n) => Math.round(n * scale);
+  const ys = [];
+  for (let y = Math.round(H * 0.1); y < H * 0.65; y += Math.max(2, u(4))) ys.push(y);
+  const edges = [], strong = new Set();
+  let last = -9;
+  for (let x = Math.round(W * 0.5); x < W - 1; x++) {
+    let n = 0;
+    for (const y of ys) if (diff(px(x - 1, y), px(x, y)) > SAME) n++;
+    if (n < ys.length * 0.75) continue;
+    const next = x - last > 1;
+    last = x;
+    if (!next) continue;
+    edges.push(x);
+    if (n >= ys.length * 0.9) strong.add(x);
+  }
+  // The rail starts where its edge line ends: the last edge with room for a rail to its right.
+  let left = prev && prev.side === "right" && edges.some((e) => Math.abs(e - prev.left) <= 2) ? prev.left : null;
+  if (left == null) {
+    const fits = edges.filter((x) => strong.has(x) && W - x >= u(200) && W - x <= W * 0.45);
+    if (!fits.length) return null;
+    left = fits[fits.length - 1];
+  }
+  const right = W - 1; // the window's border is drawn over its outer pixel
+  const counts = new Map();
+  let total = 0;
+  for (const y of ys) for (let x = left + u(4); x < right - u(4); x += 3) { const c = px(x, y); counts.set(c, (counts.get(c) || 0) + 1); total++; }
+  let bg = 0, best = 0;
+  for (const [c, n] of counts) if (n > best) { bg = c; best = n; }
+  if (best < total * 0.4) return null;
+  const edgeCounts = new Map();
+  for (const y of ys) { const c = px(left - 1, y); edgeCounts.set(c, (edgeCounts.get(c) || 0) + 1); }
+  const edge = [...edgeCounts].sort((a, b) => b[1] - a[1])[0][0];
+  // Rows at the very bottom that differ from the rail are the window's own bottom edge.
+  let y = H - 1;
+  while (y > H - u(12) && diff(px(Math.round((left + right) / 2), y), bg) > SAME) y--;
+  const end = y + 1;
+  return { side: "right", left, right, bottom: end, end, edge: hex(edge), bg: hex(bg), line: hex(edge) };
+}
+
 // Whether a menu of the app covers area { x, y, w, h } (pixels from the frame's top-left corner):
 // a menu is a panel (solid, or see-through in ChatGPT), so most of the area isn't the sidebar's
 // own color (bg, "#rrggbb"). Chat titles, a selected row and ChatGPT's "Getting started" box leave
@@ -113,4 +162,4 @@ function covered(img, frame, bg, area) {
   return total > 0 && off >= total * 0.5;
 }
 
-module.exports = { detect, covered };
+module.exports = { detect, detectRail, covered };

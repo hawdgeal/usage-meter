@@ -2,7 +2,8 @@
 "use strict";
 const $ = (id) => document.getElementById(id);
 let state = null;
-const CHECKS = ["followBrowsers", "followTerminals", "miniPanel", "miniOnTop", "attachToApp", "attachMove", "dockSidebar", "miniOnlyWithApp", "launchAtLogin", "updateCheck"];
+const CHECKS = ["followBrowsers", "followTerminals", "miniPanel", "attachMove", "launchAtLogin", "updateCheck"];
+const PLACES = [["float", "Floating"], ["app", "On top of its app"], ["dock", "In its app's sidebar"], ["rail", "In Claude's session rail"]];
 const SELECTS = ["mode", "cards", "cardsLayout"];
 const NAMES = { claude: "Claude", chatgpt: "ChatGPT", codex: "Codex" };
 
@@ -29,16 +30,16 @@ function render() {
   for (const k of CHECKS) $(k).checked = !!s[k];
   for (const k of SELECTS) $(k).value = s[k];
   $("miniOpacity").value = s.miniOpacity;
-  $("cardsLayout").disabled = s.cards !== "both";
-  for (const k of ["miniOnTop", "attachToApp", "miniOnlyWithApp", "miniOpacity"]) $(k).disabled = !s.miniPanel;
-  // On top of its own app replaces both "always on top" and "only while … in front".
-  if (s.attachToApp) { $("miniOnTop").checked = false; $("miniOnTop").disabled = $("miniOnlyWithApp").disabled = true; }
-  if (!state.foreground.available) $("attachToApp").disabled = true;
-  $("dockSidebar").disabled = !s.miniPanel || !s.attachToApp;
-  if (!s.attachToApp) $("dockSidebar").checked = false;
-  $("attachMove").disabled = !s.miniPanel || !s.attachToApp || s.dockSidebar;
-  if (!s.attachToApp) $("attachMove").checked = false;
+  // Options that only apply to one mode show only there.
+  $("followBox").hidden = s.cards !== "one";
+  $("layoutBox").hidden = s.cards !== "both";
   for (const k of ["followBrowsers", "followTerminals"]) $(k).disabled = s.mode !== "follow" || !state.foreground.available;
+  renderPlaces(s);
+  for (const k of ["cards", "miniOpacity", "resetPos"]) $(k).disabled = !s.miniPanel;
+  // Only shown while a card sits on top of its app.
+  const keys = s.cards === "separate" ? ["claude", "chatgpt"] : ["main"];
+  $("attachMove").closest("label").hidden = !keys.some((k) => (state.placement || {})[k] === "app");
+  $("attachMove").disabled = !s.miniPanel;
   $("followNote").textContent = s.mode !== "follow" ? "" :
     state.foreground.available ? `Showing ${NAMES[state.followApp]} now. When something else is in front, the last app stays.` :
     `Following isn't available here (${state.foreground.error || "unknown reason"}). Showing ${NAMES[state.followApp]}.`;
@@ -121,14 +122,51 @@ function render() {
   }
 }
 
+// One row per card: where it sits, and for a floating card whether it stays on top.
+function renderPlaces(s) {
+  const keys = s.cards === "separate" ? ["claude", "chatgpt"] : ["main"];
+  const box = $("placeRows");
+  if (box.dataset.keys !== keys.join()) {
+    box.dataset.keys = keys.join();
+    box.replaceChildren(...keys.map((key) => {
+      const row = Object.assign(document.createElement("div"), { className: "place-row" });
+      row.dataset.key = key;
+      const name = Object.assign(document.createElement("span"), { textContent: key === "main" ? "The card" : `${NAMES[key]} card` });
+      const sel = document.createElement("select");
+      sel.setAttribute("aria-label", `Where the ${key === "main" ? "" : NAMES[key] + " "}card sits`);
+      for (const [v, label] of PLACES) sel.append(Object.assign(document.createElement("option"), { value: v, textContent: label }));
+      sel.addEventListener("change", () => save({ placement: { ...(state.placement || {}), [key]: sel.value } }));
+      const top = Object.assign(document.createElement("label"), { className: "check" });
+      const cb = Object.assign(document.createElement("input"), { type: "checkbox" });
+      cb.addEventListener("change", () => save({ onTop: { ...(state.onTop || {}), [key]: cb.checked } }));
+      top.append(cb, " Keep on top");
+      row.append(name, sel, top);
+      return row;
+    }));
+  }
+  for (const row of box.children) {
+    const key = row.dataset.key, p = (state.placement || {})[key] || "float";
+    const sel = row.querySelector("select"), cb = row.querySelector("input");
+    sel.value = p;
+    sel.disabled = !s.miniPanel;
+    for (const o of sel.options) {
+      o.disabled = o.value !== "float" && (!state.foreground.available || (o.value === "dock" && s.cards === "both"));
+      // Only Claude has a session rail: the Claude card, or a single card (when it shows Claude).
+      if (o.value === "rail") o.hidden = key === "chatgpt" || (key === "main" && s.cards === "both");
+    }
+    cb.checked = (state.onTop || {})[key] !== false;
+    cb.disabled = !s.miniPanel;
+    // Only floating cards can be kept on top; the space stays so the rows line up.
+    row.querySelector(".check").style.visibility = p === "float" ? "" : "hidden";
+  }
+}
+
 async function save(patch) {
   state = await window.companion.setSettings(patch);
   render();
 }
 
 for (const k of CHECKS) $(k).addEventListener("change", (e) => save({ [k]: e.target.checked }));
-// Turning "always on top" back on leaves "on top of its own app".
-$("miniOnTop").addEventListener("change", (e) => { if (e.target.checked && state.settings.attachToApp) save({ attachToApp: false }); });
 for (const k of SELECTS) $(k).addEventListener("change", (e) => save({ [k]: e.target.value }));
 $("miniOpacity").addEventListener("input", (e) => save({ miniOpacity: Number(e.target.value) }));
 $("resetPos").addEventListener("click", () => save({ miniBounds: null, miniPanel: true }));

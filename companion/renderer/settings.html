@@ -14,68 +14,42 @@
     <div><h1>Usage Meter Companion</h1><p class="muted" id="version"></p></div>
   </header>
 
-  <section aria-labelledby="h-connect">
-    <h2 id="h-connect">Browser connection</h2>
-    <p class="muted">Usage comes from the Usage Meter extension in your browser, using your existing sign-in. The browser needs to be running; the Claude and ChatGPT tabs don't need to be open. To do without the browser, sign in here instead (below).</p>
-    <div id="hosts" class="status"></div>
-    <div id="reg" class="status"></div>
-    <div class="line">
-      <button id="connect" class="btn primary">Connect browsers again</button>
-      <span class="muted small">Then reload the extension (or restart the browser).</span>
-    </div>
-    <details id="manual">
-      <summary>Extension not found?</summary>
-      <p class="muted small">Chrome, Edge and other Chromium browsers only let listed extensions talk to this app. Installed copies are found automatically. If yours isn't, copy its ID from the browser's extensions page (turn on Developer mode) and add it here. Firefox needs no ID.</p>
-      <div class="line"><input id="idInput" type="text" spellcheck="false" maxlength="32" placeholder="32-letter extension ID" aria-label="Extension ID"><button id="addId" class="btn">Add</button></div>
-      <p id="idError" class="err small" role="alert" hidden></p>
-      <ul id="ids" class="ids"></ul>
-    </details>
-  </section>
-
-  <section aria-labelledby="h-direct">
-    <h2 id="h-direct">Sign in here (no browser needed)</h2>
-    <p class="muted">Sign in to Claude or ChatGPT in the companion itself, and it fetches your usage on its own, so the browser doesn't need to be running. You sign in on the site's own page; the companion keeps that login on this computer and only contacts claude.ai and chatgpt.com. When the extension reports newer numbers, those are used.</p>
-    <div class="line direct-row" data-site="claude">
-      <strong class="look-name">Claude</strong>
-      <button class="btn" data-direct="in">Sign in…</button>
-      <button class="btn" data-direct="out">Sign out</button>
-      <span class="muted small" data-direct-state></span>
-    </div>
-    <div class="line direct-row" data-site="chatgpt">
-      <strong class="look-name">ChatGPT</strong>
-      <button class="btn" data-direct="in">Sign in…</button>
-      <button class="btn" data-direct="out">Sign out</button>
-      <span class="muted small" data-direct-state></span>
-    </div>
-  </section>
-
-  <section aria-labelledby="h-show">
-    <h2 id="h-show">What to show</h2>
+  <section aria-labelledby="h-cards">
+    <h2 id="h-cards">Cards</h2>
+    <label class="check"><input type="checkbox" id="miniPanel"> Show the cards</label>
     <label class="field"><span>Cards</span>
       <select id="cards">
-        <option value="one">One app</option>
-        <option value="both">Both Claude and ChatGPT, in one panel</option>
-        <option value="separate">Separate cards for Claude and ChatGPT</option>
+        <option value="separate">A card for Claude and one for ChatGPT</option>
+        <option value="one">One card, for the app in front</option>
+        <option value="both">Claude and ChatGPT in one panel</option>
       </select>
     </label>
-    <label class="field"><span>Arrange both</span>
+    <div id="followBox" class="group">
+      <label class="field"><span>Show usage for</span>
+        <select id="mode">
+          <option value="follow">The app in front (Claude, ChatGPT, Codex)</option>
+          <option value="claude">Always Claude</option>
+          <option value="chatgpt">Always ChatGPT</option>
+          <option value="codex">Always Codex</option>
+        </select>
+      </label>
+      <p id="followNote" class="muted small"></p>
+      <label class="check sub"><input type="checkbox" id="followBrowsers"> Also follow browser windows, by tab title</label>
+      <label class="check sub"><input type="checkbox" id="followTerminals"> Also follow terminals running Claude Code or Codex, by window title</label>
+    </div>
+    <label class="field" id="layoutBox"><span>Arrange</span>
       <select id="cardsLayout"><option value="column">Stacked</option><option value="row">Side by side</option></select>
     </label>
-    <label class="field"><span>Show usage for</span>
-      <select id="mode">
-        <option value="follow">The app in front (follows Claude, ChatGPT, Codex)</option>
-        <option value="claude">Always Claude</option>
-        <option value="chatgpt">Always ChatGPT</option>
-        <option value="codex">Always Codex</option>
-      </select>
-    </label>
-    <p id="followNote" class="muted small"></p>
-    <label class="check"><input type="checkbox" id="followBrowsers"> Also follow browser windows (by tab title)</label>
-    <label class="check"><input type="checkbox" id="followTerminals"> Also follow terminals running Claude Code or Codex (by window title)</label>
+    <p class="subhead"><strong>Where each card sits</strong> <span class="muted small">(also the button on each card)</span></p>
+    <div id="placeRows" class="group"></div>
+    <label class="check"><input type="checkbox" id="attachMove"> Cards on top of their app move with it <span class="muted small">(drag a card to set its place on the window)</span></label>
+    <p class="muted small"><strong>Floating:</strong> a window of its own, anywhere. <strong>On top of its app:</strong> just above Claude's or ChatGPT's window, hidden while the app is minimized. <strong>In its app's sidebar:</strong> laid into the sidebar, as wide as it. <strong>In Claude's session rail:</strong> the same, in the panel on the right of Claude's window.</p>
+    <label class="field"><span>Opacity</span><input type="range" id="miniOpacity" min="0.3" max="1" step="0.05"></label>
+    <div class="line"><button id="resetPos" class="btn">Move floating cards back to the corner</button><span class="muted small">Drag a card by any part that isn't a button; right-click it for more.</span></div>
   </section>
 
   <section aria-labelledby="h-look">
-    <h2 id="h-look">Look and layout</h2>
+    <h2 id="h-look">Look</h2>
     <label class="check"><input type="radio" name="lookSource" value="browser"> <span><strong>Same as the browser</strong>: theme, bar colors, spacing, compact mode, module order, hover options and width come from the extension's settings for each site, and follow your changes there within a few seconds.</span></label>
     <label class="check"><input type="radio" name="lookSource" value="own"> <span><strong>Own look</strong>: the companion keeps its own copy, which you change with Customize below. Your browser panel isn't affected.</span></label>
     <div class="line look-row" data-site="claude">
@@ -96,21 +70,36 @@
     <p id="lookStatus" class="muted small"></p>
   </section>
 
-  <section aria-labelledby="h-mini">
-    <h2 id="h-mini">Mini panel</h2>
-    <label class="check"><input type="checkbox" id="miniPanel"> Show the mini panel</label>
-    <label class="check"><input type="checkbox" id="miniOnTop"> Keep it on top of other windows (also the pin button on the panel)</label>
-    <label class="check"><input type="checkbox" id="attachToApp"> Only on top of its own app: each card sits on its app's window and hides when the app is minimized or closed</label>
-    <label class="check sub"><input type="checkbox" id="attachMove"> Move with its app: the card keeps its place on the app's window when you move or resize it (drag the card to change its place)</label>
-    <label class="check sub"><input type="checkbox" id="dockSidebar"> Dock in its app's sidebar: the card fills the sidebar's width at its bottom (above your name in Claude), drawn in the sidebar's colors, and hides when the sidebar is closed</label>
-    <label class="check"><input type="checkbox" id="miniOnlyWithApp"> Only while Claude, ChatGPT or Codex is in front</label>
-    <label class="field"><span>Opacity</span><input type="range" id="miniOpacity" min="0.3" max="1" step="0.05"></label>
-    <div class="line"><button id="resetPos" class="btn">Move back to the corner</button><span class="muted small">Drag it by any part that isn't a button. Right-click it for options. Separate cards each have their own position and pin.</span></div>
-  </section>
-
-  <section aria-labelledby="h-general">
-    <h2 id="h-general">General</h2>
-    <label class="check"><input type="checkbox" id="launchAtLogin"> Start with Windows</label>
+  <section aria-labelledby="h-usage">
+    <h2 id="h-usage">Where usage comes from</h2>
+    <p class="muted">From the Usage Meter extension in your browser, or from the companion's own sign-in when the browser isn't running. The newest numbers are used.</p>
+    <p class="subhead"><strong>Browser</strong></p>
+    <div id="hosts" class="status"></div>
+    <div id="reg" class="status"></div>
+    <div class="line">
+      <button id="connect" class="btn primary">Connect browsers again</button>
+      <span class="muted small">Then reload the extension (or restart the browser).</span>
+    </div>
+    <details id="manual">
+      <summary>Extension not found?</summary>
+      <p class="muted small">Chrome, Edge and other Chromium browsers only let listed extensions talk to this app. Installed copies are found automatically. If yours isn't, copy its ID from the browser's extensions page (turn on Developer mode) and add it here. Firefox needs no ID.</p>
+      <div class="line"><input id="idInput" type="text" spellcheck="false" maxlength="32" placeholder="32-letter extension ID" aria-label="Extension ID"><button id="addId" class="btn">Add</button></div>
+      <p id="idError" class="err small" role="alert" hidden></p>
+      <ul id="ids" class="ids"></ul>
+    </details>
+    <p class="subhead"><strong>Sign in here</strong> <span class="muted small">(no browser needed; you sign in on the site's own page, and the login stays on this computer)</span></p>
+    <div class="line direct-row" data-site="claude">
+      <strong class="look-name">Claude</strong>
+      <button class="btn" data-direct="in">Sign in…</button>
+      <button class="btn" data-direct="out">Sign out</button>
+      <span class="muted small" data-direct-state></span>
+    </div>
+    <div class="line direct-row" data-site="chatgpt">
+      <strong class="look-name">ChatGPT</strong>
+      <button class="btn" data-direct="in">Sign in…</button>
+      <button class="btn" data-direct="out">Sign out</button>
+      <span class="muted small" data-direct-state></span>
+    </div>
   </section>
 
   <section aria-labelledby="h-update">
@@ -123,6 +112,12 @@
     <label class="check"><input type="checkbox" id="updateCheck"> Check for updates automatically (on GitHub, every few hours)</label>
     <p class="muted small">Updating downloads the new version from the project's GitHub releases, replaces the app's files and restarts it. Your settings stay. Update the browser extension separately.</p>
   </section>
+
+  <section aria-labelledby="h-general">
+    <h2 id="h-general">General</h2>
+    <label class="check"><input type="checkbox" id="launchAtLogin"> Start with Windows</label>
+  </section>
+
 </main>
 <script src="settings.js"></script>
 </body>

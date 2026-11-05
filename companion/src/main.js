@@ -52,18 +52,26 @@ const currentApp = () => (s().mode === "follow" ? followApp : APP_IDS.includes(s
 const currentView = () => (s().cards === "one" ? currentApp() : "both");
 const miniWins = () => [...minis.values()].map((m) => m.win).filter((w) => w && !w.isDestroyed());
 const entryOf = (win) => [...minis.values()].find((m) => m.win === win) || null;
-// Separate cards each have their own pin; otherwise one setting covers the mini panel.
-const pinFor = (key) => (key !== "main" && s().cardOnTop && typeof s().cardOnTop[key] === "boolean" ? s().cardOnTop[key] : !!s().miniOnTop);
-// "On top of its app" (attachToApp) puts each pinned card just above its app's window instead, and
-// an unpinned card is then an ordinary window. The tray's "Show usage" floats them above everything
-// until one of the apps next comes to the front.
-const attached = () => !!s().attachToApp && foreground.available() && !forceShow;
-// Docked in its app's sidebar: the card's dock button, else the "Dock in its app's sidebar" setting.
-const dockFor = (key) => (s().cardDock && typeof s().cardDock[key] === "boolean" ? s().cardDock[key] : !!s().dockSidebar);
-const cardAttached = (m) => attached() && (pinFor(m.key) || dockFor(m.key));
-// (One app per card; two cards in one panel stay as they are.)
-const docked = (m) => dockFor(m.key) && cardAttached(m) && m.view !== "both";
-const onTopFor = (key) => (attached() ? false : pinFor(key));
+// Where each card sits (key: main | claude | chatgpt), one choice per card:
+//   "float": a window of its own you put anywhere; "Keep on top" (onTop) keeps it above other windows.
+//   "app":   just above its own app's window, hidden while the app is minimized or closed;
+//            "Move with its app" (attachMove) keeps its place on the window.
+//   "dock":  laid into its app's sidebar (not for two cards in one panel, which sit on the app).
+//   "rail":  laid into Claude's session rail, the panel on the right (the Claude card only; on
+//            another app it sits on top of the app instead).
+// The tray's "Show usage" floats every card above everything until one of the apps next comes to
+// the front.
+const PLACES = ["float", "app", "dock", "rail"];
+const placeOf = (key) => { const p = (s().placement || {})[key]; return PLACES.includes(p) ? p : "float"; };
+const keepOnTop = (key) => (s().onTop || {})[key] !== false;
+const cardAttached = (m) => placeOf(m.key) !== "float" && foreground.available() && !forceShow;
+const dockSide = (m) => { const p = placeOf(m.key); return p === "dock" && m.view !== "both" ? "left" : p === "rail" && m.view === "claude" ? "right" : null; };
+const docked = (m) => !!dockSide(m) && cardAttached(m);
+const onTopFor = (key) => {
+  const m = minis.get(key);
+  if (m && cardAttached(m)) return false; // placed by attachTick, just above its app
+  return placeOf(key) === "float" ? keepOnTop(key) : true; // "Show usage", or no app tracking
+};
 const siteOf = (id) => UsageView.APPS[id].site;
 const extOf = (site) => store.ext[site] || {};
 const showLeft = (site) => extOf(site).showRemainingPlan !== false;
@@ -93,8 +101,8 @@ function snapshot() {
     prefsVersion,
     app: currentApp(),
     // The pin's state: on top of everything, or of its own app with "On top of its app only".
-    onTop: { main: pinFor("main"), claude: pinFor("claude"), chatgpt: pinFor("chatgpt") },
-    dock: { main: dockFor("main"), claude: dockFor("claude"), chatgpt: dockFor("chatgpt") },
+    placement: { main: placeOf("main"), claude: placeOf("claude"), chatgpt: placeOf("chatgpt") },
+    onTop: { main: keepOnTop("main"), claude: keepOnTop("claude"), chatgpt: keepOnTop("chatgpt") },
     followApp,
     frontMatched,
     hosts: bridge ? bridge.list() : [],
@@ -153,11 +161,18 @@ function applyUsage(site, msg, browser) {
 // Another source (not `except`) reported this site's usage in the last few minutes.
 const fresh = (site, except) => { const u = store.usage[site]; return !!(u && u.at && u.browser !== except && Date.now() - u.at < DIRECT_STALE_MS); };
 
+// 0.2.17 and earlier kept placement in seven settings; they become one choice per card.
+function migratePlacement() {
+  if (store.settings.placement && Object.keys(store.settings.placement).length) return;
+  const converted = Store.placementFromOld(store.raw);
+  if (converted) store.set(converted); // the old keys go with this save (the store keeps known keys only)
+}
+
 // ---------- settings that follow you ----------
 // The companion's settings, layout and own look travel through the extension into your browser
 // account's sync, so another computer with the extension picks them up. Window positions, logins,
 // "Start with Windows" and the like stay on each computer.
-const SYNCED = ["mode", "followBrowsers", "followTerminals", "cards", "cardsLayout", "cardOnTop", "miniPanel", "miniOnTop", "miniOnlyWithApp", "attachToApp", "dockSidebar", "attachMove", "miniOpacity", "cardDock", "cardHeights", "cardWidths", "lookSource", "updateCheck"];
+const SYNCED = ["mode", "followBrowsers", "followTerminals", "cards", "cardsLayout", "miniPanel", "placement", "onTop", "attachMove", "miniOpacity", "cardHeights", "cardWidths", "lookSource", "updateCheck"];
 let syncedJson = null, syncTimer = null, hostsSyncTimer = null;
 function syncedNow() {
   return { settings: Object.fromEntries(SYNCED.map((k) => [k, s()[k]])), own: store.own || {}, local: store.local || {} };
@@ -180,7 +195,7 @@ function sendSynced() {
 function applySynced(data, at) {
   if (!data || typeof data !== "object" || !(at > (s().syncAt || 0))) { sendSynced(); return; }
   const incoming = data.settings && typeof data.settings === "object" ? cleanSettings(Object.fromEntries(Object.entries(data.settings).filter(([k]) => SYNCED.includes(k)))) : {};
-  for (const k of ["cardOnTop", "cardDock", "cardHeights", "cardWidths"]) if (data.settings && data.settings[k] && typeof data.settings[k] === "object") incoming[k] = data.settings[k];
+  for (const k of ["placement", "onTop", "cardHeights", "cardWidths"]) if (data.settings && data.settings[k] && typeof data.settings[k] === "object") incoming[k] = data.settings[k];
   store.set({ ...incoming, syncAt: at }); // as is: setSettings' side effects would undo parts of it
   setImmediate(() => { for (const m of minis.values()) applyTopmost(m); updateTray(); });
   for (const site of ["claude", "chatgpt"]) {
@@ -276,7 +291,7 @@ function pollForeground() {
   // "Show usage" lasts until you next switch to one of the apps.
   if (forceShow && m && (!frontMatched || win.title !== lastFrontTitle)) {
     forceShow = false;
-    if (s().attachToApp) for (const e of minis.values()) applyTopmost(e);
+    for (const e of minis.values()) applyTopmost(e);
     dirty = true;
   }
   lastFrontTitle = win.title;
@@ -316,8 +331,8 @@ function attachTick() {
     m.target = target.hwnd;
     const dock = docked(m);
     if (dock) { if (!dockTo(m, target.hwnd)) { if (win.isVisible()) win.hide(); continue; } }
-    else if (s().attachMove && !drags.has(win) && !widths.has(win)) followTarget(m, target.hwnd);
-    if (!win.isVisible()) { if (!s().attachMove && !dock) keepOnScreen(win); win.showInactive(); pollHover(); }
+    else if (placeOf(m.key) === "app" && s().attachMove && !drags.has(win) && !widths.has(win)) followTarget(m, target.hwnd);
+    if (!win.isVisible()) { if (!(placeOf(m.key) === "app" && s().attachMove) && !dock) keepOnScreen(win); win.showInactive(); pollHover(); }
     foreground.placeAbove(win.getNativeWindowHandle(), target.hwnd);
   }
 }
@@ -333,25 +348,26 @@ function scaleAt(r) {
 }
 // Claude's footer has your name (and its menu), so the card stays above it. ChatGPT's footer is
 // its "Getting started" box: the card covers it and sits at the very bottom.
-const footOf = (m, f) => (m.view === "claude" ? f.bottom : f.end);
+const footOf = (m, f) => (f.side === "right" || m.view !== "claude" ? f.end : f.bottom);
 function dockTo(m, target) {
   const t = foreground.rectOf(target, true);
   if (!t) return false;
-  const key = `${target}|${t.x},${t.y},${t.w},${t.h}`;
+  const side = dockSide(m) || "left";
+  const key = `${target}|${side}|${t.x},${t.y},${t.w},${t.h}`;
   const now = Date.now();
   if (!m.dock || m.dock.key !== key || now - m.dock.at > DOCK_RECHECK_MS) {
     const scale = scaleAt(t);
     const img = foreground.capture(target);
     // base: the last picture of the sidebar without a dialog over it (the same window, any size).
-    const base = m.dock && m.dock.target === target ? m.dock.base : null;
-    const found = sidebar.detect(img, t, scale, m.dock && m.dock.key === key ? m.dock.found : null);
+    const base = m.dock && m.dock.target === target && m.dock.side === side ? m.dock.base : null;
+    const found = (side === "right" ? sidebar.detectRail : sidebar.detect)(img, t, scale, m.dock && m.dock.key === key ? m.dock.found : null);
     // A dialog (Settings, search…) dims the whole window: the same sidebar, its background darker.
     // Then the card hides and keeps the real colors (for a minute at most, in case the app simply
     // turned darker). Hover effects, scrollbars and the edge's own highlight don't change that.
     const dimmed = !!(base && found && found.right === base.right && found.left === base.left && lum(found.bg) < lum(base.bg) - 6);
     if (dimmed && !m.popup) m.popupSince = now;
     m.popup = dimmed && now - (m.popupSince || now) < 60000;
-    m.dock = { key, target, at: now, scale, found: m.popup ? base : found, base: m.popup ? base : found || base };
+    m.dock = { key, target, side, at: now, scale, found: m.popup ? base : found, base: m.popup ? base : found || base };
     // A menu of the app open where the card sits (the account menu, a chat's menu): step aside.
     const f0 = m.dock.found, c0 = foreground.rectOf(m.win.getNativeWindowHandle(), false);
     m.dock.menu = !!(f0 && c0 && sidebar.covered(img, t, f0.bg, { x: f0.left, y: footOf(m, f0) - c0.h, w: f0.right - f0.left, h: c0.h }));
@@ -446,7 +462,8 @@ function dockMenuZone(m, c) {
   const f = m.dock && m.dock.found, t = m.target && foreground.rectOf(m.target, true);
   if (!f || !t) return null;
   const top = Math.max(c.y + c.h - 4, t.y + t.h - Math.round(80 * (m.dock.scale || 1)));
-  return { x: t.x, y: top, w: f.right, h: t.y + t.h - top };
+  // The left sidebar's zone includes ChatGPT's icon strip; the rail's runs to the window's edge.
+  return f.side === "right" ? { x: t.x + f.left, y: top, w: t.w - f.left, h: t.y + t.h - top } : { x: t.x, y: top, w: f.right, h: t.y + t.h - top };
 }
 
 function setFaded(m, fade) {
@@ -556,34 +573,10 @@ function updateTray() {
   setTrayIcon(tray, id, tip);
 }
 
-function cardItems() {
-  return [
-    { label: "Show one app", type: "radio", checked: s().cards === "one", click: () => setSettings({ cards: "one" }) },
-    { label: "Show Claude and ChatGPT", type: "radio", checked: s().cards === "both", click: () => setSettings({ cards: "both" }) },
-    { label: "Separate cards (Claude and ChatGPT)", type: "radio", checked: s().cards === "separate", click: () => setSettings({ cards: "separate" }) },
-  ];
-}
-
-function modeItems() {
-  return [
-    { label: "Follow the app in front", type: "radio", checked: s().mode === "follow", click: () => setSettings({ mode: "follow" }) },
-    ...APP_IDS.map((id) => ({ label: `Always ${APP_LABELS[id]}`, type: "radio", checked: s().mode === id, click: () => setSettings({ mode: id }) })),
-  ];
-}
-
 function trayMenu() {
   return Menu.buildFromTemplate([
     { label: "Show usage", click: () => showMinis() },
-    { label: "Mini panel", type: "checkbox", checked: s().miniPanel, click: (i) => setSettings({ miniPanel: i.checked }) },
-    { label: "Keep mini panel on top", type: "checkbox", checked: s().miniOnTop && !s().attachToApp, enabled: s().miniPanel, click: (i) => setSettings({ miniOnTop: i.checked, cardOnTop: {}, attachToApp: false }) },
-    attachItem(),
-    moveItem(),
-    dockItem(),
-    { type: "separator" },
-    ...cardItems(),
-    { type: "separator" },
-    ...modeItems(),
-    { type: "separator" },
+    { label: "Show cards", type: "checkbox", checked: s().miniPanel, click: (i) => setSettings({ miniPanel: i.checked }) },
     { label: "Refresh", click: () => refresh() },
     { label: "Settings…", click: () => openSettings() },
     ...(update.available && update.latest ? [{ type: "separator" }, { label: update.state === "downloading" ? `Downloading ${update.latest.version}… ${Math.round((update.progress || 0) * 100)}%` : `Update to ${update.latest.version}`, enabled: update.state !== "downloading" && updater.canInstall().ok, click: () => installUpdate() }] : []),
@@ -592,56 +585,41 @@ function trayMenu() {
   ]);
 }
 
-// key: which mini panel was right-clicked.
+// The placement choice for one card, as menu items (the card's placement button and right-click menu).
+function placementItems(m) {
+  const key = m.key, p = placeOf(key), can = foreground.available();
+  const set = (v) => setSettings({ placement: { ...(s().placement || {}), [key]: v } });
+  return [
+    { label: "Floating", type: "radio", checked: p === "float", click: () => set("float") },
+    { label: "On top of its app", type: "radio", checked: p === "app", enabled: can, click: () => set("app") },
+    { label: "In its app's sidebar", type: "radio", checked: p === "dock", enabled: can && m.view !== "both", click: () => set("dock") },
+    { label: "In Claude's session rail", type: "radio", checked: p === "rail", visible: m.view === "claude" || p === "rail", enabled: can, click: () => set("rail") },
+    // The option that goes with the current choice, if any.
+    ...(p === "float" ? [{ type: "separator" }, { label: "Keep on top of other windows", type: "checkbox", checked: keepOnTop(key), click: (i) => setSettings({ onTop: { ...(s().onTop || {}), [key]: i.checked } }) }] : []),
+    ...(p === "app" ? [{ type: "separator" }, { label: "Move with its app", type: "checkbox", checked: !!s().attachMove, click: (i) => setSettings({ attachMove: i.checked }) }] : []),
+  ];
+}
+function placementMenu(key) {
+  const m = minis.get(key);
+  if (m && m.win && !m.win.isDestroyed()) Menu.buildFromTemplate(placementItems(m)).popup({ window: m.win });
+}
+
+// key: which card was right-clicked.
 function miniMenu(key) {
   const m = minis.get(key) || minis.values().next().value;
   if (!m || !m.win || m.win.isDestroyed()) return;
+  const sized = m.view !== "both" && (!!(s().cardHeights || {})[heightKey(m)] || !!(s().cardWidths || {})[m.key]);
   Menu.buildFromTemplate([
-    { label: s().attachToApp ? "Keep on top of its app" : "Keep on top", type: "checkbox", checked: pinFor(m.key), click: () => togglePin(m.key) },
-    attachItem(),
-    moveItem(),
-    dockItem(m.key),
-    { label: "Only while Claude, ChatGPT or Codex is in front", type: "checkbox", checked: s().miniOnlyWithApp, enabled: !s().attachToApp, click: (i) => setSettings({ miniOnlyWithApp: i.checked }) },
-    { type: "separator" },
-    ...cardItems(),
-    { label: "Side by side", type: "checkbox", checked: s().cardsLayout === "row", enabled: s().cards === "both", click: (i) => setSettings({ cardsLayout: i.checked ? "row" : "column" }) },
-    { type: "separator" },
-    ...modeItems(),
+    ...placementItems(m),
     { type: "separator" },
     { label: "Refresh", click: () => refresh() },
-    { label: "Reset height", enabled: !!(s().cardHeights || {})[heightKey(m)] && m.view !== "both", click: () => resetHeight(m) },
-    { label: "Reset width", enabled: !!(s().cardWidths || {})[m.key] && m.view !== "both", click: () => resetWidth(m.key) },
     { label: `Customize look${m.view === "both" ? " (Claude)" : ""}…`, click: () => openEditor(m.view === "both" ? "claude" : m.view) },
     ...(m.view === "both" ? [{ label: "Customize look (ChatGPT)…", click: () => openEditor("chatgpt") }] : []),
+    { label: "Reset size", enabled: sized, click: () => { resetHeight(m); resetWidth(m.key); } },
+    { type: "separator" },
     { label: "Settings…", click: () => openSettings() },
-    { label: "Hide mini panel", click: () => setSettings({ miniPanel: false }) },
+    { label: "Hide cards", click: () => setSettings({ miniPanel: false }) },
   ]).popup({ window: m.win });
-}
-
-function attachItem() {
-  return { label: "On top of its app only", type: "checkbox", checked: !!s().attachToApp, enabled: s().miniPanel && foreground.available(), click: (i) => setSettings({ attachToApp: i.checked }) };
-}
-// key: a card's own menu docks that card; the tray menu docks every card.
-function dockItem(key) {
-  if (key) return { label: "Dock in its app's sidebar", type: "checkbox", checked: !!s().attachToApp && dockFor(key), enabled: s().miniPanel && foreground.available(), click: () => toggleDock(key) };
-  return { label: "Dock in their apps' sidebars", type: "checkbox", checked: !!s().attachToApp && !!s().dockSidebar, enabled: s().miniPanel && foreground.available(), click: (i) => setSettings(i.checked ? { dockSidebar: true, attachToApp: true } : { dockSidebar: false }) };
-}
-// The card's dock button. Docking needs "On top of its app only", so it turns that on too.
-function toggleDock(key) {
-  const on = !(s().attachToApp && dockFor(key));
-  const patch = { cardDock: { ...(s().cardDock || {}), [key]: on } };
-  if (on && !s().attachToApp) patch.attachToApp = true;
-  setSettings(patch);
-}
-function moveItem() {
-  return { label: "Move with its app", type: "checkbox", checked: !!s().attachToApp && !!s().attachMove, enabled: s().miniPanel && !!s().attachToApp && !s().dockSidebar, click: (i) => setSettings({ attachMove: i.checked }) };
-}
-
-// The pin turns "on top" on or off for that card: on top of everything, or of its own app with
-// "On top of its app only".
-function togglePin(key) {
-  if (key !== "main" && s().cards === "separate") setSettings({ cardOnTop: { ...(s().cardOnTop || {}), [key]: !pinFor(key) } });
-  else setSettings({ miniOnTop: !s().miniOnTop, cardOnTop: {} });
 }
 
 // ---------- windows ----------
@@ -723,8 +701,7 @@ function onScreen(b) {
   });
 }
 
-// Which mini panels should exist; minisVisible() says whether they show right now.
-const minisVisible = () => forceShow || !s().miniOnlyWithApp || frontMatched;
+// Which mini panels should exist.
 function wantedMinis() {
   if (!s().miniPanel) return [];
   if (s().cards === "separate") return [{ key: "claude", view: "claude" }, { key: "chatgpt", view: "chatgpt" }];
@@ -760,8 +737,8 @@ function applyTopmost(m) {
   if (process.platform === "win32") foreground.setTopmost(m.win.getNativeWindowHandle(), on);
 }
 
-// Tray click and "Show usage": turn the mini panel on if it's off, show it if "only while … in
-// front" hid it (until a matching app next comes to the front), and bring it above other windows.
+// Tray click and "Show usage": turn the cards on if they're off, and bring them above everything,
+// attached cards included, until one of the apps next comes to the front.
 // only: with separate cards, the card whose tray icon was clicked.
 function showMinis(only) {
   forceShow = true;
@@ -791,9 +768,8 @@ function updateMinis() {
     if (!docked(m)) undock(m);
     if (m.peek) continue; // stepped aside for the app's menu; see clickTick
     if (cardAttached(m)) continue; // attachTick shows, hides and places it
-    // Unpinned while "On top of its app only" is on: an ordinary window, always shown.
-    if (!minisVisible() && !attached()) { if (win.isVisible()) { stopDrag(win); win.hide(); } }
-    else if (!win.isVisible() && m.ready) { keepOnScreen(win); win.showInactive(); applyTopmost(m); }
+    // Floating (or "Show usage"): always shown.
+    if (!win.isVisible() && m.ready) { keepOnScreen(win); win.showInactive(); applyTopmost(m); }
   }
   attachTick();
   pollHover();
@@ -861,7 +837,7 @@ function stopDrag(win) {
   const m = d && !win.isDestroyed() ? entryOf(win) : null;
   if (m) {
     const [x, y] = win.getPosition();
-    if (x !== d.x || y !== d.y) { saveBounds(m.key, { x, y }); if (attached() && s().attachMove && m.target) saveOffset(m); }
+    if (x !== d.x || y !== d.y) { saveBounds(m.key, { x, y }); if (cardAttached(m) && placeOf(m.key) === "app" && s().attachMove && m.target) saveOffset(m); }
   }
 }
 
@@ -1010,7 +986,7 @@ function stopWidth(win) {
   store.set({ cardWidths: { ...(s().cardWidths || {}), [m.key]: w } });
   const [x, y] = win.getPosition();
   saveBounds(m.key, { x, y });
-  if (attached() && s().attachMove && m.target) saveOffset(m);
+  if (cardAttached(m) && placeOf(m.key) === "app" && s().attachMove && m.target) saveOffset(m);
 }
 // Back to the browser panel's width.
 function resetWidth(key) {
@@ -1083,12 +1059,10 @@ function setSettings(patch, quiet) {
   const before = { ...s() };
   store.set(patch);
   // The pin buttons, tray and right-click menus, and Settings all land here.
-  if ("miniOnTop" in patch || "cardOnTop" in patch || "cards" in patch || "attachToApp" in patch) setImmediate(() => { for (const m of minis.values()) applyTopmost(m); });
+  if ("placement" in patch || "onTop" in patch || "cards" in patch) setImmediate(() => { for (const m of minis.values()) applyTopmost(m); });
   if ("cards" in patch) setImmediate(() => updateTray());
   // Moving with the app starts from where each card is now.
   if (patch.attachMove) store.set({ attachOffsets: {} });
-  // The setting docks or undocks every card, replacing each card's own choice.
-  if ("dockSidebar" in patch) store.set({ cardDock: {} });
   // Switching to the own look starts from the browser's look; either way the cards redraw.
   if ("lookSource" in patch && patch.lookSource !== before.lookSource) {
     if (patch.lookSource === "own" && !store.own.claude && !store.own.chatgpt) importLook();
@@ -1141,8 +1115,9 @@ function cleanSettings(patch) {
     if (k === "mode" && !["follow", ...APP_IDS].includes(v)) continue;
     if (k === "cards") { if (["one", "both", "separate"].includes(v)) clean[k] = v; continue; }
     if (k === "lookSource") { if (["browser", "own"].includes(v)) clean[k] = v; continue; }
-    if (k === "cardOnTop") { if (v && typeof v === "object") clean[k] = Object.fromEntries(["claude", "chatgpt"].filter((a) => typeof v[a] === "boolean").map((a) => [a, v[a]])); continue; }
-    if (k === "miniBoundsByApp" || k === "attachOffsets" || k === "cardWidths" || k === "cardDock" || k === "cardHeights" || k === "directLogin") continue; // only the app sets these
+    if (k === "placement") { if (v && typeof v === "object") clean[k] = Object.fromEntries(["main", "claude", "chatgpt"].filter((a) => PLACES.includes(v[a])).map((a) => [a, v[a]])); continue; }
+    if (k === "onTop") { if (v && typeof v === "object") clean[k] = Object.fromEntries(["main", "claude", "chatgpt"].filter((a) => typeof v[a] === "boolean").map((a) => [a, v[a]])); continue; }
+    if (k === "miniBoundsByApp" || k === "attachOffsets" || k === "cardWidths" || k === "cardHeights" || k === "directLogin") continue; // only the app sets these
     if (k === "cardsLayout") { if (["column", "row"].includes(v)) clean[k] = v; continue; }
     if (k === "miniOpacity") { const n = Number(v); if (n >= 0.3 && n <= 1) clean[k] = n; continue; }
     if (k === "miniBounds") { if (v === null) clean[k] = null; continue; }
@@ -1188,8 +1163,7 @@ function setupIpc() {
   handle("connect-browsers", () => connectBrowsers());
   const keyOf = (e) => { const m = entryOf(BrowserWindow.fromWebContents(e.sender)); return m && m.key; };
   handle("mini-menu", (e) => { const k = keyOf(e); if (k) miniMenu(k); });
-  handle("toggle-pin", (e) => { const k = keyOf(e); if (k) togglePin(k); });
-  handle("toggle-dock", (e) => { const k = keyOf(e); if (k) toggleDock(k); });
+  handle("placement-menu", (e) => { const k = keyOf(e); if (k) placementMenu(k); });
   handle("height-start", (e, edge, current) => { if (edge === "top" || edge === "bottom") startHeight(BrowserWindow.fromWebContents(e.sender), edge, current); });
   handle("height-end", (e) => stopHeight(BrowserWindow.fromWebContents(e.sender)));
   handle("height-reset", (e) => { const m = entryOf(BrowserWindow.fromWebContents(e.sender)); if (m) resetHeight(m); });
@@ -1218,6 +1192,7 @@ app.on("before-quit", () => { quitting = true; if (bridge) bridge.stop(); });
 app.whenReady().then(async () => {
   if (process.platform === "win32") app.setAppUserModelId("fr.alencar.usage-meter-companion");
   store = Store.create(app.getPath("userData"));
+  migratePlacement();
   // Any change to what follows you (from Settings, menus, dragging a card's edge, the own look,
   // collapsed sections) is handed to browser sync a few seconds later.
   {

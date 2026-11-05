@@ -1,23 +1,29 @@
 // Runs after content.js: keeps its panel fed with usage, sizes the window to it, and adds the
 // companion's own behavior: hover tracking, dragging the panel by any non-interactive part,
-// resizing its width by the side edges, the pin (on top) and the right-click menu.
+// resizing it by its edges, the placement button and the right-click menu.
 "use strict";
 (() => {
   const E = globalThis.__usageMeterCompanion;
   const C = window.companion;
   const NAMES = { claude: "Claude", chatgpt: "ChatGPT", codex: "Codex" };
   const svg = (paths) => `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
-  const PIN = svg('<path d="M9 3h6"/><path d="M10 3v5l-3 4h10l-3-4V3"/><path d="M12 12v9"/>');
-  // Dock: an arrow into the sidebar of a window; undock: an arrow out of it.
-  const DOCK = svg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/><path d="M18 12h-5"/><path d="M15 9l-3 3 3 3"/>');
-  const UNDOCK = svg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/><path d="M12 12h5"/><path d="M15 9l3 3-3 3"/>');
-  const PIN_OFF = svg('<path d="M9 3h6"/><path d="M10 3v5l-3 4h10l-3-4V3"/><path d="M12 12v9"/><path d="M4 4l16 16"/>');
+  // The placement button shows where the card sits: floating (a pin, crossed out when it isn't kept
+  // on top), on top of its app (a card on a window) or in its app's sidebar (a card in the sidebar).
+  const ICONS = {
+    float: svg('<path d="M9 3h6"/><path d="M10 3v5l-3 4h10l-3-4V3"/><path d="M12 12v9"/>'),
+    floatLoose: svg('<path d="M9 3h6"/><path d="M10 3v5l-3 4h10l-3-4V3"/><path d="M12 12v9"/><path d="M4 4l16 16"/>'),
+    app: svg('<rect x="3" y="4" width="18" height="16" rx="2"/><rect x="11" y="8" width="7" height="5" rx="1"/>'),
+    dock: svg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/><rect x="4.5" y="13" width="3" height="5" rx="0.8"/>'),
+    rail: svg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/><rect x="16.5" y="13" width="3" height="5" rx="0.8"/>'),
+  };
+  const PLACE_TEXT = { float: "Floating", app: "On top of its app", dock: "In its app's sidebar", rail: "In Claude's session rail" };
   // Pressing on these never starts a drag.
   const INTERACTIVE = 'button,a[href],input,select,textarea,summary,label,[role="button"],[role="link"],[role="tab"],[role="menuitem"],[role="slider"],[role="checkbox"],[contenteditable]:not([contenteditable="false"]),dialog,[popover]';
 
   let host = null, root = null, card = null;
 
-  const onTop = () => !!(E.state && E.state.onTop && E.state.onTop[E.key]);
+  const placement = () => (E.state && E.state.placement && E.state.placement[E.key]) || "float";
+  const onTop = () => !(E.state && E.state.onTop && E.state.onTop[E.key] === false);
 
   // ---------- hover ----------
   // windowHover: the pointer is over this window (from the companion, which polls the cursor, or
@@ -129,11 +135,9 @@
     const bg = dockLook && COLOR.test(dockLook.bg) ? dockLook.bg : null;
     const line = dockLook && COLOR.test(dockLook.line || "") ? dockLook.line : "color-mix(in srgb, var(--fg) 14%, transparent)";
     dockStyle.textContent = !dockLook ? "" : `.panel-layout{padding:0 !important}
-      .head>.pin{display:none !important}
       .card,.card:hover,.card:has(:focus-visible){margin:0 !important;border-radius:0 !important;border:0 !important;border-top:1px solid ${line} !important;box-shadow:none !important;${bg ? `background:${bg} !important;` : ""}}`;
     if (card) card.style.cursor = "";
     applyHeight();
-    updateDock();
     fit();
   }
   if (C.onDock) C.onDock((look) => { dockLook = look && typeof look === "object" ? look : null; applyDock(); });
@@ -180,10 +184,9 @@
     if (title) title.textContent = NAMES[E.app];
     root.addEventListener("click", (e) => { if (e.target.closest && e.target.closest(".refresh")) E.userRefreshUntil = Date.now() + 1500; }, true);
     const style = document.createElement("style");
-    // No text selection: dragging over text moves the panel. The pin is hover-only like Refresh.
+    // No text selection: dragging over text moves the panel. The placement button is hover-only like Refresh.
     style.textContent = `.card{-webkit-user-select:none;user-select:none;cursor:default}
-      .head>.pin[aria-pressed="false"]{opacity:.6}
-      @media(hover:hover){.card[data-hover-refresh]:not(.js-hover):not(:has(:focus-visible)) .head>:is(.pin,.dock){width:0;min-width:0;margin-right:-3px;overflow:hidden;}}`;
+      @media(hover:hover){.card[data-hover-refresh]:not(.js-hover):not(:has(:focus-visible)) .head>.place{width:0;min-width:0;margin-right:-3px;overflow:hidden;}}`;
     root.appendChild(style);
     if (E.edit) {
       // The Customize window: the extension's own Customize panel, opened right away. Its changes
@@ -223,19 +226,13 @@
       setTimeout(open, 200);
       return true;
     }
-    if (E.pin && !E.framed) {
-      const dock = document.createElement("button");
-      dock.className = "icon dock";
-      dock.addEventListener("click", () => C.toggleDock());
-      root.querySelector(".head").insertBefore(dock, root.querySelector(".head>.refresh"));
-      updateDock();
-    }
     if (E.pin) {
-      const pin = document.createElement("button");
-      pin.className = "icon pin";
-      pin.addEventListener("click", () => C.togglePin());
-      root.querySelector(".head").insertBefore(pin, root.querySelector(".head>.refresh"));
-      updatePin();
+      const b = document.createElement("button");
+      b.className = "icon place";
+      b.setAttribute("aria-haspopup", "menu");
+      b.addEventListener("click", () => C.placementMenu());
+      root.querySelector(".head").insertBefore(b, root.querySelector(".head>.refresh"));
+      updatePlace();
     }
     root.addEventListener("pointerdown", startDrag);
     // Right-click anywhere opens the panel menu.
@@ -245,25 +242,14 @@
     return true;
   }
 
-  function updateDock() {
-    const b = root && root.querySelector(".head>.dock");
+  function updatePlace() {
+    const b = root && root.querySelector(".head>.place");
     if (!b) return;
-    const on = !!(E.state && E.state.dock && E.state.dock[E.key] && E.state.settings && E.state.settings.attachToApp);
-    const label = on ? "Undock from the sidebar" : `Dock in ${NAMES[E.app]}'s sidebar`;
-    b.title = b.ariaLabel = label;
-    b.setAttribute("aria-pressed", String(on));
-    b.innerHTML = on ? UNDOCK : DOCK;
-  }
-
-  function updatePin() {
-    const pin = root && root.querySelector(".head>.pin");
-    if (!pin) return;
-    const on = onTop();
-    pin.setAttribute("aria-pressed", String(on));
-    const where = E.state && E.state.settings && E.state.settings.attachToApp ? "On top of its app" : "Always on top";
-    pin.title = `${where}: ${on ? "on (click to turn off)" : "off (click to turn on)"}`;
-    pin.setAttribute("aria-label", "Keep on top of other windows");
-    pin.innerHTML = on ? PIN : PIN_OFF;
+    const p = placement(), loose = p === "float" && !onTop();
+    const html = ICONS[loose ? "floatLoose" : p] || ICONS.float;
+    if (b.innerHTML !== html) b.innerHTML = html;
+    b.title = `${PLACE_TEXT[p] || PLACE_TEXT.float}${p === "float" ? (loose ? ", not kept on top" : ", kept on top") : ""} · click to change`;
+    b.setAttribute("aria-label", `Where this card sits: ${b.title}`);
   }
 
   function fit() {
@@ -279,8 +265,7 @@
   C.onState((s) => {
     E.state = s;
     E.feed(false);
-    updatePin();
-    updateDock();
+    updatePlace();
     applyHeight();
   });
 
