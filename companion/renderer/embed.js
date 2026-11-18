@@ -15,7 +15,7 @@
     pin: q.get("pin") === "1" || q.get("framed") !== "1",
     edit: q.get("edit") === "1", // the Customize window for the companion's own look
     userRefreshUntil: 0, // set when the Refresh button is clicked (see embed-after.js)
-    shown: { at: 0, errorAt: 0 },
+    shown: { at: 0, errorAt: 0, modelsAt: 0 },
   };
   E.ready = C.getState().then((s) => { E.state = s; E.prefs = s.prefsVersion[SITE]; theme(s); return s; });
   if (E.edit) document.documentElement.classList.add("edit");
@@ -43,6 +43,10 @@
     const out = { ...look, ...((s.local && s.local[site]) || {}) };
     const u = s.sites && s.sites[site];
     if (u && u.data && (!out.usageAt || u.at >= out.usageAt)) { out.usage = u.data; out.usageAt = u.at; if (u.plan) out.plan = u.plan; }
+    // Model and feature limits (Models & features) come with the extension's settings, which the
+    // browser reads from the site; the companion's own look doesn't carry them.
+    const models = s.ext && s.ext[site] && s.ext[site].models;
+    if (models && typeof models === "object") out.models = { ...(out.models || {}), ...models };
     return out;
   }
   const siteOfKey = (k) => Object.keys(KEYS).find((x) => KEYS[x] === k);
@@ -57,6 +61,13 @@
     if (!u) return;
     if (u.data && (force || u.at > E.shown.at)) { E.shown.at = u.at; post("usage", { data: u.data, plan: u.plan, at: u.at }); }
     if (u.error && u.errorAt > E.shown.errorAt && (!u.at || u.errorAt >= u.at)) { E.shown.errorAt = u.errorAt; post("usage-error", { message: u.error, at: u.errorAt }); }
+    // New model and feature limits from the browser, as the site's own page would send them.
+    const models = E.state.ext && E.state.ext[SITE] && E.state.ext[SITE].models;
+    if (models && typeof models === "object") {
+      const groups = new Map();
+      for (const m of Object.values(models)) if (m && m.name && (m.seenAt || 0) > E.shown.modelsAt) (groups.get(m.seenAt) || groups.set(m.seenAt, []).get(m.seenAt)).push(m);
+      for (const [at, items] of [...groups].sort((a, b) => a[0] - b[0])) { post("model-limits", { items, at }); E.shown.modelsAt = Math.max(E.shown.modelsAt, at); }
+    }
   };
 
   let settle = 0;

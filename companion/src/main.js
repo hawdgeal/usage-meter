@@ -137,7 +137,10 @@ function onBridgeMessage(msg, host) {
   if (msg.type === "settings") {
     if (!msg.settings || typeof msg.settings !== "object") return;
     // With the companion's own look, the browser's changes don't redraw the cards.
+    const models = JSON.stringify((store.ext[site] || {}).models || null);
     if (store.setExt(site, msg.settings)) { if (!ownLook() || !store.own[site]) prefsVersion[site]++; changed(); }
+    // New model and feature limits only: the cards take them without redrawing (see embed.js feed).
+    else if (JSON.stringify(msg.settings.models || null) !== models) changed();
     return;
   }
   if (msg.type === "usage-error" && fresh(site, host.browser)) return; // the companion's own login has newer numbers
