@@ -76,7 +76,8 @@ const onEdge = (m) => !!edgeOf(m.key) && placeOf(m.key) === "float" && !cardAtta
 const onTopFor = (key) => {
   const m = minis.get(key);
   if (m && cardAttached(m)) return false; // placed by attachTick, just above its app
-  if (m && onEdge(m)) return true; // its strip has to stay reachable
+  if (m && m.underFullscreen) return false; // a full-screen window (game, video, stream) on its screen covers it
+  if (m && onEdge(m)) return true; // its handle has to stay reachable
   return placeOf(key) === "float" ? keepOnTop(key) : true; // "Show usage", or no app tracking
 };
 const siteOf = (id) => UsageView.APPS[id].site;
@@ -995,7 +996,7 @@ function edgeHide(m) {
   const side = edgeOf(m.key), a = edgeArea(m), b = m.win.getBounds();
   m.edgeHidden = true;
   m.win.setIgnoreMouseEvents(true); // clicks go through it while it fades out
-  animateCard(m, screenEdge.hiddenPos(side, a, b), 0, () => { if (m.edgeHidden && !m.win.isDestroyed()) showHandle(m, screenEdge.handleRect(side, a, screenEdge.shownPos(side, a, m.win.getBounds())), side); });
+  animateCard(m, screenEdge.hiddenPos(side, a, b), 0, () => { if (m.edgeHidden && !m.underFullscreen && !m.win.isDestroyed()) showHandle(m, screenEdge.handleRect(side, a, screenEdge.shownPos(side, a, m.win.getBounds())), side); });
 }
 
 // While a floating card is dragged: a docked card stays docked, on the edge nearest the pointer (of
@@ -1013,8 +1014,37 @@ function edgeDrag(m, nx, ny) {
   return screenEdge.shownPos(side, a, { x: nx, y: ny, width: w, height: h });
 }
 
+// The screen (display id) a full-screen window in front covers, or null: a game, a video or a
+// Moonlight stream. Not the desktop and not the companion's own windows.
+function fullscreenDisplay() {
+  const f = foreground.front && foreground.front();
+  if (!f || !f.rect || f.titled || f.pid === process.pid || /\\explorer\.exe$/i.test(f.exe || "")) return null;
+  let r;
+  try { r = screen.screenToDipRect(null, { x: f.rect.x, y: f.rect.y, width: f.rect.w, height: f.rect.h }); } catch (_) { return null; }
+  const d = screen.getDisplayMatching(r), b = d.bounds;
+  const covers = r.x <= b.x + 1 && r.y <= b.y + 1 && r.x + r.width >= b.x + b.width - 1 && r.y + r.height >= b.y + b.height - 1;
+  return covers ? d.id : null;
+}
+
+// Cards on a screen with a full-screen window in front step back: floating ones stop being kept on
+// top (the full-screen window covers them), docked ones stay tucked away and their handle hides.
+function fullscreenTick() {
+  const id = fullscreenDisplay();
+  for (const m of minis.values()) {
+    if (!m.win || m.win.isDestroyed()) continue;
+    // A card tucked past an edge belongs to the screen it opens on.
+    const b = m.win.getBounds(), at = onEdge(m) ? screenEdge.shownPos(edgeOf(m.key), edgeArea(m), b) : b;
+    const under = id != null && !cardAttached(m) && screen.getDisplayNearestPoint({ x: Math.round(at.x + b.width / 2), y: Math.round(at.y + b.height / 2) }).id === id;
+    if (!!m.underFullscreen === under) continue;
+    m.underFullscreen = under;
+    applyTopmost(m);
+    if (under) { hideHandle(m); if (onEdge(m) && !m.edgeHidden) edgeHide(m); }
+  }
+}
+
 // Runs with the hover poll: tucks away and opens the cards docked on screen edges.
 function edgeTick() {
+  fullscreenTick();
   const p = screen.getCursorScreenPoint();
   const held = foreground.buttons(); // a button held: dragging something, or pressing on the card
   for (const m of minis.values()) {
@@ -1028,6 +1058,7 @@ function edgeTick() {
     const side = edgeOf(m.key), a = edgeArea(m), b = win.getBounds();
     const open = screenEdge.shownPos(side, a, b);
     if (m.edgeHidden) {
+      if (m.underFullscreen) { hideHandle(m); continue; } // stays out of the way of the full-screen window
       const r = { ...b, x: open.x, y: open.y };
       if (screenEdge.onHandle(side, a, r, p)) { edgeShow(m); continue; }
       const hp = screenEdge.hiddenPos(side, a, b); // stays in place when its size changes

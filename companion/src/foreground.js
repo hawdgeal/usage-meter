@@ -106,6 +106,25 @@ function get() {
   }
 }
 
+// The window in front with its rectangle in physical pixels: { pid, exe, rect: { x, y, w, h },
+// titled }. Used to notice a full-screen window (a game, a video, a Moonlight stream): those have no
+// title bar (titled: false), unlike a maximized app window, which can cover the whole screen too
+// when the taskbar hides itself.
+const WS_CAPTION = 0x00c00000;
+function front() {
+  if (!load()) return null;
+  try {
+    const hwnd = api.GetForegroundWindow();
+    if (!hwnd) return null;
+    const pid = new Uint32Array(1);
+    api.GetWindowThreadProcessId(hwnd, pid);
+    const titled = (api.GetWindowLongW(hwnd, -16 /* GWL_STYLE */) & WS_CAPTION) === WS_CAPTION;
+    return { pid: pid[0], exe: pid[0] ? exeOf(pid[0]) : null, rect: rectOf(hwnd, true), titled };
+  } catch (e) {
+    return null;
+  }
+}
+
 const HWND_TOP = 0, HWND_TOPMOST = -1, HWND_NOTOPMOST = -2;
 const SWP_NOSIZE = 0x0001, SWP_NOMOVE = 0x0002, SWP_NOZORDER = 0x0004, SWP_NOACTIVATE = 0x0010;
 
@@ -358,4 +377,4 @@ function available() {
   return !!load();
 }
 
-module.exports = { get, available, setTopmost, handleValue, listWindows, placeAbove, rectOf, moveTo, pointer, buttons, idleMs, windowAt, pixelAt, capture, error: () => (load(), loadError) };
+module.exports = { get, front, available, setTopmost, handleValue, listWindows, placeAbove, rectOf, moveTo, pointer, buttons, idleMs, windowAt, pixelAt, capture, error: () => (load(), loadError) };
