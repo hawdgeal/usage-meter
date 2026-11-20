@@ -19,6 +19,8 @@ const DEFAULTS = {
   miniOpacity: 1,
   miniBounds: null,
   miniBoundsByApp: {}, // separate cards: { claude: {x, y}, chatgpt: {x, y} }
+  edgeHide: {}, // floating cards docked on a screen edge: { key: "left" | "right" | "top" | "bottom" }
+  remoteButton: true, // the Claude card shows a button that turns on Remote Control for all sessions
   cardHeights: {}, // heights set by dragging a card's top or bottom edge: { key or "key:dock": height }
   cardWidths: {}, // widths set by dragging a card's edge: { main | claude | chatgpt: width }
   lookSource: "browser", // the cards' look: "browser" (the extension's, live) or "own" (own-look.json)

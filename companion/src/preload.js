@@ -27,6 +27,8 @@ contextBridge.exposeInMainWorld("companion", {
   // The companion's own login per site ("claude" | "chatgpt"); signIn resolves true once it works.
   signIn: (site) => ipcRenderer.invoke("sign-in", site),
   signOut: (site) => ipcRenderer.invoke("sign-out", site),
+  // Turns on Remote Control for every session in the Claude app; resolves to a one-line summary.
+  remoteControlAll: () => ipcRenderer.invoke("remote-control-all"),
   checkUpdate: () => ipcRenderer.invoke("update-check"),
   installUpdate: () => ipcRenderer.invoke("update-install"),
   // The companion's own look: the editor saves it; Settings imports or resets it.
@@ -42,4 +44,6 @@ contextBridge.exposeInMainWorld("companion", {
   onHover: (cb) => ipcRenderer.on("hover", (_e, on) => cb(!!on)),
   // Docked in the app's sidebar: { bg, line } colors to draw the card flat with, or null.
   onDock: (cb) => ipcRenderer.on("dock", (_e, look) => cb(look)),
+  // Docked on a screen edge: "left" | "right" | "top" | "bottom", or null.
+  onEdge: (cb) => ipcRenderer.on("edge", (_e, side) => cb(side)),
 });

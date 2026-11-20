@@ -40,7 +40,8 @@
     "asarUnpack": [
       "src/host.js",
       "src/native-messaging.js",
-      "src/pipe-path.js"
+      "src/pipe-path.js",
+      "src/remote-control.ps1"
     ],
     "win": {
       "target": [

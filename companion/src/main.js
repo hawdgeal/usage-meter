@@ -5,7 +5,8 @@
 // fixed app chosen in Settings.
 "use strict";
 const path = require("path");
-const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, nativeTheme, screen, shell } = require("electron");
+const { execFile } = require("child_process");
+const { app, BrowserWindow, Tray, Menu, Notification, nativeImage, ipcMain, nativeTheme, screen, shell } = require("electron");
 
 if (process.env.USAGE_METER_DATA) app.setPath("userData", process.env.USAGE_METER_DATA);
 if (!app.requestSingleInstanceLock()) {
@@ -23,6 +24,7 @@ const { ringBitmap, trayColor, trayFraction } = require("./icon");
 const registration = require("./register");
 const direct = require("./direct");
 const updater = require("./updater");
+const screenEdge = require("./edge");
 
 const APP_IDS = ["claude", "chatgpt", "codex"];
 const APP_LABELS = { claude: "Claude", chatgpt: "ChatGPT", codex: "Codex" };
@@ -67,9 +69,14 @@ const keepOnTop = (key) => (s().onTop || {})[key] !== false;
 const cardAttached = (m) => placeOf(m.key) !== "float" && foreground.available() && !forceShow;
 const dockSide = (m) => { const p = placeOf(m.key); return p === "dock" && m.view !== "both" ? "left" : p === "rail" && m.view === "claude" ? "right" : null; };
 const docked = (m) => !!dockSide(m) && cardAttached(m);
+// A floating card docked on the left or right edge of the screen (edgeHide), where it slides out of
+// sight until you point at its strip; see edgeTick.
+const edgeOf = (key) => { const v = (s().edgeHide || {})[key]; return screenEdge.EDGES.includes(v) ? v : null; };
+const onEdge = (m) => !!edgeOf(m.key) && placeOf(m.key) === "float" && !cardAttached(m);
 const onTopFor = (key) => {
   const m = minis.get(key);
   if (m && cardAttached(m)) return false; // placed by attachTick, just above its app
+  if (m && onEdge(m)) return true; // its strip has to stay reachable
   return placeOf(key) === "float" ? keepOnTop(key) : true; // "Show usage", or no app tracking
 };
 const siteOf = (id) => UsageView.APPS[id].site;
@@ -471,7 +478,7 @@ function clickTick() {
   const app = matchApp({ exe: p.exe, title: p.title }, { browsers: s().followBrowsers, terminals: s().followTerminals, selfExe: process.execPath });
   if (!app || app === "self") return;
   for (const m of active) {
-    if (m.peek || !m.win.isVisible() || !appsFor(m).includes(app)) continue;
+    if (m.peek || m.edgeHidden || !m.win.isVisible() || !appsFor(m).includes(app)) continue; // a tucked-away card isn't there to step aside
     const c = foreground.rectOf(m.win.getNativeWindowHandle(), true);
     if (!c) continue;
     if (docked(m)) { const z = dockMenuZone(m, c); if (z && inRect(p, z) && !inRect(p, c)) startPeek(m, c); }
@@ -597,11 +604,59 @@ function updateTray() {
   setTrayIcon(tray, id, tip);
 }
 
+// ---------- Remote Control for every Claude session ----------
+// Turns on Remote Control for each session in the Claude desktop app's sidebar, through the app's
+// accessibility interface (remote-control.ps1): it opens each session that doesn't have it, flips
+// the switch in its session rail on, and goes back to the session you were in. It never turns
+// Remote Control off. It depends on the app's labels, so an app redesign can break it.
+let remoteRunning = false;
+function remoteControlItem() {
+  return {
+    label: remoteRunning ? "Turning on Remote Control…" : "Turn on Remote Control for all Claude sessions",
+    enabled: !remoteRunning && process.platform === "win32",
+    click: () => remoteControlAll().then((summary) => notify("Remote Control", summary)),
+  };
+}
+
+// Resolves to a one-line summary of what it did (shown as a notification from the menus, and next
+// to the button in Settings).
+function remoteControlAll() {
+  if (process.platform !== "win32") return Promise.resolve("Only on Windows.");
+  if (remoteRunning) return Promise.resolve("Already turning on Remote Control.");
+  const script = app.isPackaged ? path.join(process.resourcesPath, "app.asar.unpacked", "src", "remote-control.ps1") : path.join(__dirname, "remote-control.ps1");
+  remoteRunning = true;
+  updateTray();
+  return new Promise((resolve) => {
+    execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script], { windowsHide: true, timeout: 5 * 60000 }, (err, out) => {
+      remoteRunning = false;
+      updateTray();
+      let r = null;
+      try { r = JSON.parse(String(out).trim().split(/\r?\n/).pop()); } catch (_) {}
+      resolve(remoteSummary(r, err));
+    });
+  });
+}
+
+function remoteSummary(r, err) {
+  if (!r) return `Couldn't run: ${String((err && err.message) || "no answer").slice(0, 200)}`;
+  if (r.error) return r.error;
+  const n = (r.changed || []).length, skipped = r.skipped || [];
+  const parts = [n ? `Turned on for ${n} session${n === 1 ? "" : "s"}.` : "No session needed it."];
+  if (r.already) parts.push(`${r.already} already had it.`);
+  if (skipped.length) parts.push(`Skipped ${skipped.length}: ${skipped.slice(0, 3).map((x) => `${x.title} (${x.why})`).join(", ")}${skipped.length > 3 ? ", …" : ""}.`);
+  return parts.join(" ");
+}
+
+function notify(title, body) {
+  if (Notification.isSupported()) new Notification({ title, body, icon: path.join(__dirname, "..", "assets", "icon.png") }).show();
+}
+
 function trayMenu() {
   return Menu.buildFromTemplate([
     { label: "Show usage", click: () => showMinis() },
     { label: "Show cards", type: "checkbox", checked: s().miniPanel, click: (i) => setSettings({ miniPanel: i.checked }) },
     { label: "Refresh", click: () => refresh() },
+    remoteControlItem(),
     { label: "Settings…", click: () => openSettings() },
     ...(update.available && update.latest ? [{ type: "separator" }, { label: update.state === "downloading" ? `Downloading ${update.latest.version}… ${Math.round((update.progress || 0) * 100)}%` : `Update to ${update.latest.version}`, enabled: update.state !== "downloading" && updater.canInstall().ok, click: () => installUpdate() }] : []),
     { type: "separator" },
@@ -619,13 +674,23 @@ function placementItems(m) {
     { label: "In its app's sidebar", type: "radio", checked: p === "dock", enabled: can && m.view !== "both", click: () => set("dock") },
     { label: "In Claude's session rail", type: "radio", checked: p === "rail", visible: m.view === "claude" || p === "rail", enabled: can, click: () => set("rail") },
     // The option that goes with the current choice, if any.
-    ...(p === "float" ? [{ type: "separator" }, { label: "Keep on top of other windows", type: "checkbox", checked: keepOnTop(key), click: (i) => setSettings({ onTop: { ...(s().onTop || {}), [key]: i.checked } }) }] : []),
+    ...(p === "float" ? [
+      { type: "separator" },
+      { label: "Keep on top of other windows", type: "checkbox", checked: keepOnTop(key) || !!edgeOf(key), enabled: !edgeOf(key), click: (i) => setSettings({ onTop: { ...(s().onTop || {}), [key]: i.checked } }) },
+      { label: "Hide at the screen edge", type: "checkbox", checked: !!edgeOf(key), enabled: !!edgeOf(key) || !!nearestSide(m), click: (i) => setEdge(m, i.checked ? nearestSide(m) : null) },
+    ] : []),
     ...(p === "app" ? [{ type: "separator" }, { label: "Move with its app", type: "checkbox", checked: !!s().attachMove, click: (i) => setSettings({ attachMove: i.checked }) }] : []),
   ];
 }
 function placementMenu(key) {
   const m = minis.get(key);
-  if (m && m.win && !m.win.isDestroyed()) Menu.buildFromTemplate(placementItems(m)).popup({ window: m.win });
+  if (m && m.win && !m.win.isDestroyed()) popupFor(m, placementItems(m));
+}
+
+// Shows a card's menu. While it's open, a card on a screen edge stays out (the pointer is on the menu).
+function popupFor(m, items) {
+  m.menuOpen = true;
+  Menu.buildFromTemplate(items).popup({ window: m.win, callback: () => { m.menuOpen = false; m.edgeLeave = Date.now(); } });
 }
 
 // key: which card was right-clicked.
@@ -633,17 +698,18 @@ function miniMenu(key) {
   const m = minis.get(key) || minis.values().next().value;
   if (!m || !m.win || m.win.isDestroyed()) return;
   const sized = m.view !== "both" && (!!(s().cardHeights || {})[heightKey(m)] || !!(s().cardWidths || {})[m.key]);
-  Menu.buildFromTemplate([
+  popupFor(m, [
     ...placementItems(m),
     { type: "separator" },
     { label: "Refresh", click: () => refresh() },
     { label: `Customize look${m.view === "both" ? " (Claude)" : ""}…`, click: () => openEditor(m.view === "both" ? "claude" : m.view) },
     ...(m.view === "both" ? [{ label: "Customize look (ChatGPT)…", click: () => openEditor("chatgpt") }] : []),
     { label: "Reset size", enabled: sized, click: () => { resetHeight(m); resetWidth(m.key); } },
+    ...(m.view === "chatgpt" ? [] : [remoteControlItem()]),
     { type: "separator" },
     { label: "Settings…", click: () => openSettings() },
     { label: "Hide cards", click: () => setSettings({ miniPanel: false }) },
-  ]).popup({ window: m.win });
+  ]);
 }
 
 // ---------- windows ----------
@@ -746,8 +812,8 @@ function createMini(key, view) {
   win.on("focus", () => applyTopmost(m));
   win.on("blur", () => applyTopmost(m));
   win.on("system-context-menu", (e) => e.preventDefault()); // no Windows window menu
-  win.on("closed", () => { if (minis.get(key) === m) minis.delete(key); stopDrag(win); });
-  win.webContents.on("did-start-loading", () => { m.ready = false; m.dockSent = undefined; });
+  win.on("closed", () => { if (minis.get(key) === m) minis.delete(key); stopDrag(win); clearInterval(m.slideTimer); if (m.handle && !m.handle.isDestroyed()) m.handle.destroy(); });
+  win.webContents.on("did-start-loading", () => { m.ready = false; m.dockSent = undefined; m.edgeSent = undefined; });
   win.webContents.on("did-finish-load", () => { m.ready = true; hoverSent.delete(win); sendDock(m); updateMinis(); });
   loadPanel(win, view, key);
 }
@@ -774,6 +840,7 @@ function showMinis(only) {
     if (!m.win.isVisible()) { keepOnScreen(m.win); m.win.showInactive(); }
     m.win.moveTop();
     applyTopmost(m);
+    edgeShow(m, 4000); // a card hidden on a screen edge slides out for a few seconds
   }
 }
 
@@ -788,7 +855,7 @@ function updateMinis() {
     if (win.isDestroyed()) continue;
     // Redraw when it should show another view, or its settings or the Windows theme changed.
     if (m.view !== want.view || loadedWith.get(win) !== panelKey(want.view)) { m.view = want.view; loadPanel(win, want.view, m.key); }
-    if (!m.faded) win.setOpacity(normalOpacity());
+    if (!m.faded && !m.edgeHidden && !m.slideTimer) win.setOpacity(normalOpacity());
     if (!docked(m)) undock(m);
     if (m.peek) continue; // stepped aside for the app's menu; see clickTick
     if (cardAttached(m)) continue; // attachTick shows, hides and places it
@@ -804,11 +871,174 @@ function updateMinis() {
 // resizing it. Not while it's being dragged.
 function keepOnScreen(win) {
   if (!win || win.isDestroyed() || drags.has(win)) return;
+  const m = entryOf(win);
+  if (m && onEdge(m)) return; // partly off screen on purpose; edgeTick places it
   const b = win.getBounds();
   const a = screen.getDisplayMatching(b).workArea;
   const x = Math.max(a.x, Math.min(b.x, a.x + a.width - b.width));
   const y = Math.max(a.y, Math.min(b.y, a.y + a.height - b.height));
   if (x !== b.x || y !== b.y) win.setPosition(x, y);
+}
+
+// ---------- screen edges ----------
+// Like the Moonlight Switcher's bar: while you drag a floating card, it snaps to an edge of the
+// screen once the pointer comes near that edge (any edge of any screen), and you slide it along the
+// edge; drag the pointer away from the edges and it floats freely again. Docked, it tucks away when
+// the pointer leaves it: it fades out while moving a little toward the edge, lets clicks through,
+// and leaves a slim handle on the edge. Pointing at the handle opens it again.
+const EDGE_HIDE_MS = 700; // how long the card stays open after the pointer leaves it
+const HANDLE_OPACITY = 0.7;
+
+// The work area of the screen a card is on.
+function edgeArea(m) {
+  const b = m.win.getBounds();
+  return screen.getDisplayNearestPoint({ x: b.x + Math.round(b.width / 2), y: b.y + Math.round(b.height / 2) }).workArea;
+}
+
+// The edge "Hide at the screen edge" (in a card's menu) docks it on: the nearest one.
+function nearestSide(m) {
+  if (!m || !m.win || m.win.isDestroyed()) return null;
+  return screenEdge.nearestSide(edgeArea(m), m.win.getBounds());
+}
+
+// Docks a card on an edge (side), or undocks it (null).
+function setEdge(m, side) {
+  const next = { ...(s().edgeHide || {}) };
+  if (side) next[m.key] = side;
+  else delete next[m.key];
+  setSettings({ edgeHide: next }, true);
+  if (m.win.isDestroyed()) return;
+  clearInterval(m.slideTimer); m.slideTimer = null;
+  edgeReveal(m);
+  m.edgeLeave = Date.now();
+  if (side) {
+    const p = screenEdge.shownPos(side, edgeArea(m), m.win.getBounds());
+    m.win.setPosition(p.x, p.y);
+    saveBounds(m.key, p);
+  } else keepOnScreen(m.win);
+  applyTopmost(m);
+}
+
+// Back to a normal, clickable card (no animation).
+function edgeReveal(m) {
+  if (m.win.isDestroyed()) return;
+  if (m.edgeHidden) { m.edgeHidden = false; m.win.setIgnoreMouseEvents(false); }
+  if (!m.faded) m.win.setOpacity(normalOpacity());
+  hideHandle(m);
+}
+
+// The handle a tucked-away card leaves on its edge: a small rounded bar in the card's app color, in
+// a window of its own that lets clicks through (the pointer near it is what opens the card).
+// Windows won't make a window as thin as the handle, so its window is HANDLE_BOX across, on the
+// screen side of the edge, and the page draws the handle against that edge; the rest is see-through.
+const HANDLE_BOX = 32;
+const cardColor = (m) => (UsageView.APPS[m.view] || UsageView.APPS.claude).color;
+// The handle's page, with its edge and color in it (rebuilt when either changes).
+function handlePage(side, color) {
+  const v = side === "left" || side === "right";
+  const pill = `position:absolute;${side}:0;${v ? "top:0;bottom:0;width" : "left:0;right:0;height"}:${screenEdge.HANDLE_THICKNESS}px;border-radius:999px;background:${color}`;
+  return "data:text/html;charset=utf-8," + encodeURIComponent(`<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><style>html,body{margin:0;height:100%;background:transparent;overflow:hidden}</style><div style="${pill}"></div>`);
+}
+function showHandle(m, r, side) {
+  let h = m.handle;
+  if (!h || h.isDestroyed()) {
+    h = m.handle = guard(new BrowserWindow({
+      show: false, frame: false, transparent: true, backgroundColor: "#00000000", hasShadow: false, resizable: false,
+      minimizable: false, maximizable: false, fullscreenable: false, skipTaskbar: true, focusable: false, alwaysOnTop: true,
+      webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, spellcheck: false },
+    }));
+    h.setIgnoreMouseEvents(true);
+    h.setOpacity(HANDLE_OPACITY);
+  }
+  const page = handlePage(side, cardColor(m));
+  if (h.page !== page) { h.page = page; h.loadURL(page); }
+  const box = side === "left" ? { x: r.x, y: r.y, width: HANDLE_BOX, height: r.height }
+    : side === "right" ? { x: r.x + r.width - HANDLE_BOX, y: r.y, width: HANDLE_BOX, height: r.height }
+    : side === "top" ? { x: r.x, y: r.y, width: r.width, height: HANDLE_BOX }
+    : { x: r.x, y: r.y + r.height - HANDLE_BOX, width: r.width, height: HANDLE_BOX };
+  const b = h.getBounds();
+  if (b.x !== box.x || b.y !== box.y || b.width !== box.width || b.height !== box.height) h.setBounds(box);
+  if (!h.isVisible()) { h.showInactive(); h.setAlwaysOnTop(true, "screen-saver"); if (process.platform === "win32") foreground.setTopmost(h.getNativeWindowHandle(), true); }
+}
+function hideHandle(m) {
+  if (m.handle && !m.handle.isDestroyed() && m.handle.isVisible()) m.handle.hide();
+}
+
+// Moves a card to a position and opacity in a few steps, then calls done.
+function animateCard(m, to, opacity, done) {
+  clearInterval(m.slideTimer);
+  const win = m.win, [x0, y0] = win.getPosition(), o0 = win.getOpacity(), steps = 8;
+  let i = 0;
+  m.slideTimer = setInterval(() => {
+    if (win.isDestroyed() || drags.has(win)) { clearInterval(m.slideTimer); m.slideTimer = null; return; }
+    i++;
+    const k = i >= steps ? 1 : 1 - Math.pow(1 - i / steps, 3); // ease out
+    win.setPosition(Math.round(x0 + (to.x - x0) * k), Math.round(y0 + (to.y - y0) * k));
+    win.setOpacity(o0 + (opacity - o0) * k);
+    if (i >= steps) { clearInterval(m.slideTimer); m.slideTimer = null; if (done) done(); }
+  }, 14);
+}
+
+// Opens a card that's docked on an edge (from its handle, or "Show usage"); it tucks away again once
+// the pointer has been off it for a moment (plus hold milliseconds).
+function edgeShow(m, hold = 0) {
+  if (!onEdge(m) || m.win.isDestroyed()) return;
+  hideHandle(m);
+  m.edgeLeave = Date.now() + hold;
+  if (!m.edgeHidden) return;
+  m.edgeHidden = false;
+  m.win.setIgnoreMouseEvents(false);
+  animateCard(m, screenEdge.shownPos(edgeOf(m.key), edgeArea(m), m.win.getBounds()), normalOpacity());
+}
+
+function edgeHide(m) {
+  const side = edgeOf(m.key), a = edgeArea(m), b = m.win.getBounds();
+  m.edgeHidden = true;
+  m.win.setIgnoreMouseEvents(true); // clicks go through it while it fades out
+  animateCard(m, screenEdge.hiddenPos(side, a, b), 0, () => { if (m.edgeHidden && !m.win.isDestroyed()) showHandle(m, screenEdge.handleRect(side, a, screenEdge.shownPos(side, a, m.win.getBounds())), side); });
+}
+
+// While a floating card is dragged: a docked card stays docked, on the edge nearest the pointer (of
+// the screen the pointer is on); a free one snaps to an edge once the pointer comes near it. Returns
+// where the card goes and remembers the edge for when it's dropped.
+function edgeDrag(m, nx, ny) {
+  m.dragSide = null;
+  if (placeOf(m.key) !== "float" || cardAttached(m)) return { x: nx, y: ny };
+  const c = screen.getCursorScreenPoint(), a = screen.getDisplayNearestPoint(c).workArea;
+  const side = edgeOf(m.key) ? screenEdge.nearestEdge(a, c) : screenEdge.sideFor(a, c);
+  if (!side) return { x: nx, y: ny };
+  m.dragSide = side;
+  const [w, h] = m.win.getSize();
+  // Along the edge, the card keeps the spot you grabbed it by under the pointer.
+  return screenEdge.shownPos(side, a, { x: nx, y: ny, width: w, height: h });
+}
+
+// Runs with the hover poll: tucks away and opens the cards docked on screen edges.
+function edgeTick() {
+  const p = screen.getCursorScreenPoint();
+  const held = foreground.buttons(); // a button held: dragging something, or pressing on the card
+  for (const m of minis.values()) {
+    const win = m.win;
+    if (!win || win.isDestroyed() || !win.isVisible() || !m.ready || drags.has(win)) { if (win && !win.isDestroyed() && drags.has(win)) hideHandle(m); continue; }
+    // Tell the page, which draws the card flush with its edge and with a grip.
+    const sendSide = onEdge(m) ? edgeOf(m.key) : null;
+    if (m.edgeSent !== sendSide) { m.edgeSent = sendSide; win.webContents.send("edge", sendSide); }
+    if (!onEdge(m)) { if (m.edgeHidden) { edgeReveal(m); keepOnScreen(win); } else hideHandle(m); continue; }
+    if (m.slideTimer) continue;
+    const side = edgeOf(m.key), a = edgeArea(m), b = win.getBounds();
+    const open = screenEdge.shownPos(side, a, b);
+    if (m.edgeHidden) {
+      const r = { ...b, x: open.x, y: open.y };
+      if (screenEdge.onHandle(side, a, r, p)) { edgeShow(m); continue; }
+      const hp = screenEdge.hiddenPos(side, a, b); // stays in place when its size changes
+      if (b.x !== hp.x || b.y !== hp.y) win.setPosition(hp.x, hp.y);
+      showHandle(m, screenEdge.handleRect(side, a, r), side);
+      continue;
+    }
+    if (screenEdge.nearCard(b, p) || m.menuOpen || held || widths.has(win)) m.edgeLeave = Math.max(m.edgeLeave || 0, Date.now());
+    else if (Date.now() - (m.edgeLeave || 0) > EDGE_HIDE_MS) { edgeHide(m); continue; }
+    if (b.x !== open.x || b.y !== open.y) win.setPosition(open.x, open.y);
+  }
 }
 
 // ---------- hover ----------
@@ -826,6 +1056,7 @@ function pollHover() {
     const inside = p.x >= b.x && p.x < b.x + b.width && p.y >= b.y && p.y < b.y + b.height;
     if (hoverSent.get(w) !== inside && !w.webContents.isLoading()) { hoverSent.set(w, inside); w.webContents.send("hover", inside); }
   }
+  edgeTick();
 }
 
 // ---------- dragging ----------
@@ -845,7 +1076,9 @@ function moveDrags() {
   const c = screen.getCursorScreenPoint();
   for (const [win, d] of drags) {
     if (win.isDestroyed() || Date.now() - d.started > 120000) { stopDrag(win); continue; }
-    const nx = d.x + c.x - d.cx, ny = d.y + c.y - d.cy;
+    let nx = d.x + c.x - d.cx, ny = d.y + c.y - d.cy;
+    const m = entryOf(win);
+    if (m) ({ x: nx, y: ny } = edgeDrag(m, nx, ny)); // snaps to an edge the pointer is near
     const [x, y] = win.getPosition();
     if (nx === x && ny === y) continue;
     // The Customize window gets its exact size each time: moving this see-through window alone made
@@ -861,7 +1094,14 @@ function stopDrag(win) {
   const m = d && !win.isDestroyed() ? entryOf(win) : null;
   if (m) {
     const [x, y] = win.getPosition();
-    if (x !== d.x || y !== d.y) { saveBounds(m.key, { x, y }); if (cardAttached(m) && placeOf(m.key) === "app" && s().attachMove && m.target) saveOffset(m); }
+    if (x !== d.x || y !== d.y) {
+      saveBounds(m.key, { x, y });
+      if (cardAttached(m) && placeOf(m.key) === "app" && s().attachMove && m.target) saveOffset(m);
+      // A floating card dropped while snapped to an edge docks there; dropped away from the edges,
+      // it floats freely.
+      if (placeOf(m.key) === "float" && !cardAttached(m) && (m.dragSide || edgeOf(m.key))) setEdge(m, m.dragSide);
+      m.dragSide = null;
+    }
   }
 }
 
@@ -1094,9 +1334,11 @@ function setSettings(patch, quiet) {
   }
   if ("launchAtLogin" in patch && process.platform === "win32") app.setLoginItemSettings({ openAtLogin: !!s().launchAtLogin, args: ["--hidden"] });
   if ("miniBounds" in patch && patch.miniBounds === null) {
-    store.set({ miniBoundsByApp: {}, attachOffsets: {} });
+    store.set({ miniBoundsByApp: {}, attachOffsets: {}, edgeHide: {} });
     for (const m of minis.values()) {
       if (m.win.isDestroyed()) continue;
+      clearInterval(m.slideTimer); m.slideTimer = null;
+      edgeReveal(m);
       const [w, h] = m.win.getSize();
       const p = defaultMiniBounds(m.key, w, h);
       m.win.setPosition(p.x, p.y);
@@ -1185,6 +1427,7 @@ function setupIpc() {
     keepOnScreen(win); // a panel that grew past the bottom (or edge) of the screen moves back up
   });
   handle("connect-browsers", () => connectBrowsers());
+  handle("remote-control-all", () => remoteControlAll());
   const keyOf = (e) => { const m = entryOf(BrowserWindow.fromWebContents(e.sender)); return m && m.key; };
   handle("mini-menu", (e) => { const k = keyOf(e); if (k) miniMenu(k); });
   handle("placement-menu", (e) => { const k = keyOf(e); if (k) placementMenu(k); });

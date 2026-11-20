@@ -113,6 +113,16 @@
     <p class="muted small">Updating downloads the new version from the project's GitHub releases, replaces the app's files and restarts it. Your settings stay. Update the browser extension separately.</p>
   </section>
 
+  <section aria-labelledby="h-remote">
+    <h2 id="h-remote">Claude sessions</h2>
+    <div class="line">
+      <button id="remoteAll" class="btn">Turn on Remote Control for all sessions</button>
+      <span id="remoteStatus" class="muted small" role="status"></span>
+    </div>
+    <label class="check"><input type="checkbox" id="remoteButton"> Show this button on the Claude card</label>
+    <p class="muted small">Opens each session in the Claude app's sidebar that doesn't have Remote Control yet and switches it on, then goes back to the session you were in. It never switches Remote Control off. Cloud sessions are skipped. Also in the tray menu and the Claude card's right-click menu.</p>
+  </section>
+
   <section aria-labelledby="h-general">
     <h2 id="h-general">General</h2>
     <label class="check"><input type="checkbox" id="launchAtLogin"> Start with Windows</label>

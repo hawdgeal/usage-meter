@@ -17,6 +17,8 @@
     rail: svg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/><rect x="16.5" y="13" width="3" height="5" rx="0.8"/>'),
   };
   const PLACE_TEXT = { float: "Floating", app: "On top of its app", dock: "In its app's sidebar", rail: "In Claude's session rail" };
+  // The Claude card's Remote Control button: a phone with signal waves.
+  const REMOTE_ICON = svg('<rect x="8" y="3" width="8" height="15" rx="1.5"/><path d="M11 15h2"/><path d="M4.5 8a7 7 0 0 0 0 6"/><path d="M19.5 8a7 7 0 0 1 0 6"/><path d="M12 21v0"/>');
   // Pressing on these never starts a drag.
   const INTERACTIVE = 'button,a[href],input,select,textarea,summary,label,[role="button"],[role="link"],[role="tab"],[role="menuitem"],[role="slider"],[role="checkbox"],[contenteditable]:not([contenteditable="false"]),dialog,[popover]';
 
@@ -57,8 +59,9 @@
     if (dockLook ? e.clientY >= r.top - 2 && e.clientY <= r.top + EDGE_V : e.clientY >= r.bottom - EDGE_V && e.clientY <= r.bottom + 2) return dockLook ? "top" : "bottom";
     if (dockLook) return null; // its width is the sidebar's
     if (e.clientY < r.top || e.clientY > r.bottom) return null;
-    if (e.clientX >= r.left - 2 && e.clientX <= r.left + EDGE) return "left";
-    if (e.clientX <= r.right + 2 && e.clientX >= r.right - EDGE) return "right";
+    // On a screen edge, the side against the edge doesn't resize.
+    if (edgeSide !== "left" && e.clientX >= r.left - 2 && e.clientX <= r.left + EDGE) return "left";
+    if (edgeSide !== "right" && e.clientX <= r.right + 2 && e.clientX >= r.right - EDGE) return "right";
     return null;
   }
   let resizingEdge = null;
@@ -142,6 +145,29 @@
   }
   if (C.onDock) C.onDock((look) => { dockLook = look && typeof look === "object" ? look : null; applyDock(); });
 
+  // ---------- docked on a screen edge ----------
+  // Flush against the edge: square corners and no border or shadow on that side, its border always
+  // shown on the others (not only on hover), and a grip of six dots (as on the Moonlight Switcher's
+  // bar) to drag it along the edge or to another one. The grip sits at the card's top, or at its
+  // bottom on the top edge.
+  let edgeSide = null, edgeStyle = null;
+  const EDGE_SIDES = ["left", "right", "top", "bottom"];
+  function applyEdge() {
+    if (!root) return;
+    if (!edgeStyle) { edgeStyle = document.createElement("style"); root.appendChild(edgeStyle); }
+    const s = edgeSide;
+    if (!s || dockLook) { edgeStyle.textContent = ""; return; }
+    const corners = { left: ["top-left", "bottom-left"], right: ["top-right", "bottom-right"], top: ["top-left", "top-right"], bottom: ["bottom-left", "bottom-right"] }[s];
+    const gripAt = s === "top" ? "bottom:3px" : "top:3px";
+    edgeStyle.textContent = `.panel-layout{padding:0 !important}
+      .card,.card:hover,.card.js-hover,.card:has(:focus-visible){margin:0 !important;box-shadow:none !important;border-style:solid !important;border-width:1px !important;border-color:var(--line) !important;border-${s}-width:0 !important;${corners.map((c) => `border-${c}-radius:0 !important;`).join("")}}
+      .card::after{content:"";position:absolute;left:50%;${gripAt};width:14px;height:9px;transform:translateX(-50%);pointer-events:none;
+        background:radial-gradient(circle,color-mix(in srgb,var(--fg) 45%,transparent) 1.4px,transparent 1.7px) 0 0/4.5px 4.5px;}
+      .card{cursor:grab}`;
+    fit();
+  }
+  if (C.onEdge) C.onEdge((side) => { edgeSide = EDGE_SIDES.includes(side) ? side : null; applyEdge(); });
+
   // ---------- dragging ----------
   function startDrag(e) {
     if (e.button !== 0 || !e.isPrimary) return;
@@ -186,7 +212,8 @@
     const style = document.createElement("style");
     // No text selection: dragging over text moves the panel. The placement button is hover-only like Refresh.
     style.textContent = `.card{-webkit-user-select:none;user-select:none;cursor:default}
-      @media(hover:hover){.card[data-hover-refresh]:not(.js-hover):not(:has(:focus-visible)) .head>.place{width:0;min-width:0;margin-right:-3px;overflow:hidden;}}`;
+      @media(hover:hover){.card[data-hover-refresh]:not(.js-hover):not(:has(:focus-visible)) .head>:is(.place,.remote){width:0;min-width:0;margin-right:-3px;overflow:hidden;}}
+      .head>.remote[hidden]{display:none}`;
     root.appendChild(style);
     if (E.edit) {
       // The Customize window: the extension's own Customize panel, opened right away. Its changes
@@ -234,11 +261,31 @@
       root.querySelector(".head").insertBefore(b, root.querySelector(".head>.refresh"));
       updatePlace();
     }
+    // Claude card: turn on Remote Control for all sessions (Settings → Claude sessions shows or hides it).
+    if (E.app === "claude" && C.remoteControlAll) {
+      const r = document.createElement("button");
+      r.className = "icon remote";
+      r.innerHTML = REMOTE_ICON;
+      const idle = "Turn on Remote Control for all Claude sessions";
+      r.title = idle;
+      r.setAttribute("aria-label", idle);
+      r.addEventListener("click", async () => {
+        if (r.disabled) return;
+        r.disabled = true;
+        r.title = "Turning on Remote Control… the Claude app switches between sessions for a moment.";
+        const summary = await C.remoteControlAll();
+        r.disabled = false;
+        r.title = `${summary || "Done."} · click to run again`;
+      });
+      root.querySelector(".head").insertBefore(r, root.querySelector(".head>.refresh"));
+      updateRemote();
+    }
     root.addEventListener("pointerdown", startDrag);
     // Right-click anywhere opens the panel menu.
     document.addEventListener("contextmenu", (e) => { e.preventDefault(); C.miniMenu(); });
     new ResizeObserver(fit).observe(host);
     applyDock();
+    applyEdge();
     return true;
   }
 
@@ -250,6 +297,11 @@
     if (b.innerHTML !== html) b.innerHTML = html;
     b.title = `${PLACE_TEXT[p] || PLACE_TEXT.float}${p === "float" ? (loose ? ", not kept on top" : ", kept on top") : ""} · click to change`;
     b.setAttribute("aria-label", `Where this card sits: ${b.title}`);
+  }
+
+  function updateRemote() {
+    const b = root && root.querySelector(".head>.remote");
+    if (b) b.hidden = !(E.state && E.state.settings && E.state.settings.remoteButton !== false);
   }
 
   function fit() {
@@ -266,6 +318,7 @@
     E.state = s;
     E.feed(false);
     updatePlace();
+    updateRemote();
     applyHeight();
   });
 

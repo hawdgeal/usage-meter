@@ -2,7 +2,7 @@
 "use strict";
 const $ = (id) => document.getElementById(id);
 let state = null;
-const CHECKS = ["followBrowsers", "followTerminals", "miniPanel", "attachMove", "launchAtLogin", "updateCheck"];
+const CHECKS = ["followBrowsers", "followTerminals", "miniPanel", "attachMove", "launchAtLogin", "updateCheck", "remoteButton"];
 const PLACES = [["float", "Floating"], ["app", "On top of its app"], ["dock", "In its app's sidebar"], ["rail", "In Claude's session rail"]];
 const SELECTS = ["mode", "cards", "cardsLayout"];
 const NAMES = { claude: "Claude", chatgpt: "ChatGPT", codex: "Codex" };
@@ -199,6 +199,13 @@ for (const row of document.querySelectorAll(".direct-row")) {
 }
 $("updateCheckNow").addEventListener("click", async () => { state = await window.companion.checkUpdate(); render(); });
 $("updateInstall").addEventListener("click", () => window.companion.installUpdate());
+$("remoteAll").addEventListener("click", async () => {
+  $("remoteAll").disabled = true;
+  $("remoteStatus").textContent = "Working… the Claude app will switch between sessions for a moment.";
+  const summary = await window.companion.remoteControlAll();
+  $("remoteAll").disabled = false;
+  $("remoteStatus").textContent = summary || "";
+});
 $("addId").addEventListener("click", () => {
   const id = $("idInput").value.trim().toLowerCase();
   const err = $("idError");
