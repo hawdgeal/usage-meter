@@ -66,7 +66,8 @@
   async function refreshUsage() {
     try {
       const raw = await getJson("/api/organizations/{org}/usage");
-      post("usage", { data: convert(raw, org && org.plan), raw, plan: org && org.plan, at: Date.now() });
+      const prepaid = await getJson("/api/organizations/{org}/prepaid/credits").catch(() => null);
+      post("usage", { data: convert(raw, org && org.plan, prepaid), raw, plan: org && org.plan, at: Date.now() });
     } catch (e) {
       post("usage-error", { message: String((e && e.message) || e), at: Date.now() });
     }

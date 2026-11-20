@@ -46,7 +46,15 @@
     return out;
   }
 
-  function convert(raw, plan) {
+  // Money left on the account (what you topped up), from /api/organizations/{org}/prepaid/credits.
+  function prepaidAmount(p) {
+    if (!p || typeof p !== "object") return null;
+    const c = p.balance && p.balance.credits;
+    if (c && num(c.amount_minor) != null) return num(c.amount_minor) / Math.pow(10, num(c.exponent) ?? 2);
+    return num(p.amount) == null ? null : num(p.amount) / 100;
+  }
+
+  function convert(raw, plan, prepaid) {
     const out = { plan_type: plan || null, source: "claude.ai" };
     if (!raw || typeof raw !== "object") return out;
 
@@ -71,17 +79,21 @@
       const cents = (v) => (num(v) == null ? null : num(v) / 100);
       const limit = cents(e.monthly_limit ?? e.monthly_credit_limit);
       const used = cents(e.used_credits ?? e.used);
+      const left = prepaidAmount(prepaid);
+      const money = (v) => (v == null ? null : Math.round(v * 100) / 100);
       out.credits = {
         enabled: e.is_enabled !== false,
         limit,
         used,
-        balance: limit != null && used != null ? Math.max(0, limit - used) : null,
+        // With a top-up, the money left is that balance (capped by what the monthly limit still allows).
+        balance: money(left != null ? (limit != null && used != null ? Math.min(Math.max(0, limit - used), left) : left) : limit != null && used != null ? Math.max(0, limit - used) : null),
+        prepaid: left,
         unlimited: e.is_enabled !== false && limit == null,
-        currency: typeof e.currency === "string" ? e.currency.toUpperCase() : null,
+        currency: typeof e.currency === "string" ? e.currency.toUpperCase() : prepaid && typeof prepaid.currency === "string" ? prepaid.currency.toUpperCase() : null,
       };
     }
     return out;
   }
 
-  globalThis.UsageMeterClaude = Object.freeze({ planName, convert });
+  globalThis.UsageMeterClaude = Object.freeze({ planName, convert, prepaidAmount });
 })();

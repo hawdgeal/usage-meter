@@ -258,16 +258,16 @@
     if (Array.isArray(extra)) {
       for (const x of extra) addWindows(x && (x.rate_limit || x), x && (x.limit_name || x.name || x.metered_feature || "Other"));
     }
-    let credits = null, creditLimit = null, currency = null;
+    let credits = null, creditLimit = null, currency = null, creditUsed = null;
     const c = u.credits;
     if (c && typeof c === "object") {
-      creditLimit = num(c.limit); currency = typeof c.currency === "string" && /^[A-Z]{3}$/.test(c.currency) ? c.currency : null;
+      creditLimit = num(c.limit); creditUsed = num(c.used); currency = typeof c.currency === "string" && /^[A-Z]{3}$/.test(c.currency) ? c.currency : null;
       if (c.enabled === false) { credits = "Off"; creditLimit = null; }
-      else if (c.unlimited) credits = "Unlimited";
+      else if (c.unlimited && num(c.balance) == null) credits = "Unlimited";
       else if (c.has_credits || num(c.balance)) credits = `${num(c.balance) ?? c.balance}`;
       else credits = "0";
     }
-    return { rows, credits, creditLimit, currency, plan: u.plan_type || state.plan };
+    return { rows, credits, creditLimit, creditUsed, currency, noLimit: !!(c && c.unlimited && c.enabled !== false), plan: u.plan_type || state.plan };
   }
 
   // ---------- messaging with page-hook ----------
@@ -675,6 +675,9 @@
     if(area!=='local')return;
     if(changes[OTHER.key]){otherSaved=changes[OTHER.key].newValue||null;if(settingsOpen&&state.settingsTab==='sync'&&!syncMessage)renderSyncPanel();}
     const change=changes[SITE.key];const value=change?.newValue;
+    // Newer model and feature limits fetched in the background (background.js): take them, so this
+    // tab doesn't save its older ones over them.
+    if(value&&value.models&&typeof value.models==='object'){let newer=false;for(const[n,m]of Object.entries(value.models))if(m&&(m.seenAt||0)>((state.models[n]||{}).seenAt||0)){state.models[n]=m;newer=true;}if(newer){render();if(settingsOpen){renderFeatureSettings();positionSettings();}}}
     if(!value||!value.appliedAt||value.appliedAt===state.appliedAt)return;
     const windowKeys=['settingsTab','settingsClosed','settingsPosition','settingsSize','creditReferencePending'];
     for(const k of Object.keys(defaultPreferences()))if(!windowKeys.includes(k)&&value[k]!==undefined)state[k]=structuredClone(value[k]);
@@ -1109,21 +1112,26 @@
       return `<div class="row plan-row" ${state.compact?`tabindex="0" role="group" aria-label="${esc(full)}"`:''}><div class="rl"><span>${esc(r.label)}</span><span class="v ${r.reached&&!state.showRemainingPlan?'at-limit':''}">${displayed==null?'—':Math.round(displayed)+(state.showRemainingPlan?'% left':'%')}</span></div>${displayed==null?'':bar(displayed,r.label,state.showRemainingPlan)}<div class="sub">${esc(caption)}</div>${state.compact&&state.showPlanTooltips?`<div class="plan-tip" aria-hidden="true">${esc(full)}</div>`:''}</div>`;
     }).join('')}</div>`:`<div class="empty">${state.error?'Usage unavailable. Try refreshing.':state.usageAt?'No plan limits reported.':'Waiting for usage…'}</div>`;
     if(state.showPaidReset)blocks.plan+=`<button class="add-credits paid-reset" title="Open ChatGPT Usage to review paid reset offers">Paid reset…</button>`;
-    const balance=num(parsed.credits),creditRef=parsed.creditLimit>0?parsed.creditLimit:state.creditReference;
+    const balance=num(parsed.credits);
+    // A top-up beyond the saved full balance becomes the new full balance, so the bar never passes 100%.
+    if(state.showCreditBar&&!(parsed.creditLimit>0)&&state.creditReference>0&&balance>state.creditReference){state.creditReference=Number(balance.toFixed(2))||balance;persist(false);syncCreditBarSettings();}
+    const creditRef=parsed.creditLimit>0?parsed.creditLimit:state.creditReference;
     const money=n=>formatMoney(n,parsed.currency);
     if(state.showCreditBar&&state.creditReferencePending&&!(parsed.creditLimit>0)&&balance>0){state.creditReference=Number(balance.toFixed(2))||balance;state.creditReferencePending=false;persist(false);syncCreditBarSettings();}
-    const creditText=balance!=null?money(balance):parsed.credits??'—';
+    // No monthly limit (Claude): what's been spent this month is the figure to show.
+    const spentNoLimit=parsed.credits==='Unlimited'&&parsed.creditUsed!=null;
+    const creditText=balance!=null?money(balance):spentNoLimit?money(parsed.creditUsed):parsed.credits??'—';
     const balanceInTitle=state.creditBalanceInTitle&&state.showCreditBar&&!state.showCreditBalance&&balance!=null&&creditRef>0;
     let creditMeter='';
     if(state.showCreditBar){
       if(balance!=null&&creditRef>0){
         const remaining=Math.max(0,balance/creditRef*100),percentage=state.showRemainingPlan?remaining:Math.max(0,100-remaining),text=new Intl.NumberFormat(undefined,{maximumFractionDigits:1}).format(percentage);
-        creditMeter=`<div class="credit-meter ${state.showCreditBalance||balanceInTitle?'':'has-inline-balance'}"><div class="rl"><span>${state.showRemainingPlan?'Remaining':'Used'}</span><span class="v"><span class="credit-percentage">${text}%</span>${state.showCreditBalance||balanceInTitle?'':`<span class="credit-meter-balance" role="group" aria-label="Available balance">${esc(creditText)}</span>`}</span></div>${bar(Math.min(100,percentage),labels.credits,state.showRemainingPlan)}<div class="sub">${parsed.creditLimit>0?`${money(creditRef-balance)} used of ${money(creditRef)} monthly limit`:`of ${format(creditRef)} credits`}</div></div>`;
+        creditMeter=`<div class="credit-meter ${state.showCreditBalance||balanceInTitle?'':'has-inline-balance'}"><div class="rl"><span>${state.showRemainingPlan?'Remaining':'Used'}</span><span class="v"><span class="credit-percentage">${text}%</span>${state.showCreditBalance||balanceInTitle?'':`<span class="credit-meter-balance" role="group" aria-label="Available balance">${esc(creditText)}</span>`}</span></div>${bar(Math.min(100,percentage),labels.credits,state.showRemainingPlan)}<div class="sub">${parsed.creditLimit>0?`${money(creditRef-balance)} used of ${money(creditRef)} monthly limit`:(IS_CLAUDE?`of ${money(creditRef)} balance`:`of ${format(creditRef)} credits`)}</div></div>`;
       }else if(balance!=null)creditMeter=`<div class="sub credit-meter">Set a ${T('full balance','fallback limit')} in settings to show a percentage.</div>`;
       else if(parsed.credits!=='Unlimited'&&parsed.credits!=='Off')creditMeter=`<div class="sub credit-meter">${T('Balance unavailable.','Extra usage not reported.')}</div>`;
     }
     const hasCreditPercentage=state.showCreditBar&&balance!=null&&creditRef>0;
-    const creditBalance=!hasCreditPercentage||state.showCreditBalance?`<div class="credit-balance"><div class="credit">${esc(creditText)}</div><div class="sub">${parsed.credits==null?T('No credit balance reported','Extra usage not reported'):parsed.credits==='Off'?'Extra usage is turned off':parsed.credits==='Unlimited'&&IS_CLAUDE?'No monthly limit':parsed.creditLimit>0?'Left this month':'Available balance'}</div></div>`:'';
+    const creditBalance=!hasCreditPercentage||state.showCreditBalance?`<div class="credit-balance"><div class="credit">${esc(creditText)}</div><div class="sub">${parsed.credits==null?T('No credit balance reported','Extra usage not reported'):parsed.credits==='Off'?'Extra usage is turned off':spentNoLimit?'Spent this month · no monthly limit':parsed.noLimit&&balance!=null?(parsed.creditUsed!=null?`Left · ${money(parsed.creditUsed)} spent this month`:'Left · no monthly limit'):parsed.credits==='Unlimited'&&IS_CLAUDE?'No monthly limit':parsed.creditLimit>0?'Left this month':'Available balance'}</div></div>`:'';
     const addCredits=state.showAddCredits?'<a class="add-credits" href="'+esc(creditPurchaseUrl())+'" target="_blank" rel="noopener noreferrer"><svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M3 8h10"/></svg>'+T('Add credits','Manage')+'</a>':'';
     blocks.credits=creditBalance+(state.showCreditBar?`<div class="credit-actions">${creditMeter}${addCredits}</div>`:addCredits);
     const models=Object.entries(state.models).filter(([name])=>state.hiddenFeatures[name]!==true).sort((a,b)=>(b[1].seenAt||0)-(a[1].seenAt||0)).slice(0,12);

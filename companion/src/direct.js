@@ -12,13 +12,16 @@ const SITES = {
   chatgpt: { host: "chatgpt.com", origin: "https://chatgpt.com", login: "https://chatgpt.com/auth/login" },
 };
 
-// claude-usage.js (shared with the extension) turns Claude's answer into what the panel draws.
+// Files shared with the extension: claude-usage.js turns Claude's answer into what the panel draws,
+// chatgpt-limits.js reads ChatGPT's per-feature limits.
+const shared = (file) => require(app.isPackaged ? path.join(process.resourcesPath, file) : path.join(__dirname, "..", "..", file));
 function claudeConverter() {
-  if (!globalThis.UsageMeterClaude) {
-    const file = app.isPackaged ? path.join(process.resourcesPath, "claude-usage.js") : path.join(__dirname, "..", "..", "claude-usage.js");
-    require(file);
-  }
+  if (!globalThis.UsageMeterClaude) shared("claude-usage.js");
   return globalThis.UsageMeterClaude;
+}
+function chatgptLimits() {
+  if (!globalThis.UsageMeterChatGPTLimits) shared("chatgpt-limits.js");
+  return globalThis.UsageMeterChatGPTLimits;
 }
 
 const sessionOf = (site) => session.fromPartition(`persist:login-${site}`);
@@ -50,8 +53,9 @@ const FETCHERS = {
     const org = list.find((o) => o && Array.isArray(o.capabilities) && o.capabilities.includes("chat")) || list[0];
     if (!org || !org.uuid) throw new SignInError();
     const raw = await getJson(ses, `https://claude.ai/api/organizations/${encodeURIComponent(org.uuid)}/usage`);
+    const prepaid = await getJson(ses, `https://claude.ai/api/organizations/${encodeURIComponent(org.uuid)}/prepaid/credits`).catch(() => null);
     const plan = C.planName(org);
-    return { data: C.convert(raw, plan), plan };
+    return { data: C.convert(raw, plan, prepaid), plan };
   },
   async chatgpt(ses) {
     const s = await getJson(ses, "https://chatgpt.com/api/auth/session");
@@ -60,7 +64,13 @@ const FETCHERS = {
     const accountId = s.account && (s.account.id || s.account.account_id);
     if (accountId) headers["ChatGPT-Account-Id"] = accountId;
     const data = await getJson(ses, "https://chatgpt.com/backend-api/wham/usage", { headers });
-    return { data, plan: (s.account && (s.account.planType || s.account.plan_type)) || null };
+    // Models & features limits, as ChatGPT's page gets them when it loads. Optional.
+    let limits = null;
+    try {
+      const L = chatgptLimits();
+      limits = L.fromInit(await getJson(ses, L.INIT_URL, { method: "POST", headers: { ...headers, "Content-Type": "application/json" }, body: L.initBody() }));
+    } catch (_) { /* usage still counts */ }
+    return { data, plan: (s.account && (s.account.planType || s.account.plan_type)) || null, limits };
   },
 };
 
@@ -104,4 +114,4 @@ async function signOut(site) {
   await prepare(site).clearStorageData();
 }
 
-module.exports = { SITES, fetchUsage, signIn, signOut };
+module.exports = { SITES, fetchUsage, signIn, signOut, chatgptLimits };

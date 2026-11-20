@@ -138,6 +138,7 @@ function onBridgeMessage(msg, host) {
     if (!msg.settings || typeof msg.settings !== "object") return;
     // With the companion's own look, the browser's changes don't redraw the cards.
     const models = JSON.stringify((store.ext[site] || {}).models || null);
+    if (msg.settings.models || (store.ext[site] || {}).models) msg.settings = { ...msg.settings, models: newerModels((store.ext[site] || {}).models, msg.settings.models) };
     if (store.setExt(site, msg.settings)) { if (!ownLook() || !store.own[site]) prefsVersion[site]++; changed(); }
     // New model and feature limits only: the cards take them without redrawing (see embed.js feed).
     else if (JSON.stringify(msg.settings.models || null) !== models) changed();
@@ -210,6 +211,20 @@ function applySynced(data, at) {
   changed();
 }
 
+// Models & features limits from the companion's own login, kept with the extension's settings for
+// that site (where the browser's arrive), so the cards draw them the same way.
+function applyLimits(site, items) {
+  const ext = store.ext[site] || {};
+  store.setExt(site, { ...ext, models: direct.chatgptLimits().merge(ext.models, items, Date.now()) });
+  changed();
+}
+// Per limit, the newer of two readings (the browser's and the companion's own).
+function newerModels(a, b) {
+  const out = { ...(a || {}) };
+  for (const [name, m] of Object.entries(b || {})) if (m && (!out[name] || (m.seenAt || 0) >= (out[name].seenAt || 0))) out[name] = m;
+  return out;
+}
+
 // ---------- the companion's own login ----------
 // Once you signed in in the companion (Settings → Sign in here), it fetches usage itself when no
 // browser reported it for a while, so the browser doesn't need to be running.
@@ -222,8 +237,9 @@ async function directFetch(site, force) {
   if (!force && (fresh(site, "Companion") || Date.now() < (d.backoff || 0))) return;
   d.busy = true;
   try {
-    const { data, plan } = await direct.fetchUsage(site);
+    const { data, plan, limits } = await direct.fetchUsage(site);
     Object.assign(d, { at: Date.now(), error: null, backoff: 0 });
+    if (limits && limits.length) applyLimits(site, limits);
     applyUsage(site, { type: "usage", data, plan, at: Date.now(), source: "companion" }, "Companion");
   } catch (e) {
     const host = direct.SITES[site].host;

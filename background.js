@@ -6,6 +6,7 @@
 // That part stays idle unless the companion is installed: without its host, connecting fails
 // quietly and is retried once a minute.
 if (typeof importScripts === "function" && !globalThis.UsageMeterClaude) importScripts("claude-usage.js");
+if (typeof importScripts === "function" && !globalThis.UsageMeterChatGPTLimits) importScripts("chatgpt-limits.js");
 
 const api = globalThis.browser ?? chrome;
 const icon = (site) => ({ 16: `icons/${site}-16.png`, 48: `icons/${site}-48.png`, 128: `icons/${site}-128.png` });
@@ -117,8 +118,9 @@ const companion = (() => {
       const org = list.find((o) => o && Array.isArray(o.capabilities) && o.capabilities.includes("chat")) || list[0];
       if (!org || !org.uuid) throw Object.assign(new Error("Not signed in"), { signin: true });
       const raw = await getJson(`https://claude.ai/api/organizations/${encodeURIComponent(org.uuid)}/usage`);
+      const prepaid = await getJson(`https://claude.ai/api/organizations/${encodeURIComponent(org.uuid)}/prepaid/credits`).catch(() => null);
       const plan = C.planName(org);
-      return { data: C.convert(raw, plan), plan };
+      return { data: C.convert(raw, plan, prepaid), plan };
     },
     async chatgpt() {
       const s = await getJson("https://chatgpt.com/api/auth/session");
@@ -150,10 +152,39 @@ const companion = (() => {
     }
   }
 
+  // ChatGPT's per-feature limits (Models & features). Its pages only get them when they load, so
+  // while the companion runs they're fetched every few minutes and stored with the ChatGPT panel's
+  // settings, which go to the companion (see storage.onChanged below) and to open ChatGPT tabs.
+  const LIMITS_EVERY_MS = 3 * 60 * 1000;
+  let limitsAt = 0, limitsBusy = false;
+  async function fetchLimits() {
+    const L = globalThis.UsageMeterChatGPTLimits;
+    if (limitsBusy || !L) return;
+    limitsBusy = true;
+    limitsAt = Date.now();
+    try {
+      const s = await getJson("https://chatgpt.com/api/auth/session");
+      if (!s || !s.accessToken) return;
+      const headers = { Authorization: `Bearer ${s.accessToken}`, "Content-Type": "application/json" };
+      const accountId = s.account && (s.account.id || s.account.account_id);
+      if (accountId) headers["ChatGPT-Account-Id"] = accountId;
+      const items = L.fromInit(await getJson(L.INIT_URL, { method: "POST", headers, body: L.initBody() }));
+      if (!items.length) return;
+      const key = SETTINGS_KEYS.chatgpt;
+      const cur = (await api.storage.local.get(key))[key] || {};
+      await api.storage.local.set({ [key]: { ...cur, models: L.merge(cur.models, items, Date.now()) } });
+    } catch (_) {
+      /* signed out or ChatGPT unreachable: try again next time */
+    } finally {
+      limitsBusy = false;
+    }
+  }
+
   // force: the companion asked (Refresh button), so ignore staleness and error back-off.
   function refresh(sites, force) {
     if (!port || !companionUp) return;
     const now = Date.now();
+    if (sites.includes("chatgpt") && (force || now - limitsAt > LIMITS_EVERY_MS)) fetchLimits();
     for (const site of sites) {
       if (now - (lastFetch[site] || 0) < MIN_GAP_MS) continue;
       if (!force && (backoffUntil[site] || 0) > now) continue;

@@ -212,3 +212,18 @@ test("browser sync: restores from the companion, syncs without per-computer part
   assert.ok(data && data.data.settings.mode === "claude" && data.at === 50);
   assert.ok(!b.ports[0].sent.some((m) => m.type === "settings-missing"), "nothing to restore: sync had it");
 });
+
+test("ChatGPT's Models & features limits are fetched in the background and stored for the companion", async () => {
+  const responses = {
+    "https://chatgpt.com/api/auth/session": { body: { accessToken: "t", account: { id: "a" } } },
+    "https://chatgpt.com/backend-api/conversation/init": { body: { limits_progress: [{ feature_name: "image_gen", remaining: 117, reset_after: "2099-01-01T00:00:00Z" }] } },
+  };
+  const b = makeBrowser({ responses, saved: { gptu: { theme: "dark" } } });
+  await tick();
+  b.ports[0].onMessage.fire({ type: "companion", connected: true });
+  await tick(); await tick();
+  const init = b.fetches.find((f) => f.url.endsWith("/conversation/init"));
+  assert.ok(init && init.init.method === "POST", "asks the way ChatGPT's page does");
+  assert.strictEqual(b.saved.gptu.models.image_gen.remaining, 117);
+  assert.strictEqual(b.saved.gptu.theme, "dark", "the panel's settings stay");
+});

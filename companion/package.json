@@ -1,7 +1,7 @@
 {
   "name": "usage-meter-companion",
   "productName": "Usage Meter Companion",
-  "version": "0.2.20",
+  "version": "0.2.21",
   "description": "Windows tray companion for the Usage Meter extension: shows Claude and ChatGPT / Codex usage next to the desktop apps.",
   "main": "src/main.js",
   "private": true,
@@ -75,6 +75,10 @@
       {
         "from": "../claude-usage.js",
         "to": "claude-usage.js"
+      },
+      {
+        "from": "../chatgpt-limits.js",
+        "to": "chatgpt-limits.js"
       }
     ]
   },
